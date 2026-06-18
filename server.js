@@ -1,0 +1,2103 @@
+// Product Source Search Engine - Backend
+// Calls Google Custom Search API and classifies each result as
+// "manufacturer" or "distributor" using keyword + domain heuristics.
+// Falls back to bundled demo data automatically if no API key is configured,
+// so the app is usable immediately and upgrades to live results once a key is added.
+
+const express = require('express');
+const path = require('path');
+const cheerio = require('cheerio');
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_CX     = process.env.GOOGLE_CX;
+const BRAVE_API_KEY = process.env.BRAVE_API_KEY;
+const OPENAI_KEY    = process.env.OPENAI_API_KEY  || '';
+const GEMINI_KEY    = process.env.GEMINI_API_KEY  || '';
+const LIVE_MODE     = Boolean((GOOGLE_API_KEY && GOOGLE_CX) || BRAVE_API_KEY);
+const AI_PROVIDER   = OPENAI_KEY ? 'openai' : GEMINI_KEY ? 'gemini' : null;
+
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ---- Classification heuristics ----
+const MANUFACTURER_HINTS = [
+  'manufacturer', 'manufacturing', 'factory', 'factories', 'oem', 'odm', 'ems',
+  'producer', 'production', 'production plant', 'production facility', 'production line',
+  'mill', 'mills', 'fabricator', 'fabrication', 'plant', 'foundry', 'forge', 'casting',
+  'made in', 'we manufacture', 'our factory', 'our plant', 'mfg', 'mfr',
+  'iso 9001', 'iso certified', 'gmp certified', 'ce certified',
+  'exporter', 'direct from factory', 'factory direct', 'factory price',
+  'injection molding', 'stamping', 'machining', 'assembly line', 'production capacity',
+  'r&d', 'research and development', 'patented', 'own brand', 'private label',
+  'since 19', 'since 20', 'established in', 'founded in', 'years of experience',
+  'metric ton', 'metric tons', 'annual capacity', 'monthly output'
+];
+
+const DISTRIBUTOR_HINTS = [
+  'distributor', 'distribution', 'wholesaler', 'wholesale',
+  'reseller', 'trading co', 'trading company', 'trading ltd', 'trade co',
+  'stockist', 'sourcing agent', 'sourcing company', 'procurement agent',
+  'authorized dealer', 'authorized distributor', 'dealer network',
+  'multi-brand', 'multi brand', 'multiple brands', 'various brands', 'brands available',
+  'in stock', 'stock available', 'ready stock', 'ex-stock', 'surplus stock',
+  'minimum order', 'bulk order', 'bulk supply', 'bulk discount',
+  'same day dispatch', 'next day delivery',
+  'alibaba', 'made-in-china', 'indiamart', 'global sources', 'tradeindia',
+  'buy online', 'add to cart', 'shop now'
+  // Note: 'supplier', 'suppliers', 'export', 'import' removed — too common on manufacturer pages
+];
+
+const MANUFACTURER_URL_HINTS = [
+  '/about-us', '/about', '/our-factory', '/manufacturing', '/production', '/facility',
+  '/products/', '/product/', '/catalog', '/capabilities'
+];
+
+const DOMAIN_HINTS = {
+  // These directories specifically focus on verifying/listing manufacturers
+  manufacturer: [
+    'thomasnet.com', 'globalspec.com', 'manufacturers.com', 'mfgpages.com'
+  ],
+  // B2B marketplaces and distributor/trading platforms
+  distributor: [
+    'alibaba.com', 'aliexpress.com', 'indiamart.com', 'made-in-china.com',
+    'tradeindia.com', 'ec21.com', 'amazon.com', 'ebay.com', 'globaltrademart.com',
+    'tradekey.com', 'exportersindia.com', 'dhgate.com', 'global-sources.com',
+    'goldsupplier.com', '1688.com', 'diytrade.com',
+    // B2B directories (list both — treat as neutral/distributor-leaning)
+    'europages.com', 'europages.co.uk', 'kompass.com', 'directindustry.com'
+  ]
+};
+
+// Domains that are noise for supplier search — news, wikis, marketplaces we don't want
+const NOISE_DOMAINS = [
+  'facebook.com', 'instagram.com', 'twitter.com', 'x.com', 'tiktok.com',
+  'youtube.com', 'pinterest.com', 'reddit.com', 'quora.com',
+  'wikipedia.org', 'wikihow.com', 'wikidata.org',
+  'amazon.com', 'ebay.com', 'etsy.com',
+  'yelp.com', 'tripadvisor.com', 'yellowpages.com',
+  'trustpilot.com', 'glassdoor.com',
+  'indeed.com', 'linkedin.com', 'monster.com',
+  'news.google.com', 'reuters.com', 'bloomberg.com', 'bbc.com', 'cnn.com',
+  'sciencedirect.com', 'researchgate.net', 'scholar.google.com'
+];
+
+// Directory / data-aggregator domains. They host profiles for MANY companies, so an
+// address scraped from them often belongs to a different entity than the one searched —
+// we must NOT present their scraped street addresses as authoritative.
+const AGGREGATOR_DOMAINS = [
+  'zoominfo.com', 'crunchbase.com', 'bloomberg.com', 'dnb.com', 'dunsregistered.com',
+  'rocketreach.co', 'theorg.com', 'comparably.com', 'globaldata.com', 'craft.co',
+  'cbinsights.com', 'pitchbook.com', 'owler.com', 'apollo.io', 'leadiq.com',
+  'sgpbusiness.com', 'opencorporates.com', 'importer.usaypage.com', 'addressadda.com',
+  'clodura.ai', 'signalhire.com', 'lusha.com', 'kompass.com', 'europages.com',
+  'tradeindia.com', 'indiamart.com', 'exportersindia.com', 'justdial.com',
+  'startupnationcentral.org', 'tofler.in', 'zaubacorp.com'
+];
+function isAggregatorHost(host = '') {
+  const h = host.toLowerCase().replace(/^www\./, '');
+  return AGGREGATOR_DOMAINS.some(d => h === d || h.endsWith('.' + d) || h.includes(d));
+}
+
+// Strip common legal/entity suffixes so "Erez Pte Ltd" → "Erez" for brand matching & queries.
+function stripLegalSuffix(name = '') {
+  return name
+    .replace(/[.,]/g, ' ')
+    .replace(/\b(pte|pvt|priv|private|public|co|company|corp|corporation|inc|incorporated|ltd|limited|llc|llp|lp|plc|gmbh|ag|sa|srl|bv|nv|oy|ab|as|sas|sdn|bhd|kk|pty|sl|spa|s\.?p\.?a)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function classify(title, snippet, displayLink = '', url = '') {
+  const titleLc   = title.toLowerCase();
+  const snippetLc = snippet.toLowerCase();
+  const host      = displayLink.toLowerCase().replace(/^www\./, '');
+  const urlLc     = url.toLowerCase();
+
+  // Title signals carry 3× more weight than snippet signals
+  const titleText   = titleLc;
+  const snippetText = snippetLc;
+
+  let manuScore = 0;
+  let distScore = 0;
+
+  for (const k of MANUFACTURER_HINTS) {
+    const w = k.length > 8 ? 2 : 1;
+    if (titleText.includes(k))   manuScore += w * 3;
+    if (snippetText.includes(k)) manuScore += w;
+  }
+  for (const k of DISTRIBUTOR_HINTS) {
+    const w = k.length > 8 ? 2 : 1;
+    if (titleText.includes(k))   distScore += w * 3;
+    if (snippetText.includes(k)) distScore += w;
+  }
+
+  // Domain name carries very strong signal
+  if (/manufactur|factory|industri|production|mfg|mfr|mill|fabricat|forge|casting/.test(host)) manuScore += 12;
+  if (/distribut|wholesale|trading|import|export|supplier|supply|sourcing/.test(host))          distScore += 12;
+
+  // Known manufacturer-focused directories
+  if (DOMAIN_HINTS.manufacturer.some(d => host.includes(d))) manuScore += 6;
+  // B2B marketplace / distributor sites
+  if (DOMAIN_HINTS.distributor.some(d => host.includes(d)))  distScore += 8;
+
+  // URL path signals (manufacturer site structure)
+  if (MANUFACTURER_URL_HINTS.some(p => urlLc.includes(p))) manuScore += 4;
+
+  // B2B marketplace listing pages: almost always distributor-type
+  if (/alibaba|indiamart|made-in-china|tradeindia|ec21|dhgate|global.?sources|tradekey|goldsupplier/.test(host)) {
+    distScore += 10;
+  }
+
+  // ccTLD signals: .cn = Chinese manufacturer/exporter is common; .co.in = India supplier
+  if (host.endsWith('.cn') || host.includes('.com.cn')) manuScore += 4;
+
+  // Strong title phrases (regex for higher precision)
+  if (/\b(manufacturer|manufactures|manufacturing|factory|oem|odm|foundry|mill|forge)\b/.test(titleLc)) manuScore += 8;
+  if (/\b(distributor|distributes|wholesale|wholesaler|reseller|stockist|trading co)\b/.test(titleLc))   distScore += 8;
+
+  // Page contains contact/quote call-to-action — leans manufacturer or distributor
+  if (/request.{0,10}quote|send.{0,10}inquiry|rfq|get.{0,8}price/i.test(snippetText)) manuScore += 3;
+  if (/in.?stock|ready.?stock|same.?day.?dispatch|bulk.?discount/i.test(snippetText))  distScore += 4;
+
+  // If both scores are zero — genuinely cannot determine
+  if (manuScore === 0 && distScore === 0) {
+    return { type: 'unclassified', confidence: 0 };
+  }
+
+  const total = manuScore + distScore;
+  const type  = manuScore >= distScore ? 'manufacturer' : 'distributor';
+  const margin = Math.max(manuScore, distScore) / Math.max(total, 1); // 0.5–1.0
+
+  // Confidence: starts at 50%, scaled by how decisive the margin is.
+  // A margin of 0.5 (tie) → 50%. A margin of 1.0 (all on one side) → 97%.
+  const confidence = Math.min(97, Math.round(50 + margin * 47));
+
+  // If confidence is below 60%, still classify but mark it weaker
+  return { type, confidence };
+}
+
+// ---- Demo data fallback (used when no API key is configured) ----
+// Includes sample contact details (phone/email/address/key people) so the
+// "company details" feature has something to display without needing to
+// scrape example.com placeholder links.
+const DEMO_DATA = [
+  {keywords:["led","bulb","light","lighting"], country:"China", title:"BrightCore Industries", link:"https://example.com/brightcore", displayLink:"brightcore-industries.example.com", snippet:"Factory-direct manufacturer of LED bulbs and lighting components. OEM/ODM, ISO 9001 certified.", type:"manufacturer", confidence:95,
+    phone:"+86 755 1234 5678", whatsapp:"+86 138 0013 8000", email:"sales@brightcore-industries.example.com", address:"88 Bao'an Road, Shenzhen, Guangdong, China", keyPeople:[{name:"Li Wei", title:"CEO"},{name:"Zhang Min", title:"Sales Director"}],
+    employeeCount:"320", companySize:"Large (250+ employees)", founded:"2008"},
+  {keywords:["led","bulb","light","lighting"], country:"India", title:"Volt & Glow Supply Co.", link:"https://example.com/voltglow", displayLink:"voltglow.example.com", snippet:"Wholesale distributor stocking LED bulbs from multiple manufacturers. Fast shipping, multi-brand.", type:"distributor", confidence:92,
+    phone:"+91 22 4001 7766", whatsapp:"+91 98765 43210", email:"info@voltglow.example.com", address:"14 Andheri Industrial Estate, Mumbai, Maharashtra, India", keyPeople:[{name:"Raj Patel", title:"Founder"},{name:"Anita Sharma", title:"Operations Manager"}],
+    employeeCount:"45", companySize:"Small (under 50 employees)", founded:"2014"},
+  {keywords:["plastic","bottle","packaging"], country:"USA", title:"PolyForm Manufacturing", link:"https://example.com/polyform", displayLink:"polyform.example.com", snippet:"Injection-molding manufacturer of plastic bottles and containers. Custom molds, food-grade.", type:"manufacturer", confidence:96,
+    phone:"+1 713 555 0148", email:"contact@polyform.example.com", address:"4500 Industrial Pkwy, Houston, TX 77029, USA", keyPeople:[{name:"Mark Reynolds", title:"President"},{name:"Susan Lee", title:"Plant Manager"}],
+    employeeCount:"180", companySize:"Medium (50–250 employees)", founded:"1991"},
+  {keywords:["plastic","bottle","packaging"], country:"Netherlands", title:"PackLine Distributors", link:"https://example.com/packline", displayLink:"packline.example.com", snippet:"Regional distributor of packaging materials including plastic bottles. Warehouse stock, EU logistics.", type:"distributor", confidence:90,
+    phone:"+31 10 234 5678", email:"sales@packline.example.com", address:"Maashaven NZ 12, 3016 Rotterdam, Netherlands", keyPeople:[{name:"Joost Bakker", title:"Managing Director"}],
+    employeeCount:"38", companySize:"Small (under 50 employees)", founded:"2003"},
+  {keywords:["steel","pipe","metal"], country:"USA", title:"IronGate Steel Works", link:"https://example.com/irongate", displayLink:"irongate.example.com", snippet:"Steel pipe and tube manufacturer with rolling mill facilities. ASTM certified, custom diameters.", type:"manufacturer", confidence:94,
+    phone:"+1 412 555 0199", email:"info@irongate.example.com", address:"2200 Steel Mill Rd, Pittsburgh, PA 15222, USA", keyPeople:[{name:"Robert Hayes", title:"CEO"},{name:"Diane Foster", title:"VP Operations"}],
+    employeeCount:"540", companySize:"Large (250+ employees)", founded:"1967"},
+  {keywords:["steel","pipe","metal"], country:"UAE", title:"MetalFlow Trading Co.", link:"https://example.com/metalflow", displayLink:"metalflow.example.com", snippet:"Distributor supplying steel pipes to construction and industrial clients. JIT delivery, credit terms.", type:"distributor", confidence:91,
+    phone:"+971 4 567 8901", whatsapp:"+971 50 123 4567", email:"sales@metalflow.example.com", address:"Jebel Ali Free Zone, Dubai, UAE", keyPeople:[{name:"Omar Al Falasi", title:"General Manager"}],
+    employeeCount:"60", companySize:"Medium (50–250 employees)", founded:"2011"},
+  {keywords:["textile","fabric","cloth"], country:"Bangladesh", title:"WeaveTech Mills", link:"https://example.com/weavetech", displayLink:"weavetech.example.com", snippet:"Textile mill producing cotton and synthetic fabrics at scale. Private label, GOTS certified.", type:"manufacturer", confidence:93,
+    phone:"+880 2 9876 5432", email:"export@weavetech.example.com", address:"Tongi Industrial Area, Dhaka, Bangladesh", keyPeople:[{name:"Kamal Hossain", title:"Managing Director"}],
+    employeeCount:"1200", companySize:"Large (250+ employees)", founded:"1985"},
+  {keywords:["textile","fabric","cloth"], country:"Turkey", title:"Fabric Hub Distribution", link:"https://example.com/fabrichub", displayLink:"fabrichub.example.com", snippet:"Distributes fabrics sourced from various mills to garment makers. Small MOQ, sample swatches.", type:"distributor", confidence:89,
+    phone:"+90 212 345 6789", whatsapp:"+90 532 123 4567", email:"info@fabrichub.example.com", address:"Merter Tekstil Merkezi, Istanbul, Turkey", keyPeople:[{name:"Elif Yildiz", title:"Owner"}],
+    employeeCount:"22", companySize:"Small (under 50 employees)", founded:"2016"},
+  {keywords:["electronics","circuit","pcb","chip"], country:"Taiwan", title:"CircuitForge Electronics", link:"https://example.com/circuitforge", displayLink:"circuitforge.example.com", snippet:"PCB and electronic component manufacturer with SMT assembly lines. RoHS compliant.", type:"manufacturer", confidence:95,
+    phone:"+886 2 8765 4321", email:"sales@circuitforge.example.com", address:"Hsinchu Science Park, Taipei, Taiwan", keyPeople:[{name:"Chen Yu-Ting", title:"CTO"},{name:"Wang Jia-Hao", title:"Sales Manager"}],
+    employeeCount:"410", companySize:"Large (250+ employees)", founded:"1999"},
+  {keywords:["electronics","circuit","pcb","chip"], country:"USA", title:"ChipChain Distributors", link:"https://example.com/chipchain", displayLink:"chipchain.example.com", snippet:"Authorized distributor of electronic components from major brands. Same-day quote.", type:"distributor", confidence:92,
+    phone:"+1 408 555 0172", email:"quotes@chipchain.example.com", address:"1200 Component Way, San Jose, CA 95131, USA", keyPeople:[{name:"Kevin Tran", title:"VP Sales"}],
+    employeeCount:"95", companySize:"Medium (50–250 employees)", founded:"2006"},
+  {keywords:["furniture","wood","chair","table"], country:"Vietnam", title:"OakCraft Manufacturing", link:"https://example.com/oakcraft", displayLink:"oakcraft.example.com", snippet:"Solid wood furniture manufacturer with in-house carpentry. Custom design, FSC certified wood.", type:"manufacturer", confidence:94,
+    phone:"+84 28 3812 3456", email:"export@oakcraft.example.com", address:"Binh Tan Industrial Zone, Ho Chi Minh City, Vietnam", keyPeople:[{name:"Nguyen Van Minh", title:"Founder"}],
+    employeeCount:"275", companySize:"Large (250+ employees)", founded:"2009"},
+  {keywords:["furniture","wood","chair","table"], country:"Poland", title:"HomeStock Furniture Distribution", link:"https://example.com/homestock", displayLink:"homestock.example.com", snippet:"Distributes furniture from multiple factories to retail stores. Showroom network, bulk discounts.", type:"distributor", confidence:90,
+    phone:"+48 22 123 4567", email:"biuro@homestock.example.com", address:"ul. Przemyslowa 8, 00-001 Warsaw, Poland", keyPeople:[{name:"Pawel Kowalski", title:"Managing Director"}],
+    employeeCount:"30", companySize:"Small (under 50 employees)", founded:"2012"},
+  {keywords:["pharma","medicine","tablet","drug"], country:"India", title:"MediSynth Labs", link:"https://example.com/medisynth", displayLink:"medisynth.example.com", snippet:"Pharmaceutical manufacturer producing tablets and capsules under GMP.", type:"manufacturer", confidence:97,
+    phone:"+91 40 6789 1234", email:"info@medisynth.example.com", address:"Genome Valley, Hyderabad, Telangana, India", keyPeople:[{name:"Dr. Suresh Rao", title:"Chairman"},{name:"Priya Nair", title:"Head of Regulatory Affairs"}],
+    employeeCount:"850", companySize:"Large (250+ employees)", founded:"1996"},
+  {keywords:["pharma","medicine","tablet","drug"], country:"Germany", title:"PharmaLink Distribution", link:"https://example.com/pharmalink", displayLink:"pharmalink.example.com", snippet:"Pharmaceutical distributor supplying pharmacies and hospitals. Cold chain logistics.", type:"distributor", confidence:93,
+    phone:"+49 69 1234 5678", email:"kontakt@pharmalink.example.com", address:"Logistikpark 5, 60314 Frankfurt, Germany", keyPeople:[{name:"Markus Weber", title:"Geschäftsführer (Managing Director)"}],
+    employeeCount:"130", companySize:"Medium (50–250 employees)", founded:"1978"},
+  {keywords:["food","snack","beverage"], country:"Brazil", title:"FreshBatch Food Manufacturing", link:"https://example.com/freshbatch", displayLink:"freshbatch.example.com", snippet:"Food production facility manufacturing packaged snacks and beverages. HACCP certified.", type:"manufacturer", confidence:95,
+    phone:"+55 11 4567 8901", whatsapp:"+55 11 91234 5678", email:"contato@freshbatch.example.com", address:"Av. Industrial 900, São Paulo, Brazil", keyPeople:[{name:"Carlos Mendes", title:"CEO"}],
+    employeeCount:"410", companySize:"Large (250+ employees)", founded:"2001"},
+  {keywords:["food","snack","beverage"], country:"Australia", title:"GroceryChain Distributors", link:"https://example.com/grocerychain", displayLink:"grocerychain.example.com", snippet:"Distributes packaged food and beverages to supermarkets nationwide.", type:"distributor", confidence:91,
+    phone:"+61 2 9876 5432", email:"sales@grocerychain.example.com", address:"22 Distribution Dr, Sydney NSW 2000, Australia", keyPeople:[{name:"Emma Wilson", title:"National Sales Manager"}],
+    employeeCount:"210", companySize:"Medium (50–250 employees)", founded:"1994"},
+  {keywords:["solar","panel","energy"], country:"China", title:"SunCell Manufacturing", link:"https://example.com/suncell", displayLink:"suncell.example.com", snippet:"Solar panel manufacturer with photovoltaic cell production. High efficiency cells, 25-yr warranty.", type:"manufacturer", confidence:96,
+    phone:"+86 29 8765 4321", email:"sales@suncell.example.com", address:"High-Tech Zone, Xi'an, Shaanxi, China", keyPeople:[{name:"Liu Yang", title:"CEO"},{name:"Sun Qing", title:"R&D Director"}],
+    employeeCount:"890", companySize:"Large (250+ employees)", founded:"2010"},
+  {keywords:["solar","panel","energy"], country:"Spain", title:"GreenWatt Distribution", link:"https://example.com/greenwatt", displayLink:"greenwatt.example.com", snippet:"Distributor of solar panels and inverters to installers. Installer network, financing options.", type:"distributor", confidence:90,
+    phone:"+34 91 234 5678", email:"info@greenwatt.example.com", address:"Calle de la Energía 15, 28001 Madrid, Spain", keyPeople:[{name:"Carmen Ruiz", title:"Managing Director"}],
+    employeeCount:"55", companySize:"Medium (50–250 employees)", founded:"2015"},
+  {keywords:["irrigation","agritech","drip","sensor"], country:"Israel", title:"AgriFlow Technologies", link:"https://example.com/agriflow", displayLink:"agriflow.example.com", snippet:"Manufacturer of precision drip irrigation systems and agritech sensors. R&D facility, patented emitters.", type:"manufacturer", confidence:95,
+    phone:"+972 3 555 0123", whatsapp:"+972 50 555 0123", email:"info@agriflow.example.com", address:"Kibbutz Industrial Park, Hadera, Israel", keyPeople:[{name:"Yossi Cohen", title:"Founder & CEO"},{name:"Tamar Levi", title:"VP R&D"}],
+    employeeCount:"75", companySize:"Medium (50–250 employees)", founded:"2017"},
+  {keywords:["irrigation","agritech","drip","sensor"], country:"Thailand", title:"FarmLink Distribution", link:"https://example.com/farmlink", displayLink:"farmlink.example.com", snippet:"Regional distributor of irrigation and agritech equipment to Southeast Asian farms. Local stock, dealer network.", type:"distributor", confidence:90,
+    phone:"+66 2 123 4567", whatsapp:"+66 81 234 5678", email:"sales@farmlink.example.com", address:"Lat Krabang Industrial Estate, Bangkok, Thailand", keyPeople:[{name:"Somchai Suwan", title:"Managing Director"}],
+    employeeCount:"40", companySize:"Small (under 50 employees)", founded:"2013"},
+  {keywords:["rubber","tire","auto","parts"], country:"Thailand", title:"SiamRubber Manufacturing", link:"https://example.com/siamrubber", displayLink:"siamrubber.example.com", snippet:"Rubber and auto parts manufacturer with vulcanization plant. Tier-1 automotive supplier, ISO/TS certified.", type:"manufacturer", confidence:96,
+    phone:"+66 38 234 5678", whatsapp:"+66 81 987 6543", email:"export@siamrubber.example.com", address:"Amata City Industrial Estate, Chonburi, Thailand", keyPeople:[{name:"Anan Wattana", title:"CEO"}],
+    employeeCount:"620", companySize:"Large (250+ employees)", founded:"1988"},
+  {keywords:["rubber","tire","auto","parts"], country:"Israel", title:"AutoPart Distributors Israel", link:"https://example.com/autopartil", displayLink:"autopart-il.example.com", snippet:"Distributor of rubber components and auto parts to garages and retailers nationwide. Authorized dealer.", type:"distributor", confidence:91,
+    phone:"+972 3 555 0456", whatsapp:"+972 50 555 0456", email:"info@autopart-il.example.com", address:"Holon Industrial Zone, Holon, Israel", keyPeople:[{name:"David Mizrahi", title:"Owner"}],
+    employeeCount:"18", companySize:"Small (under 50 employees)", founded:"2019"}
+];
+
+function searchDemo(subject, country) {
+  const terms = subject.toLowerCase().split(/\s+/).filter(Boolean);
+  const countryLc = country.toLowerCase();
+
+  return DEMO_DATA.filter(item => {
+    const matchesSubject = terms.length === 0 || terms.some(t => item.keywords.some(k => k.includes(t) || t.includes(k)));
+    const matchesCountry = !countryLc || item.country.toLowerCase() === countryLc;
+    return matchesSubject && matchesCountry;
+  }).map(({ keywords, ...rest }) => rest);
+}
+
+function searchDemoByCompanyName(company) {
+  const needle = company.toLowerCase();
+  return DEMO_DATA
+    .filter(item => item.title.toLowerCase().includes(needle))
+    .map(({ keywords, ...rest }) => rest);
+}
+
+function searchDemoByPersonName(person) {
+  const needle = person.toLowerCase();
+  return DEMO_DATA
+    .filter(item => item.keyPeople && item.keyPeople.some(p => p.name.toLowerCase().includes(needle)))
+    .map(({ keywords, ...rest }) => rest);
+}
+
+// ---- External company enrichment: Wikipedia, DuckDuckGo, Brave Search ----
+async function enrichFromExternalSources(companyName, websiteOrigin) {
+  const out = {
+    description: null, wikipedia: null, linkedin: null,
+    revenue: null, employeesExt: null, industry: null, news: []
+  };
+  if (!companyName || companyName.length < 2) return out;
+
+  const tasks = [];
+
+  // 1. Wikipedia REST summary (free, no key)
+  tasks.push(
+    (async () => {
+      try {
+        const wikiName = companyName.replace(/\s+/g, '_');
+        const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiName)}`, {
+          headers: { 'User-Agent': 'SourceIQ/1.0 (contact@sourceiq.com)' },
+          signal: AbortSignal.timeout(5000)
+        });
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.type === 'standard' && d.extract && d.extract.length > 60) {
+          out.description = d.extract.replace(/\s+/g, ' ').slice(0, 500);
+          out.wikipedia = d.content_urls?.desktop?.page || null;
+        }
+      } catch (_) {}
+    })()
+  );
+
+  // 2. DuckDuckGo Instant Answer (free, no key — fallback description)
+  tasks.push(
+    (async () => {
+      try {
+        const r = await fetch(
+          `https://api.duckduckgo.com/?q=${encodeURIComponent(companyName)}&format=json&no_html=1&skip_disambig=1`,
+          { headers: { 'User-Agent': 'SourceIQ/1.0' }, signal: AbortSignal.timeout(5000) }
+        );
+        if (!r.ok) return;
+        const d = await r.json();
+        if (d.Abstract && d.Abstract.length > 60 && !out.description) {
+          out.description = d.Abstract.slice(0, 500);
+          out.wikipedia = out.wikipedia || d.AbstractURL || null;
+        }
+      } catch (_) {}
+    })()
+  );
+
+  // 3. Brave Search — company profile data + news (3 parallel queries)
+  if (BRAVE_API_KEY) {
+    const braveHdr = { 'Accept': 'application/json', 'Accept-Encoding': 'gzip', 'X-Subscription-Token': BRAVE_API_KEY };
+    const braveFetch = async (q, extra = '') => {
+      try {
+        const r = await fetch(
+          `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(q)}&count=5${extra}`,
+          { headers: braveHdr, signal: AbortSignal.timeout(7000) }
+        );
+        return r.ok ? (await r.json()).web?.results || [] : [];
+      } catch (_) { return []; }
+    };
+
+    // 3a. Employee count, revenue, industry from business directories
+    tasks.push(
+      braveFetch(`"${companyName}" employees revenue turnover industry`).then(items => {
+        for (const item of items) {
+          const text = ((item.title || '') + ' ' + (item.description || '')).replace(/\s+/g, ' ');
+          if (!out.employeesExt) {
+            const m = text.match(/(\d[\d,]+)\+?\s*employees/i);
+            if (m) out.employeesExt = m[1].replace(/,/g,'') + ' employees';
+          }
+          if (!out.revenue) {
+            const m = text.match(/(?:revenue|turnover|sales|annual)[^\d]{0,20}\$?([\d,.]+)\s*(billion|million|bn|mn|b|m)\b/i);
+            if (m) {
+              const unit = /^b/i.test(m[2]) ? 'B' : 'M';
+              out.revenue = `$${m[1]}${unit}`;
+            }
+          }
+          if (!out.industry && !out.description) {
+            const m = text.match(/\b([A-Z][a-z]+(?: [A-Z][a-z]+)?)\s+(?:company|manufacturer|supplier|provider)\b/);
+            if (m) out.industry = m[1];
+          }
+        }
+      })
+    );
+
+    // 3b. LinkedIn company page URL
+    tasks.push(
+      braveFetch(`"${companyName}" site:linkedin.com/company`).then(items => {
+        for (const item of items) {
+          if (item.url && /linkedin\.com\/company\//i.test(item.url)) {
+            out.linkedin = item.url.split('?')[0].replace(/\/$/, '');
+            break;
+          }
+        }
+      })
+    );
+
+    // 3c. Recent news (exclude the company's own site)
+    tasks.push(
+      braveFetch(`${companyName} company news 2025`, '&freshness=py').then(items => {
+        const originHost = websiteOrigin ? new URL(websiteOrigin).host.replace(/^www\./, '') : '';
+        out.news = items
+          .filter(item => {
+            if (!item.url) return false;
+            try { return !new URL(item.url).host.replace(/^www\./, '').includes(originHost); } catch (_) { return true; }
+          })
+          .slice(0, 4)
+          .map(item => ({
+            title: (item.title || '').slice(0, 120),
+            url: item.url,
+            snippet: (item.description || '').slice(0, 160),
+            age: item.age || null
+          }));
+      })
+    );
+  }
+
+  await Promise.all(tasks);
+  return out;
+}
+
+// ---- Company detail enrichment (best-effort scrape of a company's own website) ----
+const TITLE_KEYWORDS = [
+  'Chief Executive Officer', 'CEO', 'Chief Operating Officer', 'COO',
+  'Chief Technology Officer', 'CTO', 'Chief Financial Officer', 'CFO',
+  'Founder', 'Co-Founder', 'President', 'Vice President', 'VP',
+  'Managing Director', 'General Manager', 'Director', 'Chairman',
+  'Owner', 'Sales Manager', 'Plant Manager'
+];
+
+function extractContactInfo(html) {
+  const $ = cheerio.load(html);
+  // Strip elements unlikely to contain real contact info and likely to produce
+  // false-positive address/phone matches (nav menus, scripts, etc.)
+  $('script, style, noscript, nav, header').remove();
+  const text = $('body').text().replace(/\s+/g, ' ').trim();
+
+  // Address detection is the most false-positive-prone heuristic, so restrict it
+  // to footer content and elements explicitly marked as contact/address sections.
+  const addressCandidateText = [
+    $('footer').text(),
+    $('[class*="address" i], [id*="address" i], [class*="contact" i], [id*="contact" i]').text()
+  ].join(' ').replace(/\s+/g, ' ').trim();
+
+  // --- Email: prefer mailto: links, fall back to scanning text ---
+  const mailtoEmails = [];
+  $('a[href^="mailto:"]').each((_, el) => {
+    const addr = ($(el).attr('href') || '').replace(/^mailto:/i, '').split('?')[0].trim();
+    if (addr) mailtoEmails.push(addr);
+  });
+  const textEmails = (text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [])
+    .filter(e => !/\.(png|jpg|jpeg|gif|svg|webp)$/i.test(e));
+  // De-obfuscate common anti-scrape patterns, but ONLY the bracketed forms
+  // ("info [at] domain [dot] com", "info(at)domain(dot)com"). We deliberately do
+  // NOT treat the bare words " at " / " dot " as separators — those appear
+  // constantly in normal prose and produce false-positive emails.
+  const deobfText = text
+    .replace(/\s*[\[({]\s*at\s*[\])}]\s*/gi, '@')
+    .replace(/\s*[\[({]\s*dot\s*[\])}]\s*/gi, '.');
+  const obfEmails = (deobfText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [])
+    .filter(e => !/\.(png|jpg|jpeg|gif|svg|webp)$/i.test(e))
+    // Reject prose-like false positives: a valid TLD is 2–24 lowercase letters,
+    // not a capitalized word like "According".
+    .filter(e => /\.[a-z]{2,24}$/.test(e));
+  // Placeholder / example domains that appear in boilerplate and docs, never real.
+  const JUNK_EMAIL_DOMAINS = /@(example|test|domain|yourdomain|email|sentry|wix|wordpress|godaddy|sentry\.io)\.|@(.+\.)?(example|test)\.(com|org|net)$|\.(png|jpg|gif)$/i;
+  const allEmails = [...new Set([...mailtoEmails, ...textEmails, ...obfEmails])]
+    // Final sanity: real email addresses end in a lowercase TLD (2–24 letters).
+    // This drops prose false positives like "name@home.According".
+    .filter(e => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-z]{2,24}$/.test(e))
+    .filter(e => !JUNK_EMAIL_DOMAINS.test(e));
+  const email = allEmails.sort((a, b) => {
+    const score = s => /^(info|contact|sales|hello|office|export)@/i.test(s) ? -1 : 0;
+    return score(a) - score(b);
+  })[0] || null;
+
+  // --- Phone: prefer tel: links, fall back to scanning text ---
+  // A validator that rejects common false positives: bare year ranges
+  // (e.g. "2018-2026" copyright), all-same digits, and date-like strings.
+  const looksLikePhone = (raw) => {
+    if (!raw) return false;
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length < 8 || digits.length > 15) return false;          // E.164-ish bounds
+    if (/^(19|20)\d{2}\s*[-–]\s*(19|20)\d{2}$/.test(raw.trim())) return false; // year range
+    if (/^(\d)\1+$/.test(digits)) return false;                          // 00000000 etc.
+    // A 4-digit-only or 8-digit run that is just two years stuck together
+    if (digits.length === 8 && /^(19|20)\d{2}(19|20)\d{2}$/.test(digits)) return false;
+    return true;
+  };
+  let phone = null;
+  $('a[href^="tel:"]').each((_, el) => {
+    if (phone) return;
+    const cand = ($(el).attr('href') || '').replace(/^tel:/i, '').split('?')[0].trim();
+    if (looksLikePhone(cand)) phone = cand;
+  });
+  if (!phone) {
+    // Prefer numbers that appear near a phone label, then any plausible number.
+    const labeled = text.match(/(?:tel|phone|call|mobile|cell|whatsapp|fax|t:|p:)\D{0,4}(\+?\d[\d\s().-]{7,16}\d)/i);
+    if (labeled && looksLikePhone(labeled[1])) phone = labeled[1].trim();
+  }
+  if (!phone) {
+    const phoneMatches = text.match(/\+?\d[\d\s().-]{7,16}\d/g) || [];
+    phone = phoneMatches.map(p => p.trim()).find(looksLikePhone) || null;
+  }
+
+  // --- Address: <address> tag, schema.org markup, or a street-pattern heuristic
+  //     scoped to footer/contact sections only, requiring a comma to cut down
+  //     on false positives from unrelated page text. ---
+  // Trim trailing boilerplate that often runs into a scraped address
+  // (e.g. "…Singapore 169208 Website www.x.com WhatsApp Message us Email…").
+  const cleanAddress = (a) => {
+    if (!a) return a;
+    let s = a.replace(/\s+/g, ' ').trim();
+    // Cut at the first trailing contact-label keyword
+    s = s.replace(/\s+(Website|WhatsApp|Whats App|Email|E-mail|Phone|Tel|Fax|Mobile|Call|Contact|Hours|Copyright|©|Follow|Subscribe|Newsletter|Menu|Home)\b.*$/i, '').trim();
+    // Drop a dangling trailing connector/punctuation
+    s = s.replace(/[\s,;|·•\-]+$/, '').trim();
+    return s.length >= 8 ? s : null;
+  };
+  let address = cleanAddress($('address').first().text()) || null;
+  if (!address) {
+    const schemaAddr = cleanAddress($('[itemtype*="PostalAddress"]').first().text());
+    if (schemaAddr) address = schemaAddr;
+  }
+  if (!address && addressCandidateText) {
+    const addrMatch = addressCandidateText.match(/\d{1,5}[^,\n]{0,40}(Street|St\.|Road|Rd\.|Avenue|Ave\.|Blvd|Boulevard|Lane|Drive|Suite|Floor|Building)[^,\n]{0,30},[^\n]{0,80}/i);
+    if (addrMatch) { const c = cleanAddress(addrMatch[0]); if (c && c.length < 140) address = c; }
+  }
+
+  // --- WhatsApp: look for wa.me / api.whatsapp.com links, or a "WhatsApp: <number>"
+  //     mention in the text. Note this is a company-level contact channel — sites
+  //     essentially never publish a separate WhatsApp number per individual person. ---
+  let whatsapp = null;
+  $('a[href*="wa.me/"], a[href*="api.whatsapp.com"], a[href*="whatsapp.com/send"]').each((_, el) => {
+    if (whatsapp) return;
+    const href = $(el).attr('href') || '';
+    const numMatch = href.match(/(?:wa\.me\/|phone=)\+?(\d{7,15})/i);
+    if (numMatch) whatsapp = '+' + numMatch[1];
+  });
+  if (!whatsapp) {
+    const waTextMatch = text.match(/whatsapp[^a-zA-Z0-9]{0,5}(\+?\d[\d\s().-]{6,15}\d)/i);
+    if (waTextMatch) whatsapp = waTextMatch[1].trim();
+  }
+
+  // --- Key people: name immediately followed by a recognized title ---
+  const titleAlt = TITLE_KEYWORDS.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const peopleRegex = new RegExp(`([A-Z][a-zA-Z'-]+(?:\\s[A-Z][a-zA-Z'-]+){0,2})\\s*[,\\-–|]\\s*(${titleAlt})\\b`, 'g');
+  const seen = new Set();
+  const keyPeople = [];
+  let m;
+  while ((m = peopleRegex.exec(text)) && keyPeople.length < 5) {
+    const name = m[1].trim();
+    if (seen.has(name)) continue;
+    seen.add(name);
+    keyPeople.push({ name, title: m[2].trim() });
+  }
+
+  // --- Company size: employee count mention, bucketed into a rough size band.
+  //     Financial figures (revenue, profit, funding) are deliberately NOT scraped —
+  //     they're rarely on a company's own site and guessing would be misleading. ---
+  // Deliberately excludes the generic word "people" — marketing copy frequently
+  // pairs large numbers with "people" in unrelated contexts (e.g. "used by
+  // 2 million people"), which caused false positives in testing.
+  let employeeCount = null;
+  const empMatch = text.match(/(\d{1,3}(?:,\d{3})*\+?)\s*(?:employees|members of staff)/i)
+    || text.match(/(?:team|staff)\s+of\s+(\d{1,3}(?:,\d{3})*\+?)\s*(?:employees|people)?/i);
+  if (empMatch) {
+    const n = parseInt(empMatch[1].replace(/[^\d]/g, ''), 10);
+    // Sanity bound: implausible employee counts (e.g. matched from an unrelated stat) are discarded.
+    if (!isNaN(n) && n >= 1 && n <= 100000) employeeCount = empMatch[1].trim();
+  }
+
+  let companySize = null;
+  if (employeeCount) {
+    const n = parseInt(employeeCount.replace(/[^\d]/g, ''), 10);
+    if (!isNaN(n)) {
+      if (n < 50) companySize = 'Small (under 50 employees)';
+      else if (n < 250) companySize = 'Medium (50–250 employees)';
+      else companySize = 'Large (250+ employees)';
+    }
+  }
+
+  let founded = null;
+  const foundedMatch = text.match(/(?:founded|established|incorporated|since)\D{0,12}((?:19|20)\d{2})\b/i);
+  if (foundedMatch) founded = foundedMatch[1];
+
+  return { phone, email, address, whatsapp, keyPeople, employeeCount, companySize, founded };
+}
+
+app.get('/api/enrich', async (req, res) => {
+  const url = (req.query.url || '').trim();
+  const nameHint = (req.query.name || '').trim();
+  if (!url) {
+    return res.status(400).json({ error: 'Missing url parameter' });
+  }
+
+  // Directory/aggregator pages (ZoomInfo, Bloomberg, Crunchbase, D&B, importer dirs…)
+  // list many companies; an address scraped from them is frequently the WRONG entity.
+  // Never present their scraped contact details as authoritative — just link out.
+  let enrichHost = '';
+  try { enrichHost = new URL(url).host.replace(/^www\./, '').toLowerCase(); } catch (_) {}
+  if (enrichHost && isAggregatorHost(enrichHost)) {
+    return res.json({
+      success: true, website: url, phone: null, email: null, address: null,
+      whatsapp: null, keyPeople: [], employeeCount: null, companySize: null, founded: null,
+      isAggregator: true,
+      note: `This is a third-party directory listing (${enrichHost}); its details may not match the exact company. Open it to verify.`
+    });
+  }
+
+  // If this is one of our bundled demo links, return the canned demo contact info
+  // instead of trying to fetch a non-existent example.com page.
+  const demoMatch = DEMO_DATA.find(d => d.link === url);
+  if (demoMatch) {
+    return res.json({
+      success: true,
+      website: url,
+      phone: demoMatch.phone || null,
+      email: demoMatch.email || null,
+      address: demoMatch.address || null,
+      whatsapp: demoMatch.whatsapp || null,
+      keyPeople: demoMatch.keyPeople || [],
+      employeeCount: demoMatch.employeeCount || null,
+      companySize: demoMatch.companySize || null,
+      founded: demoMatch.founded || null
+    });
+  }
+
+  const BROWSER_HEADERS = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'no-cache',
+    'Upgrade-Insecure-Requests': '1'
+  };
+
+  // Try a URL, return { html, status } or null on failure
+  async function tryFetch(fetchUrl) {
+    try {
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 8000);
+      const r = await fetch(fetchUrl, { headers: BROWSER_HEADERS, redirect: 'follow', signal: controller.signal });
+      clearTimeout(tid);
+      if (!r.ok) return { html: null, status: r.status };
+      return { html: await r.text(), status: r.status };
+    } catch (_) { return null; }
+  }
+
+  // Status codes that mean the site is actively blocking bots (Cloudflare, WAF,
+  // rate-limit) rather than the page simply not existing.
+  const BLOCK_CODES = new Set([401, 403, 405, 429, 451, 503, 999]);
+
+  try {
+    // Derive the site ROOT (origin) from the search-result URL. The result link is
+    // usually a deep page (e.g. /led-bulb-manufacturer-china/), so appending
+    // "/contact" to it would produce a bogus URL — we must build contact/about
+    // pages off the origin instead.
+    let origin, deep = url.replace(/[#?].*$/, '').replace(/\/$/, '');
+    try { origin = new URL(url).origin; } catch (_) { origin = deep; }
+
+    let combinedInfo = { phone:null, email:null, address:null, whatsapp:null, keyPeople:[], employeeCount:null, companySize:null, founded:null };
+    let blocked = false, fetchedAny = false;
+
+    const mergeFrom = (html) => {
+      fetchedAny = true;
+      const info = extractContactInfo(html);
+      for (const key of ['phone','email','address','whatsapp','employeeCount','companySize','founded']) {
+        if (!combinedInfo[key] && info[key]) combinedInfo[key] = info[key];
+      }
+      if (!combinedInfo.keyPeople.length && info.keyPeople.length) combinedInfo.keyPeople = info.keyPeople;
+    };
+    const enough = () => combinedInfo.phone && (combinedInfo.email || combinedInfo.whatsapp) && combinedInfo.address;
+
+    // Phase 1: fetch the result page + homepage in parallel (fast).
+    const phase1Urls = [...new Set([deep, origin])];
+    const phase1 = await Promise.all(phase1Urls.map(tryFetch));
+    phase1.forEach(r => {
+      if (!r) return;
+      if (!r.html) { if (BLOCK_CODES.has(r.status)) blocked = true; return; }
+      mergeFrom(r.html);
+    });
+
+    // Derive a company name for external lookups:
+    // prefer the passed name hint, fall back to domain (strip TLD + hyphens → spaces).
+    const companyName = nameHint ||
+      enrichHost.replace(/^www\./, '').replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').trim();
+
+    // Run Phase 2 (contact sub-pages) and external enrichment in parallel.
+    const [, extData] = await Promise.all([
+      (async () => {
+        if (!enough() && !(blocked && !fetchedAny)) {
+          const contactPaths = ['/contact', '/contact-us', '/about-us', '/about', '/en/contact', '/company'];
+          const phase2 = await Promise.all(contactPaths.map(p => tryFetch(origin + p)));
+          for (const r of phase2) {
+            if (!r) continue;
+            if (!r.html) { if (BLOCK_CODES.has(r.status)) blocked = true; continue; }
+            mergeFrom(r.html);
+            if (enough()) break;
+          }
+        }
+      })(),
+      enrichFromExternalSources(companyName, origin)
+    ]);
+
+    // Merge: external employee count only if not found on site
+    if (!combinedInfo.employeeCount && extData.employeesExt) {
+      const n = parseInt(extData.employeesExt, 10);
+      combinedInfo.employeeCount = extData.employeesExt;
+      if (!isNaN(n)) {
+        combinedInfo.companySize = n < 50 ? 'Small (under 50 employees)' : n < 250 ? 'Medium (50–250 employees)' : 'Large (250+ employees)';
+      }
+    }
+
+    const hasAny = combinedInfo.phone || combinedInfo.email || combinedInfo.address ||
+                   combinedInfo.whatsapp || combinedInfo.keyPeople.length ||
+                   combinedInfo.employeeCount || combinedInfo.founded ||
+                   extData.description || extData.revenue || extData.news.length;
+
+    let note;
+    if (!hasAny && blocked) note = 'This website blocks automated access (bot protection). Open it directly to see contact details.';
+    else if (!hasAny && !fetchedAny) note = 'This website could not be reached automatically. Open it directly to see contact details.';
+    else if (!hasAny) note = 'No contact details were published on this website.';
+
+    res.json({
+      success: true, website: url, ...combinedInfo, note, blocked: blocked && !hasAny,
+      description: extData.description,
+      wikipedia: extData.wikipedia,
+      linkedin: extData.linkedin,
+      revenue: extData.revenue,
+      industry: extData.industry,
+      news: extData.news
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Could not fetch the company website: ' + err.message });
+  }
+});
+
+app.get('/api/trust-check', async (req, res) => {
+  const url  = (req.query.url  || '').trim();
+  const name = (req.query.name || '').trim();
+  let people = [];
+  try { people = JSON.parse(req.query.people || '[]'); } catch(_) {}
+  people = people.slice(0, 4); // max 4 people to avoid API quota burn
+
+  if (!url && !name) return res.status(400).json({ error: 'url or name required' });
+
+  // Demo example.com links — no real domain to check
+  if (url.includes('example.com')) {
+    const demoPeople = people.map(p => ({
+      name: p, risk: 'unknown',
+      findings: [{ type: 'info', text: 'ℹ️ Demo mode — add your Google API key to run real background checks on this person.' }]
+    }));
+    return res.json({
+      score: null, rating: 'Demo Mode', ratingClass: 'trust-info', demoMode: true,
+      findings: [{ type: 'info', text: 'ℹ️ This is sample demo data. For real companies the trust check examines HTTPS, domain age, Google Safe Browsing, scam/fraud reports, and individual background checks on key people.' }],
+      searchLinks: [], reviewLinks: [], peopleResults: demoPeople
+    });
+  }
+
+  const findings = [];
+  let score = 100;
+
+  // ── 1. HTTPS ────────────────────────────────────────────────────────
+  if (url) {
+    if (url.startsWith('https://')) {
+      findings.push({ type: 'good', text: '✅ Website uses HTTPS (secure, encrypted connection)' });
+    } else {
+      findings.push({ type: 'warning', text: '⚠️ Website does not use HTTPS — connection is unencrypted' });
+      score -= 15;
+    }
+  }
+
+  // ── 2. Domain age via RDAP (free public registry data) ───────────────
+  if (url) {
+    try {
+      const domain = new URL(url).hostname.replace(/^www\./, '');
+      const controller = new AbortController();
+      const tid = setTimeout(() => controller.abort(), 6000);
+      const rdapRes = await fetch(`https://rdap.org/domain/${domain}`, {
+        headers: { Accept: 'application/json' }, signal: controller.signal
+      });
+      clearTimeout(tid);
+      if (rdapRes.ok) {
+        const rd = await rdapRes.json();
+        const reg = (rd.events || []).find(e => e.eventAction === 'registration');
+        if (reg) {
+          const regDate = new Date(reg.eventDate);
+          const ageYrs = (Date.now() - regDate.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+          if (ageYrs < 0.5) {
+            findings.push({ type: 'danger', text: `🚨 Domain registered very recently (${regDate.toDateString()}) — under 6 months, high-risk indicator` });
+            score -= 35;
+          } else if (ageYrs < 1) {
+            findings.push({ type: 'warning', text: `⚠️ Domain registered recently (${regDate.toDateString()}) — less than 1 year old` });
+            score -= 15;
+          } else {
+            findings.push({ type: 'good', text: `✅ Domain established since ${regDate.getFullYear()} (${Math.floor(ageYrs)} year${Math.floor(ageYrs)===1?'':'s'} old)` });
+          }
+        }
+      }
+    } catch (_) { /* RDAP timed out or domain not found — skip */ }
+  }
+
+  // ── 3. Google Safe Browsing ────────────────────────────────────────
+  if (url && GOOGLE_API_KEY) {
+    try {
+      const sbRes = await fetch(`https://safebrowsing.googleapis.com/v4/threatMatches:find?key=${GOOGLE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client: { clientId: 'product-source-search', clientVersion: '1.0' },
+          threatInfo: {
+            threatTypes: ['MALWARE','SOCIAL_ENGINEERING','UNWANTED_SOFTWARE','POTENTIALLY_HARMFUL_APPLICATION'],
+            platformTypes: ['ANY_PLATFORM'], threatEntryTypes: ['URL'],
+            threatEntries: [{ url }]
+          }
+        })
+      });
+      if (sbRes.ok) {
+        const sbData = await sbRes.json();
+        if (sbData.matches && sbData.matches.length) {
+          const threatLabel = sbData.matches[0].threatType.replace(/_/g,' ').toLowerCase();
+          findings.push({ type: 'danger', text: `🚨 Google Safe Browsing flagged this URL as: ${threatLabel}` });
+          score -= 50;
+        } else {
+          findings.push({ type: 'good', text: '✅ Not flagged by Google Safe Browsing' });
+        }
+      }
+    } catch (_) { /* Safe Browsing API not enabled — skip */ }
+  }
+
+  // ── 4. Web search: scam / fraud / complaints ─────────────────────
+  let searchLinks = [], reviewLinks = [];
+  const canWebSearch = (GOOGLE_API_KEY && GOOGLE_CX) || BRAVE_API_KEY;
+
+  async function webSearch(q, num) {
+    if (BRAVE_API_KEY) {
+      const r = await fetch(`https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(q)}&count=${num}`, {
+        headers: { 'Accept': 'application/json', 'X-Subscription-Token': BRAVE_API_KEY }
+      });
+      const d = await r.json();
+      return (d.web && d.web.results || []).map(i => ({ title: i.title, url: i.url, snippet: i.description }));
+    } else {
+      const r = await fetch(`https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(GOOGLE_API_KEY)}&cx=${encodeURIComponent(GOOGLE_CX)}&q=${encodeURIComponent(q)}&num=${num}`);
+      const d = await r.json();
+      return (d.items || []).map(i => ({ title: i.title, url: i.link, snippet: i.snippet }));
+    }
+  }
+
+  if (name && canWebSearch) {
+    try {
+      const scamQ = `"${name}" (scam OR fraud OR complaint OR "stay away" OR "avoid" OR "not recommended" OR "ripoff")`;
+      searchLinks = await webSearch(scamQ, 5);
+      if (searchLinks.length) {
+        findings.push({ type: 'warning', text: `⚠️ Found ${searchLinks.length} web result(s) mentioning complaints, scam, or fraud — see links below` });
+        score -= Math.min(searchLinks.length * 8, 25);
+      } else {
+        findings.push({ type: 'good', text: '✅ No scam or fraud reports found in web search' });
+      }
+    } catch (_) {}
+
+    try {
+      const revQ = `"${name}" (reviews OR rating OR trustpilot OR "BBB" OR "better business bureau")`;
+      reviewLinks = (await webSearch(revQ, 4)).map(i => ({ title: i.title, url: i.url }));
+    } catch (_) {}
+  }
+
+  if (!canWebSearch) {
+    findings.push({ type: 'info', text: 'ℹ️ Add a Brave or Google API key to .env for complaint web search' });
+  }
+
+  // ── 5. Per-person background checks ──────────────────────────────
+  const peopleResults = [];
+  if (people.length && canWebSearch) {
+    for (const personName of people) {
+      const personFindings = [];
+      let personRisk = 'clean';
+
+      try {
+        const issueQ = `"${personName}" (scam OR fraud OR lawsuit OR convicted OR arrested OR "legal action" OR "court case" OR "criminal charges" OR indicted OR "money laundering" OR "securities fraud")`;
+        const issueItems = await webSearch(issueQ, 5);
+        if (issueItems.length) {
+          personRisk = 'flagged';
+          personFindings.push({ type: 'warning', text: `⚠️ Found ${issueItems.length} result(s) linked to legal issues, fraud, or scam`, links: issueItems });
+          score -= Math.min(issueItems.length * 6, 20);
+        } else {
+          personFindings.push({ type: 'good', text: '✅ No scam or legal records found' });
+        }
+      } catch (_) {}
+
+      if (name) {
+        try {
+          const newsQ = `"${personName}" "${name}" (news OR profile OR background OR CEO OR director OR founder)`;
+          const newsLinks = (await webSearch(newsQ, 3)).map(i => ({ title: i.title, url: i.url || i.link }));
+          if (newsLinks.length) personFindings.push({ type: 'info', text: `ℹ️ ${newsLinks.length} news / profile result(s) found`, links: newsLinks });
+        } catch (_) {}
+      }
+
+      peopleResults.push({ name: personName, risk: personRisk, findings: personFindings });
+    }
+  } else if (people.length && !canWebSearch) {
+    people.forEach(p => peopleResults.push({ name: p, risk: 'unknown', findings: [{ type: 'info', text: 'ℹ️ Add a Brave or Google API key to enable background checks on individuals' }] }));
+  }
+
+  let rating, ratingClass;
+  if      (score >= 75) { rating = 'Appears Trustworthy';        ratingClass = 'trust-good';   }
+  else if (score >= 45) { rating = 'Exercise Caution';           ratingClass = 'trust-warn';   }
+  else                  { rating = 'High Risk — Verify Carefully'; ratingClass = 'trust-danger'; }
+
+  res.json({ score, rating, ratingClass, findings, searchLinks, reviewLinks, peopleResults, demoMode: false });
+});
+
+// Maps country names to Brave Search country codes
+// Supported: AR AU AT BE BR CA CL DK FI FR DE GR HK IN ID IT JP KR MY MX NL NZ NO CN PL PT PH RU SA ZA ES SE CH TW TR GB US ALL
+const COUNTRY_META = {
+  // Asia
+  'China':          { code: 'CN' }, 'India':         { code: 'IN' },
+  'Japan':          { code: 'JP' }, 'South Korea':   { code: 'KR' },
+  'Taiwan':         { code: 'TW' }, 'Malaysia':      { code: 'MY' },
+  'Indonesia':      { code: 'ID' }, 'Philippines':   { code: 'PH' },
+  'Singapore':      { code: 'ALL' }, 'Vietnam':      { code: 'ALL' },
+  'Thailand':       { code: 'ALL' }, 'Bangladesh':   { code: 'ALL' },
+  'Pakistan':       { code: 'ALL' }, 'Sri Lanka':    { code: 'ALL' },
+  'Nepal':          { code: 'ALL' }, 'Myanmar':      { code: 'ALL' },
+  'Cambodia':       { code: 'ALL' }, 'Laos':         { code: 'ALL' },
+  'Mongolia':       { code: 'ALL' }, 'Brunei':       { code: 'ALL' },
+  'Maldives':       { code: 'ALL' }, 'Bhutan':       { code: 'ALL' },
+  'Timor-Leste':    { code: 'ALL' }, 'Uzbekistan':   { code: 'ALL' },
+  'Kazakhstan':     { code: 'ALL' }, 'Kyrgyzstan':   { code: 'ALL' },
+  'Tajikistan':     { code: 'ALL' }, 'Turkmenistan': { code: 'ALL' },
+  'Afghanistan':    { code: 'ALL' },
+  // Middle East
+  'UAE':            { code: 'ALL' }, 'Saudi Arabia':  { code: 'SA' },
+  'Turkey':         { code: 'TR' }, 'Israel':         { code: 'ALL' },
+  'Iran':           { code: 'ALL' }, 'Iraq':          { code: 'ALL' },
+  'Jordan':         { code: 'ALL' }, 'Kuwait':        { code: 'ALL' },
+  'Qatar':          { code: 'ALL' }, 'Bahrain':       { code: 'ALL' },
+  'Oman':           { code: 'ALL' }, 'Lebanon':       { code: 'ALL' },
+  'Syria':          { code: 'ALL' }, 'Yemen':         { code: 'ALL' },
+  'Palestine':      { code: 'ALL' }, 'Cyprus':        { code: 'ALL' },
+  // Europe
+  'Germany':        { code: 'DE' }, 'France':         { code: 'FR' },
+  'United Kingdom': { code: 'GB' }, 'Italy':          { code: 'IT' },
+  'Spain':          { code: 'ES' }, 'Netherlands':    { code: 'NL' },
+  'Poland':         { code: 'PL' }, 'Portugal':       { code: 'PT' },
+  'Belgium':        { code: 'BE' }, 'Sweden':         { code: 'SE' },
+  'Switzerland':    { code: 'CH' }, 'Austria':        { code: 'AT' },
+  'Norway':         { code: 'NO' }, 'Denmark':        { code: 'DK' },
+  'Finland':        { code: 'FI' }, 'Greece':         { code: 'GR' },
+  'Russia':         { code: 'RU' }, 'Ukraine':        { code: 'ALL' },
+  'Czech Republic': { code: 'ALL' }, 'Romania':       { code: 'ALL' },
+  'Hungary':        { code: 'ALL' }, 'Slovakia':      { code: 'ALL' },
+  'Bulgaria':       { code: 'ALL' }, 'Croatia':       { code: 'ALL' },
+  'Serbia':         { code: 'ALL' }, 'Slovenia':      { code: 'ALL' },
+  'Lithuania':      { code: 'ALL' }, 'Latvia':        { code: 'ALL' },
+  'Estonia':        { code: 'ALL' }, 'Albania':       { code: 'ALL' },
+  'North Macedonia':{ code: 'ALL' }, 'Kosovo':        { code: 'ALL' },
+  'Montenegro':     { code: 'ALL' }, 'Bosnia and Herzegovina': { code: 'ALL' },
+  'Moldova':        { code: 'ALL' }, 'Georgia':       { code: 'ALL' },
+  'Armenia':        { code: 'ALL' }, 'Azerbaijan':    { code: 'ALL' },
+  'Belarus':        { code: 'ALL' }, 'Luxembourg':    { code: 'ALL' },
+  'Malta':          { code: 'ALL' }, 'Iceland':       { code: 'ALL' },
+  'Ireland':        { code: 'ALL' }, 'Andorra':       { code: 'ALL' },
+  'Liechtenstein':  { code: 'ALL' }, 'Monaco':        { code: 'ALL' },
+  'San Marino':     { code: 'ALL' },
+  // Americas
+  'USA':            { code: 'US' }, 'Canada':         { code: 'CA' },
+  'Mexico':         { code: 'MX' }, 'Brazil':         { code: 'BR' },
+  'Argentina':      { code: 'AR' }, 'Chile':          { code: 'CL' },
+  'Colombia':       { code: 'ALL' }, 'Peru':          { code: 'ALL' },
+  'Venezuela':      { code: 'ALL' }, 'Ecuador':       { code: 'ALL' },
+  'Bolivia':        { code: 'ALL' }, 'Paraguay':      { code: 'ALL' },
+  'Uruguay':        { code: 'ALL' }, 'Guyana':        { code: 'ALL' },
+  'Suriname':       { code: 'ALL' }, 'Costa Rica':    { code: 'ALL' },
+  'Panama':         { code: 'ALL' }, 'Guatemala':     { code: 'ALL' },
+  'Honduras':       { code: 'ALL' }, 'El Salvador':   { code: 'ALL' },
+  'Nicaragua':      { code: 'ALL' }, 'Cuba':          { code: 'ALL' },
+  'Dominican Republic': { code: 'ALL' }, 'Jamaica':   { code: 'ALL' },
+  'Trinidad and Tobago': { code: 'ALL' }, 'Belize':   { code: 'ALL' },
+  'Haiti':          { code: 'ALL' }, 'Puerto Rico':   { code: 'ALL' },
+  // Oceania
+  'Australia':      { code: 'AU' }, 'New Zealand':    { code: 'NZ' },
+  'Papua New Guinea':{ code: 'ALL' }, 'Fiji':         { code: 'ALL' },
+  'Solomon Islands':{ code: 'ALL' }, 'Vanuatu':       { code: 'ALL' },
+  // Africa
+  'South Africa':   { code: 'ZA' }, 'Nigeria':        { code: 'ALL' },
+  'Egypt':          { code: 'ALL' }, 'Kenya':         { code: 'ALL' },
+  'Ethiopia':       { code: 'ALL' }, 'Ghana':         { code: 'ALL' },
+  'Tanzania':       { code: 'ALL' }, 'Morocco':       { code: 'ALL' },
+  'Algeria':        { code: 'ALL' }, 'Angola':        { code: 'ALL' },
+  'Ivory Coast':    { code: 'ALL' }, 'Cameroon':      { code: 'ALL' },
+  'Uganda':         { code: 'ALL' }, 'Mozambique':    { code: 'ALL' },
+  'Zimbabwe':       { code: 'ALL' }, 'Zambia':        { code: 'ALL' },
+  'Senegal':        { code: 'ALL' }, 'Tunisia':       { code: 'ALL' },
+  'DRC':            { code: 'ALL' }, 'Congo':         { code: 'ALL' },
+  'Namibia':        { code: 'ALL' }, 'Burkina Faso':  { code: 'ALL' },
+  'Mali':           { code: 'ALL' }, 'Niger':         { code: 'ALL' },
+  'Chad':           { code: 'ALL' }, 'Sudan':         { code: 'ALL' },
+  'South Sudan':    { code: 'ALL' }, 'Somalia':       { code: 'ALL' },
+  'Rwanda':         { code: 'ALL' }, 'Burundi':       { code: 'ALL' },
+  'Malawi':         { code: 'ALL' }, 'Madagascar':    { code: 'ALL' },
+  'Libya':          { code: 'ALL' }, 'Sierra Leone':  { code: 'ALL' },
+  'Liberia':        { code: 'ALL' }, 'Togo':          { code: 'ALL' },
+  'Benin':          { code: 'ALL' }, 'Guinea':        { code: 'ALL' },
+  'Guinea-Bissau':  { code: 'ALL' }, 'Gabon':         { code: 'ALL' },
+  'Equatorial Guinea': { code: 'ALL' }, 'Eritrea':    { code: 'ALL' },
+  'Djibouti':       { code: 'ALL' }, 'Comoros':       { code: 'ALL' },
+  'Cabo Verde':     { code: 'ALL' }, 'Mauritius':     { code: 'ALL' },
+  'Mauritania':     { code: 'ALL' }, 'Seychelles':    { code: 'ALL' },
+  'Eswatini':       { code: 'ALL' }, 'Lesotho':       { code: 'ALL' },
+  'Botswana':       { code: 'ALL' }, 'Gambia':        { code: 'ALL' },
+  'Sao Tome and Principe': { code: 'ALL' },
+};
+
+// ── Strict country filtering ──────────────────────────────────────────────────
+// Brave's `country` param only *biases* results, it doesn't filter — so results
+// from other countries leak in. We post-filter using country-name/alias mentions
+// and ccTLD evidence to enforce the user's selected country.
+//
+// ccTLD per country (lowercased). For most this equals the ISO2 code; notable
+// exception: United Kingdom uses ".uk", not ".gb".
+const COUNTRY_TLD = {
+  'China':'cn','India':'in','Japan':'jp','South Korea':'kr','Taiwan':'tw','Malaysia':'my',
+  'Indonesia':'id','Philippines':'ph','Singapore':'sg','Vietnam':'vn','Thailand':'th',
+  'Bangladesh':'bd','Pakistan':'pk','Sri Lanka':'lk','Nepal':'np','Myanmar':'mm',
+  'Cambodia':'kh','Mongolia':'mn','Brunei':'bn','Kazakhstan':'kz','Uzbekistan':'uz',
+  'Afghanistan':'af','UAE':'ae','Saudi Arabia':'sa','Turkey':'tr','Israel':'il','Iran':'ir',
+  'Iraq':'iq','Jordan':'jo','Kuwait':'kw','Qatar':'qa','Bahrain':'bh','Oman':'om',
+  'Lebanon':'lb','Syria':'sy','Yemen':'ye','Cyprus':'cy','Germany':'de','France':'fr',
+  'United Kingdom':'uk','Italy':'it','Spain':'es','Netherlands':'nl','Poland':'pl',
+  'Portugal':'pt','Belgium':'be','Sweden':'se','Switzerland':'ch','Austria':'at',
+  'Norway':'no','Denmark':'dk','Finland':'fi','Greece':'gr','Russia':'ru','Ukraine':'ua',
+  'Czech Republic':'cz','Romania':'ro','Hungary':'hu','Slovakia':'sk','Bulgaria':'bg',
+  'Croatia':'hr','Serbia':'rs','Slovenia':'si','Lithuania':'lt','Latvia':'lv','Estonia':'ee',
+  'Ireland':'ie','Iceland':'is','Luxembourg':'lu','Malta':'mt','Moldova':'md','Georgia':'ge',
+  'Armenia':'am','Azerbaijan':'az','Belarus':'by','USA':'us','Canada':'ca','Mexico':'mx',
+  'Brazil':'br','Argentina':'ar','Chile':'cl','Colombia':'co','Peru':'pe','Venezuela':'ve',
+  'Ecuador':'ec','Bolivia':'bo','Paraguay':'py','Uruguay':'uy','Costa Rica':'cr','Panama':'pa',
+  'Guatemala':'gt','Honduras':'hn','Dominican Republic':'do','Jamaica':'jm','Australia':'au',
+  'New Zealand':'nz','Fiji':'fj','South Africa':'za','Nigeria':'ng','Egypt':'eg','Kenya':'ke',
+  'Ethiopia':'et','Ghana':'gh','Tanzania':'tz','Morocco':'ma','Algeria':'dz','Angola':'ao',
+  'Cameroon':'cm','Uganda':'ug','Mozambique':'mz','Zimbabwe':'zw','Zambia':'zm','Senegal':'sn',
+  'Tunisia':'tn','Namibia':'na','Mali':'ml','Libya':'ly','Rwanda':'rw','Mauritius':'mu',
+  'Madagascar':'mg','Botswana':'bw'
+};
+// Aliases / demonyms / major cities that indicate a country in free text.
+const COUNTRY_ALIASES = {
+  'USA':['usa','u.s.a','united states','u.s.','america','american'],
+  'United Kingdom':['uk','u.k','united kingdom','britain','british','england','scotland','wales','london'],
+  'UAE':['uae','u.a.e','united arab emirates','dubai','abu dhabi','sharjah','ajman','emirati','emirates'],
+  'South Korea':['south korea','korea','korean','republic of korea','seoul'],
+  'China':['china','chinese','prc','shenzhen','shanghai','guangzhou','beijing','ningbo','yiwu'],
+  'Singapore':['singapore','singaporean'],
+  'Saudi Arabia':['saudi arabia','saudi','riyadh','jeddah','ksa'],
+  'Netherlands':['netherlands','holland','dutch','amsterdam','rotterdam'],
+  'Germany':['germany','german','deutschland','berlin','munich','hamburg','frankfurt'],
+  'India':['india','indian','mumbai','delhi','bangalore','chennai','gujarat','pune'],
+  'Russia':['russia','russian','moscow'],
+  'Czech Republic':['czech republic','czechia','czech','prague'],
+  'Vietnam':['vietnam','vietnamese','hanoi','ho chi minh','saigon'],
+  'Taiwan':['taiwan','taiwanese','taipei'],
+  'Hong Kong':['hong kong','hk']
+};
+function countryMatchers(country) {
+  const lc = country.toLowerCase();
+  const list = COUNTRY_ALIASES[country] ? [...COUNTRY_ALIASES[country]] : [lc];
+  if (!list.includes(lc)) list.push(lc);
+  return list;
+}
+// Known ccTLDs that are clearly NOT a target country — used to detect SEO-keyword stuffing
+// e.g. rajveerstainless.com (Indian) targeting "Germany" is not a German manufacturer
+const INDIAN_SEO_DOMAINS = /\.(in|co\.in)$|rajveer|philips.?metal|prosaic.?steel|neelcon|metline|rexton|sachiya|kinnari|guru|shree|panchal|bhavya/i;
+
+function resultInCountry(r, country) {
+  if (!country) return true;
+  const hay  = `${r.title || ''} ${r.snippet || ''} ${r.displayLink || ''}`.toLowerCase();
+  const host = (r.displayLink || '').toLowerCase().split('/')[0];
+
+  // 1) Domain uses the target country's ccTLD — most reliable signal
+  const tld = COUNTRY_TLD[country];
+  if (tld && (host.endsWith('.' + tld) || host.includes('.' + tld + '.'))) return true;
+
+  // 2) Country name / alias / major city mentioned anywhere in text
+  const matchers = countryMatchers(country);
+  const mentionsCountry = matchers.some(a => {
+    const esc = a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^a-z])${esc}([^a-z]|$)`, 'i').test(hay);
+  });
+  if (!mentionsCountry) return false;
+
+  // 3) If country appears only in the title (likely SEO keyword stuffing) and the domain
+  //    pattern looks like an Indian stainless-steel SEO farm, downgrade it.
+  // We still include it (return true) so the result shows, but flag it for scoring.
+  if (INDIAN_SEO_DOMAINS.test(host) && !['India','Pakistan','Bangladesh','Nepal','Sri Lanka'].includes(country)) {
+    r._seoSpam = true;
+  }
+  return true;
+}
+// Apply country filter to a scored list. Keeps in-country results; if that removes
+// everything, returns the original list with a note so the user isn't left empty.
+function applyCountryFilter(results, country, { keep = () => false } = {}) {
+  if (!country) return { results, note: null };
+  const inC = results.filter(r => keep(r) || resultInCountry(r, country));
+  if (inC.length === 0) {
+    return { results, note: `Couldn't confirm any results specifically in ${country}; showing closest matches. Try adding a city or the company website for a tighter match.` };
+  }
+  return { results: inC, note: null };
+}
+
+// Extract actionable trade signals from a snippet
+function extractSignals(title, snippet) {
+  const text = (title + ' ' + snippet).replace(/\s+/g, ' ');
+  const signals = [];
+
+  // Price
+  const priceM = text.match(/(?:USD?|US\$|\$|€|£|¥|CNY|INR|₹)\s*[\d,.]+(?: ?[-–] ?(?:USD?|US\$|\$|€|£|¥|CNY|INR|₹)?\s*[\d,.]+)?(?:\s*\/\s*(?:pc|pcs|piece|unit|kg|mt|ton|set|roll|yard|meter|m))?/i)
+    || text.match(/[\d,.]+ ?(?:USD|EUR|GBP|CNY|INR)(?:\s*\/\s*(?:pc|pcs|piece|unit|kg|mt|set))?/i);
+  if (priceM) signals.push({ type: 'price', label: priceM[0].trim() });
+
+  // MOQ
+  const moqM = text.match(/MOQ[:\s]+[\d,]+ ?(?:pcs?|pieces?|units?|sets?|kg|mt|tons?|meters?|yards?)?/i)
+    || text.match(/minimum order[:\s]+[\d,]+ ?(?:pcs?|pieces?|units?|sets?|kg|mt)?/i)
+    || text.match(/min(?:imum)? ?(?:order)?[:\s]+[\d,]+ ?(?:pcs?|units?|sets?|kg)?/i);
+  if (moqM) signals.push({ type: 'moq', label: moqM[0].trim() });
+
+  // Certifications
+  const certs = [];
+  const certPatterns = [
+    /ISO\s*\d{3,5}(?::\d{4})?/gi, /CE\b/g, /\bRoHS\b/gi, /\bGOTS?\b/gi,
+    /\bHACCP\b/gi, /\bGMP\b/gi, /\bFDA\b/gi, /\bUL\b/g, /\bBIS\b/g,
+    /\bASTM\b/gi, /\bDIN\b/g, /\bJIS\b/g, /\bBSCI\b/gi, /\bOEKO-TEX\b/gi,
+    /\bFSC\b/g, /\bReach\b/gi, /\bTS\s*16949\b/gi, /\bIATF\b/gi,
+    /\bUL\s*listed\b/gi, /\bUL\s*certified\b/gi
+  ];
+  for (const pat of certPatterns) {
+    const m = text.match(pat);
+    if (m) m.forEach(c => certs.push(c.trim()));
+  }
+  if (certs.length) signals.push({ type: 'cert', label: [...new Set(certs)].slice(0, 4).join(' · ') });
+
+  // Lead time / delivery
+  const ltM = text.match(/(?:lead time|delivery|ship|dispatch)[:\s]+\d+[-–]?\d*\s*(?:days?|weeks?|business days?)/i)
+    || text.match(/ready to ship in\s+\d+[-–]?\d*\s*(?:days?|weeks?)/i)
+    || text.match(/\d+[-–]\d+\s*(?:days?|weeks?)\s*(?:delivery|lead time|shipping)/i);
+  if (ltM) signals.push({ type: 'leadtime', label: ltM[0].trim() });
+
+  // Location / city
+  const locM = text.match(/(?:located in|based in|factory in|plant in|headquartered in)[:\s]+([A-Z][a-zA-Z\s,]{3,40})/i);
+  if (locM) signals.push({ type: 'location', label: locM[1].trim().slice(0, 35) });
+
+  // Year established
+  const yrM = text.match(/(?:est(?:ablished)?\.?|since|founded|incorporated)\s*(?:in\s*)?((?:19|20)\d{2})\b/i);
+  if (yrM) signals.push({ type: 'since', label: 'Est. ' + yrM[1] });
+
+  // Capacity / output
+  const capM = text.match(/(?:annual|monthly|daily)\s+(?:capacity|output|production)[:\s]+[\d,.]+ ?(?:MT|tons?|pcs|units?|m²|sqm)?/i);
+  if (capM) signals.push({ type: 'capacity', label: capM[0].trim() });
+
+  // Export experience
+  if (/export(?:er|ing|s)?\s+(?:to|since|for)/i.test(text)) signals.push({ type: 'export', label: 'Exporter' });
+
+  return signals;
+}
+
+// Categorise a result so the frontend can separate direct sites from directories
+function categorise(displayLink, title, snippet) {
+  const dom = (displayLink || '').toLowerCase();
+  const MARKETPLACES = [
+    'alibaba.com', 'aliexpress.com', 'made-in-china.com', 'indiamart.com',
+    'tradeindia.com', 'ec21.com', 'tradekey.com', 'dhgate.com',
+    'global-sources.com', 'globalsources.com', '1688.com', 'diytrade.com',
+    'exportersindia.com', 'b2bmart.com', 'esources.co.uk',
+    'goldsupplier.com',   // Alibaba Gold Supplier subdomain pages
+    'europages.com', 'europages.co.uk', 'kompass.com', 'directindustry.com',
+    'thomasnet.com', 'wer-liefert-was.de', 'yellowpages.com', 'mfgpages.com'
+  ];
+  if (MARKETPLACES.some(m => dom.includes(m))) return 'marketplace';
+  if (/linkedin\.com/i.test(dom)) return 'linkedin';
+  return 'direct';
+}
+
+async function searchBrave(query, country, count = 20, offset = 0) {
+  const meta = country ? COUNTRY_META[country] : null;
+  const params = new URLSearchParams({ q: query, count: String(Math.min(count, 20)) });
+  if (offset > 0) params.set('offset', String(Math.min(offset, 9)));
+  if (meta && meta.code !== 'ALL') {
+    params.set('country', meta.code);
+  }
+  const url = `https://api.search.brave.com/res/v1/web/search?${params.toString()}`;
+
+  // Retry up to 3 times on transient errors (429 rate-limit, 5xx). Brave's free
+  // tier allows ~1 req/sec, so a brief backoff turns a hard failure into a success.
+  let data, resp, lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      resp = await fetch(url, {
+        headers: { 'Accept': 'application/json', 'Accept-Encoding': 'gzip', 'X-Subscription-Token': BRAVE_API_KEY }
+      });
+      if (resp.status === 429 || resp.status >= 500) {
+        lastErr = new Error(`Brave Search ${resp.status}`);
+        await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+        continue;
+      }
+      data = await resp.json();
+      if (!resp.ok) throw new Error((data && data.message) || `Brave Search error (${resp.status})`);
+      break;
+    } catch (err) {
+      lastErr = err;
+      await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
+    }
+  }
+  if (!data) throw (lastErr || new Error('Brave Search failed'));
+
+  return (data.web && data.web.results || []).map(item => {
+    const itemUrl = item.url || '';
+    const displayLink = itemUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+    const title = item.title || '';
+    const snippet = item.description || '';
+    const { type, confidence } = classify(title, snippet, displayLink, itemUrl);
+    const thumbnail = (item.thumbnail && item.thumbnail.src) ? item.thumbnail.src : null;
+    const signals = extractSignals(title, snippet);
+    const category = categorise(displayLink, title, snippet);
+    const age = item.age || item.page_age || null;
+    return { title, link: itemUrl, snippet, displayLink, type, confidence, thumbnail, signals, category, age };
+  });
+}
+
+// Run several Brave queries resiliently — a failure in one query never kills the
+// whole search; we just use whatever results the successful queries returned.
+async function braveMulti(queries) {
+  const settled = await Promise.allSettled(
+    queries.map(({ q, country = null, offset = 0 }) =>
+      BRAVE_API_KEY ? searchBrave(q, country, 20, offset) : Promise.resolve([])
+    )
+  );
+  return settled.map(s => (s.status === 'fulfilled' ? s.value : []));
+}
+
+function deduplicateResults(arrays, { maxPerDomain = 2, limit = 25, noiseFilter = true } = {}) {
+  const seen = new Set();
+  const seenDomain = new Map();
+  const out = [];
+  for (const item of arrays.flat()) {
+    if (!item.link) continue;
+    if (seen.has(item.link)) continue;
+    seen.add(item.link);
+    const dom = (item.displayLink || '').toLowerCase();
+    if (noiseFilter && NOISE_DOMAINS.some(d => dom.includes(d))) continue;
+    const domCount = seenDomain.get(dom) || 0;
+    if (domCount >= maxPerDomain) continue;
+    seenDomain.set(dom, domCount + 1);
+    out.push(item);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+// Words that are never part of a real person's name — if a captured "name"
+// contains any of these, it's a prose fragment (e.g. "and Executive Vice"), not a person.
+const NON_NAME_WORDS = new Set([
+  'and','or','the','of','for','to','in','at','on','with','from','by','our','your','their','its',
+  'a','an','as','is','are','was','were','be','we','us','you','he','she','they','this','that',
+  'including','include','key','decision','decisions','team','teams','member','members','staff',
+  'group','company','companies','corporation','corp','inc','ltd','llc','gmbh','co','holdings',
+  'executive','executives','chief','officer','officers','president','vice','senior','junior',
+  'board','management','leadership','director','directors','manager','managers','head','heads',
+  'ceo','cfo','cto','coo','cmo','founder','founders','chairman','chairwoman','owner','partner',
+  'global','international','national','regional','worldwide','corporate','department','division',
+  'about','contact','overview','news','profile','services','products','solutions','industries',
+  'meet','learn','more','read','view','see','all','other','new','top','best','list','people',
+  // Geographic / business-unit words — "Asia Pacific", "Greater China", "Customer Service"
+  'asia','pacific','europe','european','america','american','africa','african','china','chinese',
+  'india','indian','japan','korea','greater','middle','east','west','north','south','central',
+  'energy','mobility','healthineers','customer','service','strategy','diagnostic','imaging',
+  'digital','financial','cloud','security','enterprise','consumer','retail','wholesale','unit'
+]);
+
+// Strictly validate that a captured string looks like a real human name.
+function isValidPersonName(raw) {
+  if (!raw) return false;
+  const name = raw.trim().replace(/\s+/g, ' ');
+  if (name.length < 4 || name.length > 40) return false;
+  const words = name.split(' ');
+  if (words.length < 2 || words.length > 4) return false;
+  for (const w of words) {
+    // Each word: a capital letter, then letters/'/- (allow "McAdam", "O'Neil", "Jean-Luc")
+    if (!/^[A-Z][a-zA-Z'’\-.]*[a-zA-Z'’]$|^[A-Z][a-zA-Z]$/.test(w)) return false;
+    if (NON_NAME_WORDS.has(w.toLowerCase().replace(/[.'’\-]/g, ''))) return false;
+    // Reject ALL-CAPS tokens longer than 1 char (acronyms/titles, e.g. "USA", "CEO")
+    if (w.length > 1 && w === w.toUpperCase() && /[A-Z]{2,}/.test(w)) return false;
+  }
+  return true;
+}
+
+// Clean a raw title string into a concise role label.
+function cleanRoleTitle(raw) {
+  if (!raw) return '';
+  let t = raw.trim().replace(/\s+/g, ' ').replace(/\s*\|\s*linkedin.*$/i, '');
+  // Cut at the company/"at"/"@" boundary so we keep just the role
+  t = t.replace(/\s+(at|@|—|–|-)\s+.*$/i, '').trim();
+  if (t.length > 48) t = t.slice(0, 48).trim();
+  return t;
+}
+
+// ── Company key-people lookup ─────────────────────────────────────────────────
+app.get('/api/company-people', async (req, res) => {
+  const company = (req.query.company || '').trim();
+  if (!company) return res.status(400).json({ error: 'company required' });
+
+  const EXEC_TITLES = ['Chief Executive Officer','CEO','Chief Operating Officer','COO',
+    'Chief Financial Officer','CFO','Chief Technology Officer','CTO','Chief Marketing Officer','CMO',
+    'Co-Founder','Founder','President','Vice President','Chairman','Chairwoman',
+    'Managing Director','General Manager','Sales Director','Marketing Director',
+    'Head of Sales','Head of Marketing','Director','Owner','Partner'];
+
+  const titleOr = '(CEO OR Founder OR "Managing Director" OR President OR Chairman OR "Chief Executive" OR director OR owner)';
+  // Mix of: people-listing pages, LinkedIn profiles, and structured directories.
+  const q1 = `"${company}" leadership team executives`;
+  const q2 = `"${company}" ${titleOr}`;
+  const q3 = `"${company}" site:linkedin.com/in`;
+  const q4 = `"${company}" (management OR "board of directors" OR "our team" OR "key people")`;
+
+  try {
+    const [r1, r2, r3, r4] = await braveMulti([
+      { q: q1 }, { q: q2 }, { q: q3 }, { q: q4 }
+    ]);
+
+    // Company-name tokens — used to reject (a) people who merely share the company
+    // surname ("Samuel Bosch" when searching Bosch) and (b) division/place "names"
+    // like "Siemens Greater China". Real executives won't have the company name as
+    // one of their name words.
+    const companyTokens = new Set(
+      company.toLowerCase().split(/\s+/).filter(w => w.length > 2)
+        .filter(w => !['the','and','llc','ltd','inc','corp','gmbh','group','company','co'].includes(w))
+    );
+
+    const people = [];
+    const seenNames = new Set();
+    const addPerson = (name, title, source, sourceUrl) => {
+      const clean = (name || '').trim().replace(/\s+/g, ' ');
+      if (!isValidPersonName(clean)) return false;
+      // Reject if any name word IS a company token (named-after-company / division names)
+      const nameWords = clean.toLowerCase().split(' ').map(w => w.replace(/[.'’\-]/g, ''));
+      if (nameWords.some(w => companyTokens.has(w))) return false;
+      const key = clean.toLowerCase();
+      if (seenNames.has(key)) return false;
+
+      // Clean the title; if it's empty or just the company name, use a neutral label.
+      let role = cleanRoleTitle(title);
+      const roleLc = role.toLowerCase();
+      const roleIsCompany = role && [...companyTokens].some(t => roleLc === t || roleLc.includes(t)) && role.split(' ').length <= 2;
+      if (!role || roleIsCompany) role = 'Executive / Team';
+
+      seenNames.add(key);
+      people.push({ name: clean, title: role, source, sourceUrl });
+      return true;
+    };
+
+    const titlePattern = EXEC_TITLES.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    // "Name, Title" / "Name - Title" / "Name | Title"
+    const patA = new RegExp(`([A-Z][a-zA-Z'’.\\-]+(?:\\s[A-Z][a-zA-Z'’.\\-]+){1,2})\\s*[,\\-–—|:]\\s*(${titlePattern})`, 'g');
+    // "Title Name" e.g. "CEO John Smith" / "President Jane Doe"
+    const patB = new RegExp(`(?:^|[\\s,.])(${titlePattern})\\s+([A-Z][a-zA-Z'’.\\-]+(?:\\s[A-Z][a-zA-Z'’.\\-]+){1,2})`, 'g');
+
+    const processText = (text, source, sourceUrl) => {
+      let m;
+      patA.lastIndex = 0;
+      while ((m = patA.exec(text)) !== null) addPerson(m[1], m[2], source, sourceUrl);
+      patB.lastIndex = 0;
+      while ((m = patB.exec(text)) !== null) addPerson(m[2], m[1], source, sourceUrl);
+    };
+
+    // LinkedIn profile: title is usually "Name - Role - Company | LinkedIn"
+    const extractLinkedIn = (r) => {
+      const titleM = (r.title || '').match(/^([^|–—-]+?)\s*[-–—]\s*(.+?)(?:\s*[-–—|]|$)/);
+      if (titleM && addPerson(titleM[1], titleM[2], 'LinkedIn', r.link)) return;
+      // Fallback: derive name from the /in/<slug>
+      const slugM = (r.link || '').match(/linkedin\.com\/in\/([a-z0-9\-]+)/i);
+      if (slugM) {
+        const nameFromSlug = slugM[1].replace(/-\d+$/, '').split('-')
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+        addPerson(nameFromSlug, '(LinkedIn Profile)', 'LinkedIn', r.link);
+      }
+    };
+
+    // Crunchbase / ZoomInfo person profiles: "John Smith - CEO @ Company - Crunchbase..."
+    const extractDirectory = (r) => {
+      const titleM = (r.title || '').match(/^([^|–—-]+?)\s*[-–—]\s*(.+?)(?:\s*(?:@|at)\s|[-–—|]|$)/);
+      if (titleM) addPerson(titleM[1], titleM[2], r.displayLink, r.link);
+    };
+
+    for (const r of [...r1, ...r2, ...r3, ...r4]) {
+      const url = (r.link || '').toLowerCase();
+      if (url.includes('linkedin.com/in/')) extractLinkedIn(r);
+      else if (/crunchbase|zoominfo|theorg\.com|rocketreach/.test(url)) extractDirectory(r);
+      else processText(((r.title || '') + '. ' + (r.snippet || '')), r.displayLink || r.link, r.link);
+    }
+
+    res.json({ company, people: people.slice(0, 12) });
+  } catch (err) {
+    res.status(500).json({ error: 'People lookup failed: ' + err.message });
+  }
+});
+
+app.get('/api/search', async (req, res) => {
+  const subject = (req.query.q || '').trim();
+  const country = (req.query.country || '').trim();
+  const company = (req.query.company || '').trim();
+  const person  = (req.query.person  || '').trim();
+  const gender  = (req.query.gender  || '').trim().toLowerCase(); // 'male', 'female', or ''
+  const website = (req.query.website || '').trim(); // optional known company website
+
+  if (!subject && !country && !company && !person) {
+    return res.status(400).json({ error: 'Please provide a product subject, a country, a company name, or a person name to search.' });
+  }
+
+  if (!LIVE_MODE) {
+    let results;
+    if (person)  results = searchDemoByPersonName(person);
+    else if (company) results = searchDemoByCompanyName(company);
+    else results = searchDemo(subject, country);
+    return res.json({ subject, country, company, person, count: results.length, results, demoMode: true });
+  }
+
+  // Build a tight, country-specific query
+  const meta = country ? COUNTRY_META[country] : null;
+  let query;
+  if (person) {
+    const countryClause = country ? ` "${country}"` : '';
+    const genderClause  = gender === 'male'   ? ' (he OR his OR him OR "Mr." OR businessman OR "male")' :
+                          gender === 'female' ? ' (she OR her OR "Ms." OR "Mrs." OR businesswoman OR "female")' : '';
+    // q1: LinkedIn profile (most reliable source for professionals)
+    const q1 = `"${person}" linkedin${countryClause}${genderClause}`;
+    // q2: executive/role titles — find their company position
+    const q2 = `"${person}" (CEO OR director OR founder OR owner OR president OR chairman OR manager OR partner)${countryClause}${genderClause}`;
+    // q3: general professional presence — news, company pages, interviews
+    const q3 = `"${person}" (company OR business OR contact OR email OR interview OR biography)${countryClause}${genderClause}`;
+    // q4: structured professional directories
+    const q4 = `"${person}" (crunchbase OR zoominfo OR bloomberg OR "executive profile" OR "board member")${countryClause}${genderClause}`;
+    try {
+      const [r1, r2, r3, r4] = await braveMulti([
+        { q: q1, country }, { q: q2, country }, { q: q3, country }, { q: q4, country }
+      ]);
+
+      const nameLower = person.toLowerCase();
+      const nameParts = nameLower.split(/\s+/).filter(Boolean);
+      // Score every candidate first, then dedup so the best page per domain wins.
+      const scoredAll = [
+        ...r1.map(r=>({...r,_qs:3})), ...r2.map(r=>({...r,_qs:2})),
+        ...r3.map(r=>({...r,_qs:1})), ...r4.map(r=>({...r,_qs:2}))
+      ].map(r => {
+          const url     = (r.link    || '').toLowerCase();
+          const title   = (r.title   || '').toLowerCase();
+          const snippet = (r.snippet || '').toLowerCase();
+          let score = r._qs * 10;
+          if (url.includes('linkedin.com/in'))                           score += 45;
+          else if (url.includes('linkedin.com'))                         score += 25;
+          if (/crunchbase|zoominfo|bloomberg|dnb\.com/.test(url))        score += 18;
+          if (url.includes(nameLower.replace(/\s+/g, '-')))             score += 20;
+          if (title.includes(nameLower))                                 score += 15;
+          if (snippet.includes(nameLower))                               score += 8;
+          if (/ceo|director|founder|owner|president|chairman|manager|partner/i.test(title + snippet)) score += 10;
+          if (/email|phone|contact|\+\d/.test(snippet))                 score += 6;
+          // Relevance: at least one name part must appear somewhere
+          const mentions = nameParts.some(p => title.includes(p) || snippet.includes(p) || url.includes(p));
+          return { ...r, _score: score, _relevant: mentions };
+        });
+
+      const relevantP = scoredAll.filter(r => r._relevant);
+      const poolP = relevantP.length >= 4 ? relevantP : scoredAll;
+      poolP.sort((a, b) => b._score - a._score);
+
+      const scoredP = deduplicateResults([poolP], { maxPerDomain: 2, limit: 24, noiseFilter: false })
+        .map(r => { const { _qs, _score, _relevant, ...rest } = r; return { ...rest, type: 'person', confidence: null }; });
+
+      const { results: scored, note: countryNote } = applyCountryFilter(scoredP, country);
+      return res.json({ subject: '', country, company: '', person, count: scored.length, results: scored, countryNote, demoMode: false });
+    } catch(err) {
+      return res.status(500).json({ error: 'Person search failed: ' + err.message });
+    }
+  } else if (company) {
+    const countryClause = country ? ` "${country}"` : '';
+    const brand = stripLegalSuffix(company) || company; // "Erez Pte Ltd" → "Erez"
+
+    // If the user supplied a known website, normalise it to host + origin and make it
+    // the authoritative source.
+    let wantHost = null, wantOrigin = null;
+    if (website) {
+      let w = website.trim();
+      if (!/^https?:\/\//i.test(w)) w = 'https://' + w;
+      try { const u = new URL(w); wantHost = u.host.replace(/^www\./, '').toLowerCase(); wantOrigin = u.origin; } catch (_) {}
+    }
+    const siteClause = wantHost ? ` site:${wantHost}` : '';
+
+    // q1: official website / homepage
+    const cq1 = `"${company}" (official website OR homepage OR "official site")${countryClause}`;
+    // q2: company profile / about / overview
+    const cq2 = `"${company}" (about OR "company profile" OR overview OR "who we are" OR headquarters)${countryClause}`;
+    // q3: contact details
+    const cq3 = `"${company}" (contact OR phone OR email OR address)${countryClause}`;
+    // q4: authoritative structured sources — LinkedIn, Crunchbase, Wikipedia, Bloomberg
+    const cq4 = `"${company}" company (linkedin OR crunchbase OR wikipedia OR bloomberg OR "dun & bradstreet")${countryClause}`;
+    // q5: brand (legal suffix stripped) + leadership/products — widens discovery for
+    //     names like "Erez Pte Ltd" whose official site doesn't carry the full legal name.
+    const cq5 = wantHost
+      ? `${brand}${siteClause}`
+      : `${brand} (company OR official website OR contact OR products)${countryClause}`;
+    try {
+      const [cr1, cr2, cr3, cr4, cr5] = await braveMulti([
+        { q: cq1, country }, { q: cq2, country }, { q: cq3, country },
+        { q: cq4, country }, { q: cq5, country: wantHost ? null : country }
+      ]);
+
+      const companySlug  = company.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const companyWords = company.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+      // Registrable-ish host (strip leading www. and any sub-domain noise for matching)
+      const hostOf = (r) => (r.displayLink || '').toLowerCase().replace(/^www\./, '');
+      const matchesName = (host) => {
+        const h = host.replace(/[^a-z0-9]/g, '');
+        if (companySlug.length >= 4 && h.includes(companySlug)) return true;
+        // all significant words present in the host
+        return companyWords.length > 0 && companyWords.every(w => host.includes(w));
+      };
+
+      // Third-party / aggregator domains that merely MENTION the company but are not
+      // the company itself — retailer Q&A, review, repair, complaint, jobs sites.
+      const THIRD_PARTY = /(bestbuy|lowes|homedepot|walmart|amazon|ebay|target|costco|repair|review|complaint|glassdoor|indeed|trustpilot|yelp|justdial|yellowpages|mapquest|facebook|tiktok|pinterest|reddit|quora)/i;
+
+      const all = [
+        ...cr1.map(r=>({...r,_qs:3})), ...cr2.map(r=>({...r,_qs:3})),
+        ...cr3.map(r=>({...r,_qs:2})), ...cr4.map(r=>({...r,_qs:2})),
+        ...cr5.map(r=>({...r,_qs:1}))
+      ];
+
+      // If the user supplied a website, guarantee its homepage is present as a result
+      // even if the search didn't return it — this is the authoritative source.
+      if (wantOrigin && !all.some(r => hostOf(r) === wantHost)) {
+        all.unshift({
+          title: `${company} — Official Website`,
+          link: wantOrigin, snippet: `Official website of ${company}.`,
+          displayLink: wantHost, type: 'unclassified', confidence: null,
+          signals: [], category: 'direct', _qs: 5
+        });
+      }
+
+      // Detect the OFFICIAL domain. If the user gave a website, that wins outright.
+      // Otherwise: among hosts whose name matches the company, the one appearing most
+      // often (ties broken by shortest host = closest to root).
+      let officialDomain = wantHost;
+      if (!officialDomain) {
+        const officialCounts = {};
+        for (const r of all) {
+          const h = hostOf(r);
+          if (h && matchesName(h) && !THIRD_PARTY.test(h) && !isAggregatorHost(h)) officialCounts[h] = (officialCounts[h] || 0) + 1;
+        }
+        officialDomain = Object.keys(officialCounts)
+          .sort((a, b) => (officialCounts[b] - officialCounts[a]) || (a.length - b.length))[0] || null;
+      }
+
+      // Score first, THEN dedup, so the best page per domain survives. noiseFilter is
+      // off here because LinkedIn/Crunchbase/Wikipedia are valuable for company lookups.
+      const scoredAll = all.map(r => {
+        const url = (r.link || '').toLowerCase();
+        const host = hostOf(r);
+        const path = url.replace(/^https?:\/\/[^/]+/, '');
+        const title = (r.title || '').toLowerCase();
+        const snippet = (r.snippet || '').toLowerCase();
+        let score = r._qs * 8;
+
+        const isOfficial = officialDomain && host === officialDomain;
+        const nameInHost = matchesName(host);
+        const thirdParty = THIRD_PARTY.test(host);
+        const aggregator = isAggregatorHost(host);
+
+        // The company's OWN official site is by far the most relevant
+        if (isOfficial)        score += 80;
+        else if (nameInHost)   score += 35;          // other domain bearing the name
+        // The user-supplied website always wins
+        if (wantHost && host === wantHost) score += 120;
+        // Homepage/about/contact pages of the official site
+        if (isOfficial && /^\/?$/.test(path))               score += 25;
+        if (isOfficial && /contact|about|company/.test(path)) score += 12;
+        // Authoritative structured profiles
+        if (url.includes('linkedin.com/company')) score += 40;
+        if (/crunchbase|bloomberg|zoominfo|dnb\.com|\.wikipedia\.org/.test(host)) score += 28;
+        // Company name in title
+        if (companyWords.length && companyWords.every(w => title.includes(w))) score += 12;
+        // Contact signals
+        if (/phone|email|address|tel:|fax|\+\d/.test(snippet)) score += 6;
+        // Penalize third-party retailer/review/aggregator pages heavily
+        if (thirdParty) score -= 45;
+        // Penalize results that don't bear the company name anywhere meaningful
+        const nameInTitle = companyWords.some(w => title.includes(w));
+        if (!nameInTitle && !nameInHost) score -= 25;
+
+        // Relevance: the company name must appear in the title or the host (snippet
+        // alone is too weak — many off-topic pages mention a brand in passing).
+        const relevant = companyWords.length === 0 || nameInTitle || nameInHost;
+        // Tag aggregator/directory results so the frontend won't scrape a possibly-
+        // wrong street address from them and present it as authoritative.
+        return { ...r, _score: score, _relevant: relevant, isAggregator: aggregator, isOfficial: isOfficial || (wantHost && host === wantHost) };
+      });
+
+      const relevantC = companyWords.length ? scoredAll.filter(r => r._relevant) : scoredAll;
+      const poolC = relevantC.length >= 4 ? relevantC : scoredAll;
+      poolC.sort((a, b) => b._score - a._score);
+
+      const scoredC = deduplicateResults([poolC], { maxPerDomain: 3, limit: 24, noiseFilter: false })
+        .map(r => { const { _qs, _score, _relevant, ...rest } = r; return rest; });
+
+      // Filter to the selected country, but always keep the official / user-provided
+      // site (it's the exact company the user wants, regardless of where its TLD points).
+      const { results: scored, note: countryNote } = applyCountryFilter(scoredC, country, { keep: r => r.isOfficial });
+      return res.json({ subject: '', country, company, person: '', officialDomain, count: scored.length, results: scored, countryNote, demoMode: false });
+    } catch(err) {
+      return res.status(500).json({ error: 'Company search failed: ' + err.message });
+    }
+  } else {
+    // ── Product / supplier search ──────────────────────────────────────────────
+    // Strategy: run 9 complementary queries covering different angles (manufacturer
+    // direct sites, distributors, marketplaces, industry directories, exporters,
+    // broad fallback). Country is embedded IN the query text (not just as a Brave
+    // country param) so Brave's full-text index picks up snippets that mention the
+    // country — this is far more reliable than post-filtering alone.
+    const cc = country ? `"${country}"` : '';
+
+    // Exclude low-value noise pages only — keep broad enough to surface real suppliers
+    const noNoise = `-wikipedia -"top 10" -"top 20" -"top 5" -"best of" -"ranking"`;
+
+    // q1: Manufacturer direct sites (highest value)
+    const q1 = cc
+      ? `${subject} manufacturer ${cc} -site:alibaba.com -site:amazon.com -site:ebay.com`
+      : `${subject} manufacturer OEM factory direct -site:alibaba.com -site:amazon.com`;
+
+    // q2: Distributors / wholesalers
+    const q2 = cc
+      ? `${subject} distributor wholesaler supplier ${cc} -site:amazon.com -site:ebay.com`
+      : `${subject} wholesale distributor supplier B2B bulk -site:amazon.com`;
+
+    // q3: B2B directory listings — Alibaba, IndiaMART, MIC, GlobalSources, TradeKey
+    const q3 = `${subject}${cc ? ' ' + cc : ''} (site:alibaba.com OR site:indiamart.com OR site:made-in-china.com OR site:globalsources.com OR site:tradekey.com OR site:ec21.com)`;
+
+    // q4: Export / trade companies
+    const q4 = cc
+      ? `${subject} exporter ${cc} (FOB OR CIF OR "export price" OR "shipping" OR "container")`
+      : `${subject} exporter manufacturer (FOB OR CIF OR EXW OR "export price" OR "trade") ${noNoise}`;
+
+    // q5: Industry B2B directories (ThomasNet, DirectIndustry, Kompass, Europages)
+    const q5 = `${subject}${cc ? ' ' + cc : ''} (site:thomasnet.com OR site:directindustry.com OR site:kompass.com OR site:europages.com OR site:mfgpages.com OR site:globalspec.com)`;
+
+    // q6: Broad unconstrained — catches suppliers the focused queries miss
+    const q6 = cc
+      ? `${subject} supplier factory ${cc} ${noNoise}`
+      : `${subject} (manufacturer OR supplier OR factory OR producer) ${noNoise}`;
+
+    // q7: Contact/quote pages — pages most likely to be actual business websites
+    const q7 = cc
+      ? `${subject} ${cc} ("request a quote" OR "contact us" OR "get a quote" OR "inquiry" OR "RFQ") -site:alibaba.com`
+      : `${subject} ("request a quote" OR "contact us" OR "get a quote" OR "send inquiry" OR "RFQ") manufacturer -site:alibaba.com`;
+
+    // q8: Certification and capacity signals — pages mentioning production details
+    const q8 = cc
+      ? `${subject} ${cc} (ISO OR GMP OR "annual capacity" OR "production line" OR "our factory" OR "our plant")`
+      : `${subject} (ISO OR "ISO 9001" OR "annual capacity" OR "production capacity" OR "our factory" OR OEM ODM)`;
+
+    // q9: Page 2 of the highest-value query for extra depth
+    const q9 = cc
+      ? `${subject} manufacturer ${cc} -site:alibaba.com -site:amazon.com`
+      : `${subject} manufacturer factory direct -site:alibaba.com`;
+
+    try {
+      const [r1, r2, r3, r4, r5, r6, r7, r8, r9] = await braveMulti([
+        { q: q1, country },
+        { q: q2, country },
+        { q: q3 },
+        { q: q4, country },
+        { q: q5 },
+        { q: q6, country },
+        { q: q7, country },
+        { q: q8, country },
+        { q: q9, country, offset: 1 },
+      ]);
+
+      const subjectTerms = subject.toLowerCase().split(/\s+/).filter(Boolean);
+
+      // Assign each result a quality score before dedup
+      const scored = [
+        ...r1.map(r => ({ ...r, _qs: 5 })),   // manufacturer direct — highest
+        ...r7.map(r => ({ ...r, _qs: 5 })),   // contact/quote pages
+        ...r8.map(r => ({ ...r, _qs: 4 })),   // cert/capacity signals
+        ...r9.map(r => ({ ...r, _qs: 4 })),   // page 2 manufacturer
+        ...r2.map(r => ({ ...r, _qs: 4 })),   // distributors
+        ...r6.map(r => ({ ...r, _qs: 3 })),   // broad
+        ...r4.map(r => ({ ...r, _qs: 3 })),   // exporters
+        ...r5.map(r => ({ ...r, _qs: 2 })),   // industry directories
+        ...r3.map(r => ({ ...r, _qs: 1 })),   // marketplace listings (lower priority)
+      ].map(r => {
+        const titleLc   = (r.title   || '').toLowerCase();
+        const snippetLc = (r.snippet || '').toLowerCase();
+        const dom       = (r.displayLink || '').toLowerCase();
+        let s = r._qs * 10;
+
+        // ── Subject relevance (most important signal) ─────────────────────────
+        const titleTerms   = subjectTerms.filter(t => titleLc.includes(t)).length;
+        const snippetTerms = subjectTerms.filter(t => snippetLc.includes(t)).length;
+        s += titleTerms * 18;    // title match worth much more than snippet
+        s += snippetTerms * 6;
+
+        // ── Country relevance ─────────────────────────────────────────────────
+        if (country) {
+          const countryAliases = countryMatchers(country);
+          const inTitle   = countryAliases.some(a => titleLc.includes(a));
+          const inSnippet = countryAliases.some(a => snippetLc.includes(a));
+          const inDomain  = (() => { const tld = COUNTRY_TLD[country]; return tld && (dom.endsWith('.' + tld) || dom.includes('.' + tld + '.')); })();
+          if (inTitle)   s += 20;
+          if (inSnippet) s += 12;
+          if (inDomain)  s += 15;
+        }
+
+        // ── Page type ─────────────────────────────────────────────────────────
+        if (r.category === 'direct')      s += 30;  // real company website
+        if (r.category === 'marketplace') s -= 10;  // listing page — lower priority
+
+        // ── Supplier-type signals (more nuanced weighting) ────────────────────
+        if (r.type === 'manufacturer') s += 10;
+        if (r.type === 'distributor')  s += 7;
+        // Unclassified direct sites are still better than marketplace listings
+        if (r.type === 'unclassified' && r.category === 'direct') s += 3;
+
+        // ── Business quality signals ──────────────────────────────────────────
+        if (r.signals && r.signals.length >= 2) s += 18;
+        if (r.signals && r.signals.length >= 4) s += 10;  // extra for info-rich pages
+        if (r.signals && r.signals.some(sg => sg.type === 'price'))    s += 12;
+        if (r.signals && r.signals.some(sg => sg.type === 'cert'))     s += 10;
+        if (r.signals && r.signals.some(sg => sg.type === 'moq'))      s += 8;
+        if (r.signals && r.signals.some(sg => sg.type === 'capacity')) s += 8;
+
+        // Contact/quote intent on page
+        if (/contact|inquiry|quote|rfq|\+\d{6,}/.test(snippetLc)) s += 12;
+        if (/email|phone|tel:/.test(snippetLc))                    s += 6;
+
+        // Domain quality signals (manufacturer words in domain = strong signal)
+        if (/manufactur|factory|industri|production|mfg|mfr/.test(dom)) s += 14;
+        if (/distribut|wholesale|trading|supply|supplier/.test(dom))    s += 10;
+        if (/alibaba|indiamart|made-in-china|tradekey|ec21/.test(dom))  s -= 8;
+
+        // ── Noise penalties ───────────────────────────────────────────────────
+        if (/top \d+|best \d+|list of|ranking|review of|guide to/i.test(titleLc)) s -= 40;
+        if (!r.snippet || r.snippet.length < 50)  s -= 20;  // very low info
+        if (!r.snippet || r.snippet.length < 100) s -= 8;   // thin snippet
+
+        // Penalize Indian SEO farms keyword-stuffing foreign country names in titles.
+        // Signal: non-ccTLD .com domain, "manufacturer in <country>" pattern in title,
+        // but snippet mentions India / Indian cities / Indian pricing (₹/INR/Rs.).
+        if (country && country !== 'India') {
+          const isIndianSEO = INDIAN_SEO_DOMAINS.test(dom) ||
+            (/manufacturer.{1,20}in\s+(germany|usa|uk|france|italy|uae|canada|australia|netherlands)/i.test(titleLc) &&
+             /india|mumbai|gujarat|chennai|delhi|pune|kolkata|₹|inr|\brs\b/i.test(snippetLc));
+          if (isIndianSEO) s -= 40;
+        }
+
+        // Mark relevance: at least one subject term must appear somewhere
+        r._relevant = subjectTerms.length === 0 || (titleTerms + snippetTerms) > 0;
+
+        return { ...r, _score: s };
+      });
+
+      // Drop off-topic results; fall back to full pool if subject is very niche
+      const relevant = subjectTerms.length ? scored.filter(r => r._relevant) : scored;
+      const pool = relevant.length >= 6 ? relevant : scored;
+
+      pool.sort((a, b) => b._score - a._score);
+
+      // Stricter per-domain limit for marketplaces (max 2), normal for direct sites
+      const allItemsRaw = (() => {
+        const seen = new Set();
+        const seenDomain = new Map();
+        const out = [];
+        for (const item of pool) {
+          if (!item.link || seen.has(item.link)) continue;
+          seen.add(item.link);
+          const dom = (item.displayLink || '').toLowerCase();
+          if (NOISE_DOMAINS.some(d => dom.includes(d))) continue;
+          const isMarket = item.category === 'marketplace';
+          const max = isMarket ? 2 : 4;
+          const cnt = seenDomain.get(dom) || 0;
+          if (cnt >= max) continue;
+          seenDomain.set(dom, cnt + 1);
+          out.push(item);
+          if (out.length >= 80) break;
+        }
+        return out;
+      })().map(({ _qs, _score, _relevant, ...rest }) => rest);
+
+      // Country filter: if country selected, keep results that mention it;
+      // fall back to full set so we never return empty on thin markets.
+      const { results: allItems, note: countryNote } = applyCountryFilter(allItemsRaw, country);
+
+      // Present direct company sites first, marketplace listings as supplementary
+      const direct      = allItems.filter(r => r.category !== 'marketplace').slice(0, 40);
+      const marketplace = allItems.filter(r => r.category === 'marketplace').slice(0, 12);
+      const items = [...direct, ...marketplace];
+
+      return res.json({
+        subject, country, company, person,
+        count: items.length,
+        results: items,
+        countryNote,
+        resultSections: { direct: direct.length, marketplace: marketplace.length },
+        demoMode: false
+      });
+    } catch (err) {
+      return res.status(500).json({ error: 'Search request failed: ' + err.message });
+    }
+  }
+});
+
+// ── Physical Stock Search ─────────────────────────────────────────────────────
+// Finds suppliers who have a specific product physically in stock right now:
+// ready-to-ship inventory, MOQ, unit price, and warehouse/delivery info.
+
+const DEMO_STOCK = [
+  { title:'LED Bulbs 10W — In Stock, MOQ 500pcs | BrightCore Industries', link:'https://example.com/brightcore-led', displayLink:'brightcore-industries.example.com', snippet:'10W LED bulbs in stock. MOQ: 500 pcs. Unit price: $0.85–$1.20 FOB Shenzhen. Ready to ship within 3 days. Bulk discount available.', subtype:'direct', type:'stock', thumbnail:null },
+  { title:'Steel Pipe 48mm — Warehouse Stock 200 Tons | IronGate Steel', link:'https://example.com/irongate-stock', displayLink:'irongate.example.com', snippet:'200 MT of 48mm schedule 40 steel pipe in stock at Pittsburgh warehouse. ASTM A53 certified. Immediate delivery. Quote within 24h.', subtype:'direct', type:'stock', thumbnail:null },
+  { title:'Cotton Fabric 100% — 50,000 Yards Available | WeaveTech Mills', link:'https://example.com/weavetech-stock', displayLink:'weavetech.example.com', snippet:'50,000 yards of plain-weave 100% cotton fabric in stock. 40s count, 60" wide. CIF port available. GOTS certified. MOQ: 1,000 yards.', subtype:'direct', type:'stock', thumbnail:null },
+  { title:'LED Bulbs Wholesale — Ready Stock 10,000 Units | Volt & Glow', link:'https://example.com/voltglow-stock', displayLink:'voltglow.example.com', snippet:'Multi-brand LED bulbs ready stock in Mumbai warehouse. 5W, 9W, 12W, 18W variants. Price: ₹22–₹65 per piece. Same-day dispatch.', subtype:'warehouse', type:'stock', thumbnail:null },
+  { title:'Solar Panels 400W Mono — Stock Alert: 2,000 Units | SunCell', link:'https://example.com/suncell-stock', displayLink:'suncell.example.com', snippet:'400W monocrystalline panels currently in stock. 2,000 units available. Price: $0.22/Wp FOB Shanghai. Pallet-ready for container loading.', subtype:'direct', type:'stock', thumbnail:null },
+  { title:'Drip Irrigation Kits — 500 Sets In Stock | AgriFlow Technologies', link:'https://example.com/agriflow-stock', displayLink:'agriflow.example.com', snippet:'Complete drip irrigation kits (0.5 acre coverage) in stock at Hadera warehouse. 500 sets available. Ship within 5 business days. MOQ: 10 sets.', subtype:'direct', type:'stock', thumbnail:null },
+  { title:'PCB Assembly Boards — 10,000 Units Surplus Stock | CircuitForge', link:'https://example.com/circuitforge-stock', displayLink:'circuitforge.example.com', snippet:'Surplus PCB stock: 10,000 assembled units from cancelled order. SMT, RoHS compliant. Deep discount. Inquire for specs and pricing.', subtype:'surplus', type:'stock', thumbnail:null },
+  { title:'Plastic Bottles 500ml — 100,000 Units | PolyForm Manufacturing', link:'https://example.com/polyform-stock', displayLink:'polyform.example.com', snippet:'100,000 food-grade HDPE 500ml bottles in stock. Clear and colored variants. MOQ: 5,000 units. $0.09 per unit EXW Houston. Stock updated weekly.', subtype:'direct', type:'stock', thumbnail:null },
+  { title:'Wheat Flour — 500MT Spot Cargo Available | Cargill Grain', link:'https://example.com/cargill-flour', displayLink:'cargill.example.com', snippet:'500 MT of milling-grade wheat flour available for spot delivery. FOB Rotterdam. Moisture < 14%. HACCP certified. Delivery lead time: 7 days.', subtype:'warehouse', type:'stock', thumbnail:null },
+  { title:'Rubber Seals — Ex-Stock 20,000 pcs | SiamRubber', link:'https://example.com/siamrubber-stock', displayLink:'siamrubber.example.com', snippet:'O-rings and seals in EPDM and NBR in stock. 20,000 pcs across 15 sizes. Automotive grade. Price from $0.04/pc. Air freight available.', subtype:'direct', type:'stock', thumbnail:null },
+];
+
+function searchDemoStock(product, country) {
+  const needle = product.toLowerCase();
+  const countryLc = country.toLowerCase();
+  return DEMO_STOCK.filter(d => {
+    const matchProduct = !needle || d.title.toLowerCase().includes(needle) || d.snippet.toLowerCase().includes(needle);
+    const matchCountry = !countryLc || d.snippet.toLowerCase().includes(countryLc) || d.title.toLowerCase().includes(countryLc);
+    return matchProduct && matchCountry;
+  });
+}
+
+app.get('/api/stock', async (req, res) => {
+  const product  = (req.query.product  || '').trim();
+  const country  = (req.query.country  || '').trim();
+  const minQty   = (req.query.minQty   || '').trim(); // e.g. "1000"
+  const unit     = (req.query.unit     || '').trim(); // e.g. "pcs", "kg", "mt"
+
+  if (!product) {
+    return res.status(400).json({ error: 'Please provide a product name.' });
+  }
+
+  if (!LIVE_MODE) {
+    const results = searchDemoStock(product, country);
+    return res.json({ product, country, count: results.length, results, demoMode: true });
+  }
+
+  const countryClause = country ? ` "${country}"` : '';
+  const qtyClause     = minQty  ? ` "${minQty} ${unit || 'pcs'}" OR "MOQ ${minQty}"` : '';
+
+  // q1: suppliers explicitly advertising in-stock / ready-to-ship inventory
+  const q1 = `"${product}" ("in stock" OR "ready to ship" OR "ex-stock" OR "ex stock" OR "available now" OR "immediate delivery" OR "spot cargo")${countryClause}${qtyClause}`;
+  // q2: warehouse stock, bulk availability, surplus
+  const q2 = `"${product}" (warehouse OR inventory OR "bulk stock" OR "stock available" OR "available stock" OR surplus OR "ready inventory")${countryClause}`;
+  // q3: B2B wholesale listings with price / MOQ signals
+  const q3 = `"${product}" (wholesale OR "price per" OR "unit price" OR MOQ OR "minimum order" OR "FOB price" OR "bulk price")${countryClause}`;
+
+  try {
+    const [r1, r2, r3] = await Promise.all([
+      BRAVE_API_KEY ? searchBrave(q1, country || null) : [],
+      BRAVE_API_KEY ? searchBrave(q2, country || null) : [],
+      BRAVE_API_KEY ? searchBrave(q3, country || null) : []
+    ]);
+
+    const seenStock = new Set();
+    const seenStockDomain = new Map();
+
+    const scored = [
+      ...r1.map(r => ({ ...r, _qs: 3 })),
+      ...r2.map(r => ({ ...r, _qs: 2 })),
+      ...r3.map(r => ({ ...r, _qs: 1 }))
+    ].filter(r => {
+      if (seenStock.has(r.link)) return false;
+      seenStock.add(r.link);
+      const dom = (r.displayLink || '').toLowerCase();
+      if (NOISE_DOMAINS.some(d => dom.includes(d))) return false;
+      const domCount = seenStockDomain.get(dom) || 0;
+      if (domCount >= 3) return false;
+      seenStockDomain.set(dom, domCount + 1);
+      return true;
+    }).map(r => {
+      const snippet = (r.snippet || '').toLowerCase();
+      const title   = (r.title   || '').toLowerCase();
+      let score   = r._qs * 10;
+      let subtype = 'listing';
+
+      // Strong in-stock signals
+      if (/in stock|ready to ship|ex.?stock|available now|immediate delivery|spot cargo/.test(snippet + title)) {
+        score += 45; subtype = 'direct';
+      } else if (/warehouse|inventory|bulk stock|stock available|surplus/.test(snippet + title)) {
+        score += 30; subtype = 'warehouse';
+      } else if (/surplus|clearance|overstocked|excess stock/.test(snippet + title)) {
+        score += 20; subtype = 'surplus';
+      }
+
+      // Price / MOQ signals boost relevance
+      if (/\$[\d,.]+|moq|minimum order|price per|fob|cif|unit price/.test(snippet)) score += 15;
+      // Product name in title
+      if (title.includes(product.toLowerCase())) score += 12;
+
+      return { ...r, _score: score, subtype };
+    }).sort((a, b) => b._score - a._score)
+      .slice(0, 24)
+      .map(r => { const { _qs, _score, ...rest } = r; return { ...rest, type: 'stock' }; });
+
+    res.json({ product, country, count: scored.length, results: scored, demoMode: false });
+  } catch (err) {
+    res.status(500).json({ error: 'Stock search failed: ' + err.message });
+  }
+});
+
+// ── AI Analysis ──────────────────────────────────────────────────────────────
+
+async function callAI(prompt) {
+  if (OPENAI_KEY) {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 700,
+        response_format: { type: 'json_object' }
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    return JSON.parse(data.choices[0].message.content);
+  }
+
+  if (GEMINI_KEY) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 700 }
+        })
+      }
+    );
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const raw = data.candidates[0].content.parts[0].text;
+    return JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim());
+  }
+
+  throw new Error('No AI key configured');
+}
+
+// ── Trade / Import-Export Search ─────────────────────────────────────────────
+app.get('/api/trade', async (req, res) => {
+  const product  = (req.query.product  || '').trim();
+  const hsCode   = (req.query.hs       || '').trim();
+  const country  = (req.query.country  || '').trim();
+  const tradeDir = (req.query.dir      || '').trim(); // 'import', 'export', or ''
+
+  if (!product && !hsCode) {
+    return res.status(400).json({ error: 'Please provide a product or HS code to search.' });
+  }
+
+  if (!LIVE_MODE) {
+    return res.json({ product, hsCode, country, tradeDir, count: 0, results: [], demoMode: true,
+      message: 'Trade search requires live API keys. Add BRAVE_API_KEY to .env.' });
+  }
+
+  const term = hsCode ? `HS code ${hsCode} "${product || ''}"` : `"${product}"`;
+  const dirClause = tradeDir === 'import' ? ' (importer OR "import data" OR "import records")' :
+                    tradeDir === 'export' ? ' (exporter OR "export data" OR "export records")' :
+                    ' (import OR export OR trade)';
+  const countryClause = country ? ` "${country}"` : '';
+
+  const q1 = `${term}${dirClause}${countryClause} (shipment OR customs OR "trade data" OR "bill of lading")`;
+  const q2 = `${term} supplier${countryClause} (HS OR "tariff code" OR "customs code" OR "harmonized code")`;
+  const q3 = `${term}${countryClause} (importer exporter OR "trade route" OR "global trade" OR "import export company")`;
+
+  try {
+    const [r1, r2, r3] = await Promise.all([
+      BRAVE_API_KEY ? searchBrave(q1, country || null) : [],
+      BRAVE_API_KEY ? searchBrave(q2, country || null) : [],
+      BRAVE_API_KEY ? searchBrave(q3, country || null) : []
+    ]);
+
+    const results = deduplicateResults(
+      [r1.map(r=>({...r,_qs:3})), r2.map(r=>({...r,_qs:2})), r3.map(r=>({...r,_qs:1}))],
+      { maxPerDomain: 2, limit: 20 }
+    ).map(r => {
+      const text = `${r.title || ''} ${r.snippet || ''}`.toLowerCase();
+      const isTradeDB = /panjiva|importgenius|datamyne|customs|shipment|bill of lading|trade data/i.test(text);
+      let score = (r._qs || 1) * 10;
+      if (isTradeDB) score += 20;
+      if (country && text.includes(country.toLowerCase())) score += 10;
+      const { _qs, ...rest } = r;
+      return { ...rest, type: 'trade', _score: score };
+    }).sort((a,b) => b._score - a._score).slice(0,15)
+     .map(({ _score, ...r }) => r);
+
+    res.json({ product, hsCode, country, tradeDir, count: results.length, results, demoMode: false });
+  } catch(err) {
+    res.status(500).json({ error: 'Trade search failed: ' + err.message });
+  }
+});
+
+// ── Market / Industry Search ──────────────────────────────────────────────────
+app.get('/api/market', async (req, res) => {
+  const industry = (req.query.industry || '').trim();
+  const country  = (req.query.country  || '').trim();
+  const focus    = (req.query.focus    || '').trim(); // 'size', 'trends', 'players', ''
+
+  if (!industry) {
+    return res.status(400).json({ error: 'Please provide an industry or sector to search.' });
+  }
+
+  if (!LIVE_MODE) {
+    return res.json({ industry, country, focus, count: 0, results: [], demoMode: true,
+      message: 'Market search requires live API keys. Add BRAVE_API_KEY to .env.' });
+  }
+
+  const countryClause = country ? ` "${country}"` : '';
+  const focusClause   = focus === 'size'    ? ' ("market size" OR "market value" OR "billion" OR "CAGR" OR "forecast")' :
+                        focus === 'trends'  ? ' (trends OR "market trend" OR "industry trend" OR outlook OR forecast)' :
+                        focus === 'players' ? ' ("key players" OR "major players" OR "leading companies" OR "top manufacturers")' :
+                        ' ("market size" OR "key players" OR "industry outlook" OR "market share")';
+
+  const q1 = `"${industry}" market${focusClause}${countryClause} (report OR analysis OR overview)`;
+  const q2 = `"${industry}" industry${countryClause} (suppliers OR manufacturers OR "supply chain" OR "industry players")`;
+  const q3 = `"${industry}" sector${countryClause} (growth OR "market share" OR competitive OR "leading companies")`;
+
+  try {
+    const [r1, r2, r3] = await Promise.all([
+      BRAVE_API_KEY ? searchBrave(q1, country || null) : [],
+      BRAVE_API_KEY ? searchBrave(q2, country || null) : [],
+      BRAVE_API_KEY ? searchBrave(q3, country || null) : []
+    ]);
+
+    const results = deduplicateResults(
+      [r1.map(r=>({...r,_qs:3})), r2.map(r=>({...r,_qs:2})), r3.map(r=>({...r,_qs:1}))],
+      { maxPerDomain: 2, limit: 20 }
+    ).map(r => {
+      const text = `${r.title || ''} ${r.snippet || ''}`.toLowerCase();
+      let score = (r._qs || 1) * 10;
+      if (/statista|grandviewresearch|mordorintelligence|marketsandmarkets|ibisworld|precedenceresearch/i.test(r.link || '')) score += 25;
+      if (text.includes('market size') || text.includes('market share')) score += 15;
+      if (text.includes(industry.toLowerCase())) score += 10;
+      const { _qs, ...rest } = r;
+      return { ...rest, type: 'market', _score: score };
+    }).sort((a,b) => b._score - a._score).slice(0,15)
+     .map(({ _score, ...r }) => r);
+
+    res.json({ industry, country, focus, count: results.length, results, demoMode: false });
+  } catch(err) {
+    res.status(500).json({ error: 'Market search failed: ' + err.message });
+  }
+});
+
+app.post('/api/ai-analyze', async (req, res) => {
+  if (!AI_PROVIDER) {
+    return res.status(503).json({ error: 'No AI key configured. Add OPENAI_API_KEY or GEMINI_API_KEY to .env' });
+  }
+
+  const { query, results = [], mode = 'product' } = req.body;
+  if (!query) return res.status(400).json({ error: 'query is required' });
+
+  const snippets = results.slice(0, 14).map((r, i) =>
+    `[${i + 1}] ${r.title} | ${r.displayLink || ''} | ${(r.snippet || '').slice(0, 160)}`
+  ).join('\n');
+
+  const modeContext = {
+    product:  'finding global manufacturers and distributors for a product',
+    company:  'researching a specific company — its profile, contacts, and credibility',
+    person:   'finding a business person — their role, company, and contact details',
+    stock:    'finding suppliers with physical inventory ready to ship',
+    image:    'identifying a product or business from an image'
+  }[mode] || 'global supplier search';
+
+  const prompt = `You are a global trade intelligence expert specializing in ${modeContext}.
+
+Query: "${query}"
+Search results:
+${snippets}
+
+Analyze these results and return a JSON object with exactly these fields:
+{
+  "summary": "2-3 sentence expert summary of the most relevant findings",
+  "topPicks": [1, 2, 3],
+  "keyInsights": ["insight 1", "insight 2", "insight 3", "insight 4"],
+  "suggestions": ["refined query 1", "refined query 2", "refined query 3"],
+  "warning": "optional red flag or important note, or empty string if none"
+}
+
+Rules:
+- topPicks: 1-based indices of the 3 most genuinely useful results (not just popular sites)
+- keyInsights: specific actionable facts (MOQ, certifications, pricing signals, market structure, etc.)
+- suggestions: smarter follow-up queries that will surface better supplier leads
+- Be concise and specific — no generic filler
+- Return only valid JSON`;
+
+  try {
+    const analysis = await callAI(prompt);
+    res.json({ analysis, provider: AI_PROVIDER });
+  } catch (err) {
+    res.status(500).json({ error: 'AI analysis failed: ' + err.message });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Product Source Search Engine running at http://localhost:${PORT}`);
+  const liveEngine = BRAVE_API_KEY ? 'Brave Search' : (GOOGLE_API_KEY && GOOGLE_CX) ? 'Google Custom Search' : null;
+  console.log(LIVE_MODE ? `Mode: LIVE (${liveEngine})` : 'Mode: DEMO (no API key configured — using bundled sample data)');
+});
