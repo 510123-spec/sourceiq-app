@@ -1408,2450 +1408,371 @@
     .results-wrap{ padding:0 10px; }
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     🚀 SOURCEIQ VISUAL OVERHAUL — Fun, Bold, Interactive
-     ═══════════════════════════════════════════════════════════ */
 
-  /* Animated mesh gradient background */
+  /* ═══════════════════════════════════════════════
+     SOURCEIQ — LIGHT FROSTED GLASS REDESIGN
+     ═══════════════════════════════════════════════ */
+
+  /* === PALETTE === */
   :root{
-    --bg:#0b0f1e;
-    --neon1:#818cf8; --neon2:#e879f9; --neon3:#22d3ee; --neon4:#34d399;
-    --text:#f0f4ff; --text-2:#94a3b8; --muted:#64748b;
-    --glass:rgba(255,255,255,.06);
-    --glass-border:rgba(255,255,255,.12);
-    --shadow-neon:0 0 30px rgba(129,140,248,.25);
+    --bg-from:#dde8ff; --bg-mid:#f0d9ff; --bg-to:#d9f0ff;
+    --glass:#ffffffcc; --glass-hover:#ffffffee;
+    --border:rgba(255,255,255,.75);
+    --text:#0f172a; --text-2:#334155; --muted:#64748b;
+    --indigo:#4f46e5; --violet:#7c3aed; --pink:#db2777;
+    --teal:#0891b2; --emerald:#059669; --amber:#d97706;
+    --radius:20px;
+    --shadow:0 4px 24px rgba(79,70,229,.08), 0 1px 4px rgba(0,0,0,.06);
+    --shadow-hover:0 20px 60px rgba(79,70,229,.18), 0 8px 24px rgba(0,0,0,.1);
   }
 
-  html,body{ margin:0; background:#0b0f1e; color:var(--text); }
-
-  /* Animated blobs */
-  body{
-    background:#0b0f1e !important;
+  /* === ANIMATED PASTEL BACKGROUND === */
+  html, body { margin:0; min-height:100vh; }
+  body {
+    background: linear-gradient(135deg, #dde8ff 0%, #f0d9ff 35%, #fce4ec 60%, #d9f0ff 100%) !important;
+    background-size:400% 400% !important;
     background-image:none !important;
-    position:relative;
+    animation: bg-shift 12s ease infinite !important;
+    background-attachment:fixed !important;
+    color:var(--text) !important;
   }
-  body::before{
-    content:'';
-    position:fixed; inset:0; z-index:0; pointer-events:none;
+  @keyframes bg-shift {
+    0%   { background-position:0% 50%; }
+    50%  { background-position:100% 50%; }
+    100% { background-position:0% 50%; }
+  }
+  body::before {
+    content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
     background:
-      radial-gradient(ellipse 60% 50% at 20% 20%, rgba(99,102,241,.22) 0%, transparent 60%),
-      radial-gradient(ellipse 50% 50% at 80% 10%, rgba(232,121,249,.18) 0%, transparent 55%),
-      radial-gradient(ellipse 45% 55% at 10% 80%, rgba(34,211,238,.15) 0%, transparent 55%),
-      radial-gradient(ellipse 55% 45% at 90% 75%, rgba(52,211,153,.12) 0%, transparent 50%),
-      radial-gradient(ellipse 40% 40% at 50% 50%, rgba(129,140,248,.08) 0%, transparent 65%);
-    animation:blob-drift 18s ease-in-out infinite alternate;
+      radial-gradient(ellipse 55% 55% at 15% 20%, rgba(199,210,254,.6) 0%, transparent 65%),
+      radial-gradient(ellipse 45% 50% at 85% 15%, rgba(233,213,255,.5) 0%, transparent 60%),
+      radial-gradient(ellipse 50% 45% at 50% 90%, rgba(186,230,253,.5) 0%, transparent 60%);
   }
-  @keyframes blob-drift{
-    0%  { transform:scale(1) translateX(0)    translateY(0);    filter:blur(0px); }
-    33% { transform:scale(1.04) translateX(2%) translateY(-2%); filter:blur(1px); }
-    66% { transform:scale(.97) translateX(-1%) translateY(3%);  filter:blur(0px); }
-    100%{ transform:scale(1.02) translateX(3%) translateY(1%);  filter:blur(.5px); }
-  }
-  body::after{
-    content:'';
-    position:fixed; inset:0; z-index:0; pointer-events:none;
-    background-image:radial-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
-    background-size:30px 30px;
+  body::after {
+    content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:none !important;
   }
 
-  /* ── Topbar ── */
-  .topbar{
-    background:rgba(11,15,30,.7) !important;
-    backdrop-filter:blur(28px) saturate(200%) !important;
-    border-bottom:1px solid rgba(255,255,255,.08) !important;
-    box-shadow:0 1px 0 rgba(255,255,255,.05), 0 8px 32px rgba(0,0,0,.4) !important;
+  /* === TOPBAR === */
+  .topbar {
+    background:rgba(255,255,255,.65) !important;
+    backdrop-filter:blur(32px) saturate(200%) !important;
+    border-bottom:1px solid rgba(255,255,255,.8) !important;
+    box-shadow:0 2px 20px rgba(79,70,229,.08) !important;
   }
-  .topbar::after{
-    background:linear-gradient(90deg, transparent 0%, #818cf8 30%, #e879f9 55%, #22d3ee 80%, transparent 100%) !important;
-    opacity:.5; height:1px !important;
+  .topbar::after {
+    background:linear-gradient(90deg, #4f46e5, #7c3aed, #db2777, #0891b2) !important;
+    height:2px !important; opacity:1 !important;
   }
-  .topbar-name{
-    background:linear-gradient(120deg, #818cf8, #e879f9, #22d3ee) !important;
-    -webkit-background-clip:text !important; background-clip:text !important;
-    color:transparent !important; font-size:17px !important;
-  }
-  .topbar-tag{ color:#64748b !important; }
-  .topbar-pill{
-    background:rgba(129,140,248,.1) !important;
-    border:1px solid rgba(129,140,248,.25) !important;
-    color:#a5b4fc !important;
-  }
-  .topbar-pill:hover{ background:rgba(129,140,248,.2) !important; color:#e0e7ff !important; }
-
-  /* ── Hero ── */
-  .hero{ position:relative; z-index:1; }
-  h1{ color:#f0f4ff !important; }
-  .h1-accent{
-    background:linear-gradient(120deg, #818cf8 0%, #e879f9 40%, #22d3ee 80%) !important;
+  .topbar-name {
+    background:linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #db2777 100%) !important;
     -webkit-background-clip:text !important; background-clip:text !important;
     color:transparent !important;
   }
-  p.subtitle{ color:#94a3b8 !important; }
-  .hero-eyebrow{
-    background:rgba(129,140,248,.12) !important;
-    border:1px solid rgba(129,140,248,.3) !important;
-    color:#a5b4fc !important;
+  .topbar-tag { color:#94a3b8 !important; }
+  .topbar-pill {
+    background:rgba(79,70,229,.08) !important;
+    border:1px solid rgba(79,70,229,.2) !important;
+    color:#4f46e5 !important;
   }
-  .hero-stats{
-    background:rgba(255,255,255,.04) !important;
-    backdrop-filter:blur(20px) !important;
-    border:1px solid rgba(255,255,255,.1) !important;
-    box-shadow:0 8px 32px rgba(0,0,0,.4) !important;
-  }
-  .hero-stat-num{ color:#818cf8 !important; }
-  .hero-stat:nth-child(1) .hero-stat-num{ color:#818cf8 !important; }
-  .hero-stat:nth-child(3) .hero-stat-num{ color:#34d399 !important; }
-  .hero-stat:nth-child(5) .hero-stat-num{ color:#e879f9 !important; }
-  .hero-stat:nth-child(7) .hero-stat-num{ color:#22d3ee !important; }
-  .hero-stat-label{ color:#475569 !important; }
-  .hero-stat-sep{ background:rgba(255,255,255,.08) !important; }
-  .hero-trust-pill{
-    background:rgba(255,255,255,.04) !important;
-    border:1px solid rgba(255,255,255,.1) !important;
-    color:#64748b !important;
-  }
-  .hero-trust-pill:hover{ background:rgba(129,140,248,.12) !important; border-color:rgba(129,140,248,.3) !important; color:#a5b4fc !important; }
+  .topbar-pill:hover { background:rgba(79,70,229,.14) !important; }
 
-  /* ── Search Panel — glassmorphism ── */
-  .panel{
-    background:rgba(255,255,255,.05) !important;
-    backdrop-filter:blur(24px) saturate(180%) !important;
-    border:1px solid rgba(255,255,255,.1) !important;
-    box-shadow:0 4px 24px rgba(0,0,0,.4), 0 0 0 1px rgba(129,140,248,.1), inset 0 1px 0 rgba(255,255,255,.08) !important;
-  }
-  .panel::after{
-    background:linear-gradient(90deg, transparent, rgba(129,140,248,.4) 35%, rgba(232,121,249,.35) 55%, rgba(34,211,238,.25) 80%, transparent) !important;
-  }
-
-  /* ── Mode Tabs ── */
-  .mode-tabs{
-    background:rgba(0,0,0,.3) !important;
-    border:1px solid rgba(255,255,255,.07) !important;
-  }
-  .mode-tab{ color:#64748b !important; }
-  .mode-tab:not(.active):hover{ background:rgba(255,255,255,.06) !important; color:#94a3b8 !important; }
-  .mode-tab.active{
-    background:rgba(129,140,248,.18) !important;
-    color:#e0e7ff !important;
-    box-shadow:0 2px 12px rgba(129,140,248,.2), inset 0 1px 0 rgba(255,255,255,.1) !important;
-  }
-  .mode-tab[data-mode="product"].active  { color:#818cf8 !important; border-color:rgba(129,140,248,.3) !important; }
-  .mode-tab[data-mode="company"].active  { color:#34d399 !important; border-color:rgba(52,211,153,.3) !important; }
-  .mode-tab[data-mode="person"].active   { color:#e879f9 !important; border-color:rgba(232,121,249,.3) !important; }
-  .mode-tab[data-mode="buyers"].active   { color:#22d3ee !important; border-color:rgba(34,211,238,.3) !important; }
-  .mode-tab[data-mode="trade"].active    { color:#22d3ee !important; border-color:rgba(34,211,238,.3) !important; }
-  .mode-tab[data-mode="market"].active   { color:#e879f9 !important; border-color:rgba(232,121,249,.3) !important; }
-  .mode-tab[data-mode="stock"].active    { color:#34d399 !important; border-color:rgba(52,211,153,.3) !important; }
-  .mode-tab[data-mode="image"].active    { color:#fb923c !important; border-color:rgba(251,146,60,.3) !important; }
-
-  /* ── Inputs ── */
-  .search-box input, .search-box select{
-    background:rgba(0,0,0,.35) !important;
-    border:1px solid rgba(255,255,255,.1) !important;
-    color:#f0f4ff !important;
-    caret-color:#818cf8;
-  }
-  .search-box input::placeholder{ color:#334155 !important; }
-  .search-box input:focus, .search-box select:focus{
-    border-color:rgba(129,140,248,.6) !important;
-    box-shadow:0 0 0 3px rgba(129,140,248,.15), 0 0 20px rgba(129,140,248,.1) !important;
-  }
-  .search-box select option{ background:#0f172a !important; color:#f0f4ff !important; }
-  .search-field label, .search-select-field label{ color:#475569 !important; }
-
-  /* ── Search Button — neon glow ── */
-  .search-box button{
-    background:linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #a855f7 100%) !important;
-    box-shadow:0 4px 20px rgba(124,58,237,.5), 0 0 40px rgba(129,140,248,.2), inset 0 1px 0 rgba(255,255,255,.2) !important;
-    position:relative; overflow:hidden;
-  }
-  .search-box button:hover{
-    transform:translateY(-3px) scale(1.03) !important;
-    box-shadow:0 8px 32px rgba(124,58,237,.65), 0 0 60px rgba(129,140,248,.3), inset 0 1px 0 rgba(255,255,255,.25) !important;
-  }
-
-  /* ── Chips ── */
-  .chip{
-    background:rgba(255,255,255,.04) !important;
-    border:1px solid rgba(255,255,255,.09) !important;
-    color:#64748b !important;
-  }
-  .chip:hover{
-    background:rgba(129,140,248,.12) !important;
-    border-color:rgba(129,140,248,.35) !important;
-    color:#a5b4fc !important;
-    box-shadow:0 0 12px rgba(129,140,248,.15) !important;
-  }
-
-  /* ── Cards — glass with neon border glow ── */
-  .card{
-    background:rgba(255,255,255,.04) !important;
-    backdrop-filter:blur(16px) !important;
-    border:1px solid rgba(255,255,255,.1) !important;
-    box-shadow:0 4px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.07) !important;
-    transition:transform .3s cubic-bezier(.34,1.56,.64,1), box-shadow .3s ease, border-color .3s ease !important;
-  }
-  .card:hover{
-    transform:translateY(-8px) scale(1.012) !important;
-    border-color:rgba(129,140,248,.4) !important;
-    box-shadow:0 16px 50px rgba(0,0,0,.5), 0 0 30px rgba(129,140,248,.2), inset 0 1px 0 rgba(255,255,255,.1) !important;
-  }
-  .card::before{
-    height:2px !important;
-    background:linear-gradient(90deg, transparent, #818cf8 30%, #e879f9 55%, #22d3ee 80%, transparent) !important;
-    opacity:.8 !important;
-  }
-  .card h3 a{ color:#e2e8f0 !important; }
-  .card h3 a:hover{ color:#a5b4fc !important; }
-  .card .desc{ color:#64748b !important; }
-  .card-domain a{ color:#334155 !important; }
-  .card-domain a:hover{ color:#818cf8 !important; }
-  .card-divider{ background:rgba(255,255,255,.06) !important; }
-  .card-favicon{
-    background:rgba(129,140,248,.12) !important;
-    border:1px solid rgba(129,140,248,.2) !important;
-  }
-
-  /* Card type neon tints */
-  .card.manufacturer{ border-color:rgba(52,211,153,.2) !important; background:rgba(52,211,153,.04) !important; }
-  .card.manufacturer:hover{ border-color:rgba(52,211,153,.45) !important; box-shadow:0 16px 50px rgba(0,0,0,.5), 0 0 30px rgba(52,211,153,.2) !important; }
-  .card.manufacturer::before{ background:linear-gradient(90deg, transparent, #34d399 30%, #22d3ee 55%, transparent) !important; }
-  .card.distributor{ border-color:rgba(251,146,60,.2) !important; background:rgba(251,146,60,.04) !important; }
-  .card.distributor:hover{ border-color:rgba(251,146,60,.45) !important; box-shadow:0 16px 50px rgba(0,0,0,.5), 0 0 30px rgba(251,146,60,.2) !important; }
-  .card.distributor::before{ background:linear-gradient(90deg, transparent, #fb923c 30%, #fbbf24 55%, transparent) !important; }
-  .card.trade-card{ border-color:rgba(34,211,238,.2) !important; background:rgba(34,211,238,.04) !important; }
-  .card.trade-card:hover{ border-color:rgba(34,211,238,.45) !important; box-shadow:0 16px 50px rgba(0,0,0,.5), 0 0 30px rgba(34,211,238,.2) !important; }
-  .card.market-card{ border-color:rgba(232,121,249,.2) !important; background:rgba(232,121,249,.04) !important; }
-  .card.market-card:hover{ border-color:rgba(232,121,249,.45) !important; box-shadow:0 16px 50px rgba(0,0,0,.5), 0 0 30px rgba(232,121,249,.2) !important; }
-  .card.buyer-card{ border-color:rgba(34,211,238,.2) !important; background:rgba(34,211,238,.03) !important; }
-
-  /* ── Stats bar ── */
-  .stats{
-    background:rgba(255,255,255,.04) !important;
-    border:1px solid rgba(255,255,255,.08) !important;
-    box-shadow:0 4px 24px rgba(0,0,0,.3) !important;
-    color:#64748b !important;
-    backdrop-filter:blur(16px) !important;
-  }
-  .stats strong{ color:#e2e8f0 !important; }
-
-  /* ── Filters ── */
-  .filters{
-    background:rgba(0,0,0,.3) !important;
-    border:1px solid rgba(255,255,255,.08) !important;
-  }
-  .filters button{ color:#475569 !important; }
-  .filters button.active{ background:rgba(129,140,248,.18) !important; color:#a5b4fc !important; border-color:rgba(129,140,248,.3) !important; }
-  .filters button:not(.active):hover{ color:#94a3b8 !important; background:rgba(255,255,255,.05) !important; }
-
-  select#sortBy, .export-btn{
-    background:rgba(0,0,0,.35) !important;
-    border:1px solid rgba(255,255,255,.1) !important;
-    color:#94a3b8 !important;
-  }
-  select#sortBy:hover, .export-btn:hover{
-    border-color:rgba(129,140,248,.35) !important;
-    color:#e2e8f0 !important;
-  }
-
-  /* ── Group title ── */
-  .group-title{ color:rgba(148,163,184,.7) !important; }
-
-  /* ── Empty / welcome state ── */
-  .welcome-title{ color:#e2e8f0 !important; }
-  .welcome-sub{ color:#64748b !important; }
-  .welcome-mode{
-    background:rgba(255,255,255,.04) !important;
-    border:1px solid rgba(255,255,255,.1) !important;
-    color:#94a3b8 !important;
-  }
-  .welcome-mode:hover{
-    background:rgba(129,140,248,.12) !important;
-    border-color:rgba(129,140,248,.3) !important;
-    box-shadow:0 8px 24px rgba(129,140,248,.15) !important;
-  }
-  .wm-label{ color:#94a3b8 !important; }
-  .welcome-icon{ background:rgba(129,140,248,.12) !important; border-color:rgba(129,140,248,.2) !important; color:#818cf8 !important; }
-
-  /* ── AI panel ── */
-  .ai-panel{
-    background:rgba(255,255,255,.04) !important;
-    backdrop-filter:blur(20px) !important;
-    border:1px solid rgba(232,121,249,.2) !important;
-    box-shadow:0 4px 24px rgba(0,0,0,.4), 0 0 30px rgba(232,121,249,.08) !important;
-  }
-  .ai-summary{ background:rgba(129,140,248,.06) !important; border-left-color:rgba(129,140,248,.5) !important; color:#94a3b8 !important; }
-
-  /* ── Person card ── */
-  .person-chip{
-    background:rgba(255,255,255,.04) !important;
-    border:1px solid rgba(232,121,249,.18) !important;
-  }
-  .person-chip:hover{ border-color:rgba(232,121,249,.4) !important; box-shadow:0 6px 20px rgba(232,121,249,.1) !important; }
-  .person-chip .pc-name{ color:#e2e8f0 !important; }
-  .person-chip .pc-title{ color:#475569 !important; }
-
-  /* ── Trust panel ── */
-  .trust-panel{ background:rgba(0,0,0,.3) !important; border-color:rgba(255,255,255,.08) !important; }
-
-  /* ── Stock cards ── */
-  .stock-card{
-    background:rgba(255,255,255,.04) !important;
-    backdrop-filter:blur(16px) !important;
-    border:1px solid rgba(255,255,255,.1) !important;
-  }
-  .stock-card:hover{ border-color:rgba(129,140,248,.35) !important; box-shadow:0 12px 40px rgba(0,0,0,.4), 0 0 20px rgba(129,140,248,.15) !important; }
-  .stock-stats{ background:rgba(255,255,255,.04) !important; border-color:rgba(255,255,255,.08) !important; backdrop-filter:blur(16px) !important; }
-
-  /* ── Banner ── */
-  .banner{ background:rgba(251,146,60,.08) !important; border-color:rgba(251,146,60,.25) !important; color:#fb923c !important; }
-  .country-note{ background:rgba(129,140,248,.08) !important; border-color:rgba(129,140,248,.25) !important; color:#a5b4fc !important; }
-
-  /* ── Skeleton ── */
-  .skeleton-card{ background:rgba(255,255,255,.04) !important; border-color:rgba(255,255,255,.07) !important; }
-  .skeleton-line{ background:rgba(255,255,255,.07) !important; }
-  .skeleton-card::after{ background:linear-gradient(90deg, transparent 25%, rgba(255,255,255,.06) 50%, transparent 75%) !important; }
-
-  /* ── Footer ── */
-  footer{ border-top-color:rgba(255,255,255,.06) !important; background:transparent !important; color:#334155 !important; }
-
-  /* ── Scroll glow effect on cards ── */
-  @keyframes card-glow-pulse{
-    0%,100%{ box-shadow:0 4px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.07); }
-    50%{ box-shadow:0 4px 24px rgba(0,0,0,.4), 0 0 20px rgba(129,140,248,.1), inset 0 1px 0 rgba(255,255,255,.07); }
-  }
-
-  /* ── Result count ── */
-  .result-count{ background:rgba(129,140,248,.12) !important; color:#a5b4fc !important; border-color:rgba(129,140,248,.25) !important; }
-
-  /* ── Details ── */
-  .detail-label{ color:#475569 !important; }
-  .detail-value{ color:#cbd5e1 !important; }
-  .detail-value a{ color:#818cf8 !important; }
-  .details-grid{ border-top-color:rgba(255,255,255,.07) !important; }
-
-  /* ── Quick contact ── */
-  .qc-btn.email   { color:#818cf8 !important; background:rgba(129,140,248,.1) !important; border-color:rgba(129,140,248,.25) !important; }
-  .qc-btn.phone   { color:#34d399 !important; background:rgba(52,211,153,.1) !important; border-color:rgba(52,211,153,.25) !important; }
-  .qc-btn.whatsapp{ color:#34d399 !important; background:rgba(52,211,153,.1) !important; border-color:rgba(52,211,153,.25) !important; }
-  .qc-btn.website { color:#e879f9 !important; background:rgba(232,121,249,.1) !important; border-color:rgba(232,121,249,.25) !important; }
-
-  /* ── 3D Tilt effect on card hover ── */
-  .card{ transform-style:preserve-3d; will-change:transform; }
-
-  /* ── Animated gradient text for h1 ── */
-  @keyframes gradient-shift{
-    0%  { background-position:0% 50%; }
-    50% { background-position:100% 50%; }
-    100%{ background-position:0% 50%; }
-  }
-  .h1-accent{
-    background:linear-gradient(120deg, #818cf8, #e879f9, #22d3ee, #818cf8) !important;
-    background-size:300% 300% !important;
-    animation:gradient-shift 5s ease infinite !important;
+  /* === HERO === */
+  .hero { position:relative; z-index:1; }
+  h1 { color:#0f172a !important; }
+  .h1-accent {
+    background:linear-gradient(120deg, #4f46e5 0%, #7c3aed 40%, #db2777 80%, #0891b2 100%) !important;
+    background-size:300% 100% !important;
+    animation:shimmer-text 4s linear infinite !important;
     -webkit-background-clip:text !important; background-clip:text !important;
     color:transparent !important;
   }
-
-  /* ── Badge glow on manufacturer/distributor ── */
-  .badge.manufacturer{ background:rgba(52,211,153,.1) !important; color:#34d399 !important; border-color:rgba(52,211,153,.3) !important; }
-  .badge.distributor { background:rgba(251,146,60,.1) !important; color:#fb923c !important; border-color:rgba(251,146,60,.3) !important; }
-  .badge.person-badge{ background:rgba(232,121,249,.1) !important; color:#e879f9 !important; border-color:rgba(232,121,249,.3) !important; }
-
-  /* Card export buttons */
-  .card-copy-btn{ border-color:rgba(52,211,153,.3) !important; background:rgba(52,211,153,.08) !important; color:#34d399 !important; }
-  .card-cut-btn { border-color:rgba(251,113,133,.3) !important; background:rgba(251,113,133,.08) !important; color:#fb7185 !important; }
-  .details-btn  { border-color:rgba(129,140,248,.3) !important; background:rgba(129,140,248,.08) !important; color:#818cf8 !important; }
-  .people-btn   { border-color:rgba(232,121,249,.3) !important; background:rgba(232,121,249,.08) !important; color:#e879f9 !important; }
-  .trust-btn    { border-color:rgba(52,211,153,.3) !important; background:rgba(52,211,153,.08) !important; color:#34d399 !important; }
-
-  /* Stats pills */
-  .stats-pill.manu{ background:rgba(52,211,153,.1) !important; color:#34d399 !important; border-color:rgba(52,211,153,.25) !important; }
-  .stats-pill.dist{ background:rgba(251,146,60,.1) !important; color:#fb923c !important; border-color:rgba(251,146,60,.25) !important; }
-  .stats-pill.unk { background:rgba(100,116,139,.08) !important; color:#64748b !important; }
-
-  /* Globe glow */
-  #globeCanvas{
-    box-shadow:0 0 0 1px rgba(129,140,248,.3), 0 0 80px rgba(129,140,248,.4), 0 0 160px rgba(232,121,249,.15), 0 32px 100px rgba(0,0,0,.8) !important;
+  @keyframes shimmer-text {
+    0%   { background-position:0% 0%; }
+    100% { background-position:300% 0%; }
   }
-  .globe-wrap::before{
-    background:radial-gradient(circle at center, rgba(129,140,248,.15) 0%, rgba(232,121,249,.08) 45%, transparent 70%) !important;
+  p.subtitle { color:#475569 !important; }
+  .hero-eyebrow {
+    background:rgba(79,70,229,.08) !important;
+    border:1px solid rgba(79,70,229,.25) !important;
+    color:#4f46e5 !important;
   }
-  .orbit-1{ border-top-color:rgba(129,140,248,.3) !important; border-left-color:rgba(129,140,248,.12) !important; }
-  .orbit-2{ border-top-color:rgba(232,121,249,.25) !important; border-right-color:rgba(232,121,249,.08) !important; }
-  .orbit-3{ border-bottom-color:rgba(34,211,238,.18) !important; }
+  .hero-stats {
+    background:rgba(255,255,255,.7) !important;
+    backdrop-filter:blur(20px) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    box-shadow:var(--shadow) !important;
+  }
+  .hero-stat:nth-child(1) .hero-stat-num { color:#4f46e5 !important; }
+  .hero-stat:nth-child(3) .hero-stat-num { color:#059669 !important; }
+  .hero-stat:nth-child(5) .hero-stat-num { color:#7c3aed !important; }
+  .hero-stat:nth-child(7) .hero-stat-num { color:#0891b2 !important; }
+  .hero-stat-label { color:#94a3b8 !important; }
+  .hero-stat-sep { background:rgba(15,23,42,.1) !important; }
+  .hero-trust-pill {
+    background:rgba(255,255,255,.6) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    color:#64748b !important; backdrop-filter:blur(8px) !important;
+  }
+  .hero-trust-pill:hover { background:rgba(79,70,229,.08) !important; color:#4f46e5 !important; border-color:rgba(79,70,229,.3) !important; }
 
+  /* === SEARCH PANEL — frosted glass === */
+  .panel {
+    background:rgba(255,255,255,.65) !important;
+    backdrop-filter:blur(32px) saturate(180%) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    box-shadow:0 8px 40px rgba(79,70,229,.1), 0 2px 8px rgba(0,0,0,.04), inset 0 1px 0 rgba(255,255,255,.9) !important;
+    border-radius:24px !important;
+  }
+  .panel::after {
+    background:linear-gradient(90deg, transparent, rgba(79,70,229,.3) 30%, rgba(124,58,237,.25) 55%, rgba(219,39,119,.2) 75%, transparent) !important;
+    opacity:.7 !important;
+  }
+
+  /* === MODE TABS === */
+  .mode-tabs {
+    background:rgba(255,255,255,.4) !important;
+    border:1px solid rgba(255,255,255,.8) !important;
+    backdrop-filter:blur(12px) !important;
+  }
+  .mode-tab { color:#94a3b8 !important; }
+  .mode-tab:not(.active):hover { background:rgba(255,255,255,.5) !important; color:#334155 !important; }
+  .mode-tab.active {
+    background:rgba(255,255,255,.9) !important;
+    box-shadow:0 2px 12px rgba(79,70,229,.14), 0 1px 4px rgba(0,0,0,.06) !important;
+    border-radius:10px !important;
+  }
+  .mode-tab[data-mode="product"].active  { color:#4f46e5 !important; }
+  .mode-tab[data-mode="company"].active  { color:#059669 !important; }
+  .mode-tab[data-mode="person"].active   { color:#7c3aed !important; }
+  .mode-tab[data-mode="buyers"].active   { color:#0891b2 !important; }
+  .mode-tab[data-mode="trade"].active    { color:#0891b2 !important; }
+  .mode-tab[data-mode="market"].active   { color:#7c3aed !important; }
+  .mode-tab[data-mode="stock"].active    { color:#059669 !important; }
+  .mode-tab[data-mode="image"].active    { color:#d97706 !important; }
+
+  /* === INPUTS === */
+  .search-box input, .search-box select {
+    background:rgba(255,255,255,.75) !important;
+    border:1px solid rgba(255,255,255,.9) !important;
+    color:#0f172a !important;
+    backdrop-filter:blur(8px) !important;
+    box-shadow:0 1px 4px rgba(0,0,0,.05), inset 0 1px 0 rgba(255,255,255,.9) !important;
+  }
+  .search-box input::placeholder { color:#94a3b8 !important; }
+  .search-box input:focus, .search-box select:focus {
+    background:rgba(255,255,255,.95) !important;
+    border-color:rgba(79,70,229,.4) !important;
+    box-shadow:0 0 0 4px rgba(79,70,229,.1), 0 2px 8px rgba(0,0,0,.06) !important;
+  }
+  .search-box select option { background:#fff !important; color:#0f172a !important; }
+
+  /* === SEARCH BUTTON === */
+  .search-box button {
+    background:linear-gradient(135deg, #4f46e5, #7c3aed, #a855f7) !important;
+    box-shadow:0 4px 20px rgba(79,70,229,.45), 0 1px 4px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.2) !important;
+    border-radius:12px !important;
+    font-weight:700 !important;
+    letter-spacing:.3px !important;
+  }
+  .search-box button:hover {
+    transform:translateY(-3px) scale(1.04) !important;
+    box-shadow:0 10px 36px rgba(79,70,229,.55), 0 4px 12px rgba(124,58,237,.3) !important;
+  }
+
+  /* === CHIPS === */
+  .chip {
+    background:rgba(255,255,255,.6) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    color:#64748b !important; backdrop-filter:blur(8px) !important;
+    transition:all .2s ease !important;
+  }
+  .chip:hover {
+    background:rgba(79,70,229,.1) !important;
+    border-color:rgba(79,70,229,.3) !important;
+    color:#4f46e5 !important;
+    transform:translateY(-2px) !important;
+    box-shadow:0 4px 14px rgba(79,70,229,.12) !important;
+  }
+
+  /* === RESULT CARDS — frosted with 3D tilt === */
+  .card {
+    background:rgba(255,255,255,.65) !important;
+    backdrop-filter:blur(20px) saturate(180%) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    box-shadow:0 4px 20px rgba(0,0,0,.06), 0 1px 4px rgba(0,0,0,.04), inset 0 1px 0 rgba(255,255,255,.9) !important;
+    border-radius:20px !important;
+    transition:all .3s cubic-bezier(.34,1.56,.64,1) !important;
+    transform-style:preserve-3d !important;
+  }
+  .card:hover {
+    background:rgba(255,255,255,.88) !important;
+    transform:translateY(-10px) scale(1.015) rotateX(2deg) !important;
+    box-shadow:var(--shadow-hover) !important;
+    border-color:rgba(79,70,229,.25) !important;
+  }
+  .card::before {
+    height:3px !important;
+    background:linear-gradient(90deg, #4f46e5, #7c3aed, #db2777) !important;
+    opacity:0 !important;
+    transition:opacity .3s ease !important;
+    border-radius:20px 20px 0 0 !important;
+  }
+  .card:hover::before { opacity:1 !important; }
+
+  /* Card type tints */
+  .card.manufacturer {
+    border-color:rgba(5,150,105,.25) !important;
+    background:linear-gradient(150deg, rgba(209,250,229,.5) 0%, rgba(255,255,255,.65) 50%) !important;
+  }
+  .card.manufacturer::before { background:linear-gradient(90deg, #059669, #10b981, #34d399) !important; }
+  .card.manufacturer:hover { box-shadow:0 20px 60px rgba(5,150,105,.18), 0 8px 24px rgba(0,0,0,.08) !important; border-color:rgba(5,150,105,.4) !important; }
+
+  .card.distributor {
+    border-color:rgba(217,119,6,.25) !important;
+    background:linear-gradient(150deg, rgba(254,243,199,.5) 0%, rgba(255,255,255,.65) 50%) !important;
+  }
+  .card.distributor::before { background:linear-gradient(90deg, #d97706, #f59e0b, #fbbf24) !important; }
+  .card.distributor:hover { box-shadow:0 20px 60px rgba(217,119,6,.18), 0 8px 24px rgba(0,0,0,.08) !important; border-color:rgba(217,119,6,.4) !important; }
+
+  .card.trade-card {
+    border-color:rgba(8,145,178,.25) !important;
+    background:linear-gradient(150deg, rgba(207,250,254,.5) 0%, rgba(255,255,255,.65) 50%) !important;
+  }
+  .card.trade-card::before { background:linear-gradient(90deg, #0891b2, #06b6d4, #22d3ee) !important; }
+  .card.trade-card:hover { box-shadow:0 20px 60px rgba(8,145,178,.18), 0 8px 24px rgba(0,0,0,.08) !important; border-color:rgba(8,145,178,.4) !important; }
+
+  .card.market-card {
+    border-color:rgba(124,58,237,.25) !important;
+    background:linear-gradient(150deg, rgba(237,233,254,.5) 0%, rgba(255,255,255,.65) 50%) !important;
+  }
+  .card.market-card::before { background:linear-gradient(90deg, #7c3aed, #8b5cf6, #a78bfa) !important; }
+  .card.market-card:hover { box-shadow:0 20px 60px rgba(124,58,237,.18), 0 8px 24px rgba(0,0,0,.08) !important; border-color:rgba(124,58,237,.4) !important; }
+
+  .card.buyer-card {
+    border-color:rgba(14,165,233,.25) !important;
+    background:linear-gradient(150deg, rgba(224,242,254,.5) 0%, rgba(255,255,255,.65) 50%) !important;
+  }
+  .card.buyer-card::before { background:linear-gradient(90deg, #0ea5e9, #38bdf8, #7dd3fc) !important; }
+  .card.buyer-card:hover { box-shadow:0 20px 60px rgba(14,165,233,.18), 0 8px 24px rgba(0,0,0,.08) !important; }
+
+  /* Card text */
+  .card h3 a { color:#0f172a !important; }
+  .card h3 a:hover { color:#4f46e5 !important; }
+  .card .desc { color:#475569 !important; }
+  .card-domain a { color:#94a3b8 !important; }
+  .card-domain a:hover { color:#4f46e5 !important; }
+  .card-divider { background:rgba(15,23,42,.07) !important; }
+  .card-favicon {
+    background:rgba(255,255,255,.8) !important;
+    border:1px solid rgba(15,23,42,.08) !important;
+    box-shadow:0 1px 6px rgba(0,0,0,.06) !important;
+  }
+
+  /* === STATS BAR === */
+  .stats {
+    background:rgba(255,255,255,.6) !important;
+    backdrop-filter:blur(20px) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    box-shadow:var(--shadow) !important;
+    color:#64748b !important;
+  }
+  .stats strong { color:#0f172a !important; }
+  .stats::before { background:linear-gradient(90deg, transparent, rgba(79,70,229,.3) 35%, rgba(124,58,237,.25) 65%, transparent) !important; }
+
+  /* === FILTERS & SORT === */
+  .filters {
+    background:rgba(255,255,255,.6) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    backdrop-filter:blur(12px) !important;
+  }
+  .filters button { color:#64748b !important; }
+  .filters button.active { background:rgba(79,70,229,.1) !important; color:#4f46e5 !important; border:1px solid rgba(79,70,229,.25) !important; }
+  .filters button:not(.active):hover { background:rgba(255,255,255,.7) !important; color:#334155 !important; }
+  select#sortBy, .export-btn {
+    background:rgba(255,255,255,.6) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    backdrop-filter:blur(12px) !important; color:#64748b !important;
+  }
+  select#sortBy:hover, .export-btn:hover { background:rgba(255,255,255,.85) !important; border-color:rgba(79,70,229,.3) !important; color:#4f46e5 !important; }
+
+  /* === WELCOME STATE === */
+  .welcome-title { color:#0f172a !important; }
+  .welcome-sub { color:#64748b !important; }
+  .welcome-mode {
+    background:rgba(255,255,255,.6) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    backdrop-filter:blur(12px) !important;
+  }
+  .welcome-mode:hover { background:rgba(79,70,229,.08) !important; border-color:rgba(79,70,229,.3) !important; transform:translateY(-4px) !important; box-shadow:0 10px 28px rgba(79,70,229,.14) !important; }
+  .wm-label { color:#334155 !important; }
+  .welcome-icon { background:rgba(79,70,229,.08) !important; border-color:rgba(79,70,229,.2) !important; color:#4f46e5 !important; }
+
+  /* === AI PANEL === */
+  .ai-panel {
+    background:rgba(255,255,255,.65) !important;
+    backdrop-filter:blur(24px) !important;
+    border:1px solid rgba(255,255,255,.85) !important;
+    box-shadow:var(--shadow) !important;
+  }
+  .ai-summary { background:rgba(79,70,229,.05) !important; border-left-color:rgba(79,70,229,.4) !important; color:#475569 !important; }
+
+  /* === PERSON & TRUST === */
+  .person-chip { background:rgba(255,255,255,.65) !important; border:1px solid rgba(124,58,237,.15) !important; backdrop-filter:blur(12px) !important; }
+  .person-chip:hover { border-color:rgba(124,58,237,.35) !important; box-shadow:0 6px 20px rgba(124,58,237,.12) !important; background:rgba(255,255,255,.9) !important; }
+  .trust-panel { background:rgba(255,255,255,.6) !important; border:1px solid rgba(255,255,255,.85) !important; backdrop-filter:blur(12px) !important; }
+
+  /* === STOCK CARDS === */
+  .stock-card { background:rgba(255,255,255,.65) !important; backdrop-filter:blur(16px) !important; border:1px solid rgba(255,255,255,.85) !important; }
+  .stock-card:hover { background:rgba(255,255,255,.88) !important; transform:translateY(-6px) !important; box-shadow:0 16px 48px rgba(0,0,0,.1) !important; }
+  .stock-stats { background:rgba(255,255,255,.6) !important; border:1px solid rgba(255,255,255,.85) !important; backdrop-filter:blur(12px) !important; }
+
+  /* === FOOTER === */
+  footer { background:transparent !important; border-top:1px solid rgba(255,255,255,.5) !important; color:#94a3b8 !important; }
+
+  /* === SKELETON === */
+  .skeleton-card { background:rgba(255,255,255,.5) !important; border:1px solid rgba(255,255,255,.8) !important; }
+  .skeleton-line { background:rgba(15,23,42,.06) !important; }
+  .skeleton-card::after { background:linear-gradient(90deg, transparent 25%, rgba(255,255,255,.7) 50%, transparent 75%) !important; }
+
+  /* === BADGES & PILLS === */
+  .badge.manufacturer { background:rgba(5,150,105,.1) !important; color:#047857 !important; border-color:rgba(5,150,105,.25) !important; }
+  .badge.distributor  { background:rgba(217,119,6,.1) !important; color:#b45309 !important; border-color:rgba(217,119,6,.25) !important; }
+  .badge.person-badge { background:rgba(124,58,237,.1) !important; color:#6d28d9 !important; border-color:rgba(124,58,237,.25) !important; }
+  .result-count { background:rgba(79,70,229,.08) !important; color:#4f46e5 !important; border-color:rgba(79,70,229,.2) !important; }
+  .stats-pill.manu { background:rgba(5,150,105,.08) !important; color:#047857 !important; border-color:rgba(5,150,105,.2) !important; }
+  .stats-pill.dist { background:rgba(217,119,6,.08) !important; color:#b45309 !important; border-color:rgba(217,119,6,.2) !important; }
+
+  /* === BUTTONS === */
+  .details-btn { border-color:rgba(79,70,229,.2) !important; background:rgba(79,70,229,.05) !important; color:#4f46e5 !important; }
+  .details-btn:hover { background:rgba(79,70,229,.12) !important; }
+  .people-btn { border-color:rgba(124,58,237,.2) !important; background:rgba(124,58,237,.05) !important; color:#6d28d9 !important; }
+  .people-btn:hover { background:rgba(124,58,237,.12) !important; }
+  .trust-btn { border-color:rgba(5,150,105,.2) !important; background:rgba(5,150,105,.05) !important; color:#047857 !important; }
+  .trust-btn:hover { background:rgba(5,150,105,.12) !important; }
+  .card-copy-btn { border-color:rgba(5,150,105,.2) !important; background:rgba(5,150,105,.05) !important; color:#047857 !important; }
+  .card-cut-btn  { border-color:rgba(239,68,68,.2) !important; background:rgba(239,68,68,.05) !important; color:#dc2626 !important; }
+
+  /* === GLOBE === */
+  #globeCanvas { box-shadow:0 0 0 1px rgba(79,70,229,.25), 0 0 70px rgba(79,70,229,.2), 0 0 130px rgba(124,58,237,.12), 0 30px 90px rgba(0,0,0,.3) !important; }
+  .orbit-1 { border-top-color:rgba(79,70,229,.3) !important; }
+  .orbit-2 { border-top-color:rgba(124,58,237,.25) !important; }
+
+  /* === QUICK CONTACT === */
+  .qc-btn.email    { background:rgba(79,70,229,.07) !important; color:#4f46e5 !important; border-color:rgba(79,70,229,.2) !important; }
+  .qc-btn.phone    { background:rgba(5,150,105,.07) !important; color:#047857 !important; border-color:rgba(5,150,105,.2) !important; }
+  .qc-btn.whatsapp { background:rgba(5,150,105,.07) !important; color:#047857 !important; border-color:rgba(5,150,105,.2) !important; }
+  .qc-btn.website  { background:rgba(124,58,237,.07) !important; color:#6d28d9 !important; border-color:rgba(124,58,237,.2) !important; }
+
+  /* === BANNER === */
+  .banner { background:rgba(217,119,6,.06) !important; border-color:rgba(217,119,6,.25) !important; color:#b45309 !important; }
+  .country-note { background:rgba(79,70,229,.06) !important; border-color:rgba(79,70,229,.2) !important; color:#4f46e5 !important; }
+
+  /* === DETAIL GRID === */
+  .detail-label { color:#94a3b8 !important; }
+  .detail-value { color:#334155 !important; }
+  .detail-value a { color:#4f46e5 !important; }
 </style>
-</head>
-<body>
-
-<a href="#main-content" class="skip-link">Skip to main content</a>
-
-<nav class="topbar" role="navigation" aria-label="Main navigation">
-  <div class="topbar-brand">
-    <div class="topbar-logo" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    </div>
-    <div>
-      <div class="topbar-name">SourceIQ</div>
-      <div class="topbar-tag">Global Supplier Intelligence</div>
-    </div>
-  </div>
-  <div class="topbar-right" aria-label="Status indicators">
-    <div class="topbar-pill"><span class="topbar-pill-dot" aria-hidden="true"></span>Live Results</div>
-    <div class="topbar-pill">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-      195+ Countries
-    </div>
-    <a href="/logout" class="topbar-logout" title="Sign out">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-      Log Out
-    </a>
-  </div>
-</nav>
-
-<div class="hero">
-  <div class="hero-text">
-    <div class="hero-orb"></div>
-    <div class="hero-eyebrow"><span class="hero-eyebrow-dot"></span> Live Global B2B Search</div>
-    <h1>Find Suppliers &amp;<br><span class="h1-accent">Global Partners</span></h1>
-    <p class="subtitle">Search manufacturers, distributors, companies, and key decision-makers across 195+ countries — powered by live web data.</p>
-    <div class="hero-stats">
-      <div class="hero-stat">
-        <span class="hero-stat-num">195+</span>
-        <span class="hero-stat-label">Countries</span>
-      </div>
-      <div class="hero-stat-sep"></div>
-      <div class="hero-stat">
-        <span class="hero-stat-num">Live</span>
-        <span class="hero-stat-label">Web Data</span>
-      </div>
-      <div class="hero-stat-sep"></div>
-      <div class="hero-stat">
-        <span class="hero-stat-num">4</span>
-        <span class="hero-stat-label">Search Modes</span>
-      </div>
-      <div class="hero-stat-sep"></div>
-      <div class="hero-stat">
-        <span class="hero-stat-num">AI</span>
-        <span class="hero-stat-label">Enriched</span>
-      </div>
-    </div>
-    <div class="hero-trust">
-      <div class="hero-trust-pill"><span>🏭</span> Manufacturers</div>
-      <div class="hero-trust-pill"><span>📦</span> Distributors</div>
-      <div class="hero-trust-pill"><span>👤</span> Key People</div>
-      <div class="hero-trust-pill"><span>✅</span> Trust Check</div>
-    </div>
-    <div id="globeHint" style="font-size:11px;color:rgba(71,85,105,.65);font-weight:500;display:flex;align-items:center;gap:6px;margin-top:14px;">
-      <span style="color:rgba(59,130,246,.6)">🌐</span> Click any country on the globe to set your search location
-    </div>
-  </div>
-  <div class="globe-wrap">
-    <div class="orbit-ring orbit-1"></div>
-    <div class="orbit-ring orbit-2"></div>
-    <div class="orbit-ring orbit-3"></div>
-    <canvas id="globeCanvas" width="420" height="420"></canvas>
-    <div class="globe-country-tooltip" id="globeTooltip"></div>
-  </div>
-</div>
-
-<div class="hero-separator">
-  <div class="hero-separator-line"></div>
-</div>
-
-<div id="demoBanner" class="banner" style="display:none;">
-  ⚠️ Demo Mode — showing bundled sample data. Add your Google API key + CX to <code>.env</code> and restart the server for live web results.
-</div>
-
-<div class="panel" id="main-content">
-  <div class="mode-tabs" id="modeTabs" role="tablist" aria-label="Search mode">
-    <button class="mode-tab active" data-mode="product" onclick="setMode('product')" role="tab" aria-selected="true" aria-controls="productSearchBox">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Product
-    </button>
-    <button class="mode-tab" data-mode="company" onclick="setMode('company')" role="tab" aria-selected="false" aria-controls="companySearchBox">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
-      Company
-    </button>
-    <button class="mode-tab" data-mode="buyers" onclick="setMode('buyers')" role="tab" aria-selected="false" aria-controls="buyersSearchBox">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-      Buyers
-    </button>
-    <button class="mode-tab" data-mode="person" onclick="setMode('person')" role="tab" aria-selected="false" aria-controls="personSearchBox">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-      Person
-    </button>
-    <button class="mode-tab" data-mode="stock" onclick="setMode('stock')" role="tab" aria-selected="false" aria-controls="stockSearchBox">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-      Stock
-    </button>
-    <button class="mode-tab" data-mode="image" onclick="setMode('image')" role="tab" aria-selected="false" aria-controls="imageSearchBox">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-      Image
-    </button>
-    <button class="mode-tab" data-mode="trade" onclick="setMode('trade')" role="tab" aria-selected="false" aria-controls="tradeSearchBox">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-      Trade
-    </button>
-    <button class="mode-tab" data-mode="market" onclick="setMode('market')" role="tab" aria-selected="false" aria-controls="marketSearchBox">
-      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Market
-    </button>
-  </div>
-
-  <div class="search-box" id="productSearchBox" role="tabpanel" aria-labelledby="tab-product">
-    <div class="search-field">
-      <label for="query">Product / Keyword</label>
-      <input id="query" type="text" placeholder="Product" autocomplete="off" />
-    </div>
-    <div class="search-select-field">
-      <label for="country">Country</label>
-      <select id="country">
-      <option value="">Any country</option>
-      <optgroup label="── Asia ──">
-      <option value="Afghanistan">Afghanistan</option>
-      <option value="Bangladesh">Bangladesh</option>
-      <option value="Bhutan">Bhutan</option>
-      <option value="Brunei">Brunei</option>
-      <option value="Cambodia">Cambodia</option>
-      <option value="China">China</option>
-      <option value="India">India</option>
-      <option value="Indonesia">Indonesia</option>
-      <option value="Japan">Japan</option>
-      <option value="Kazakhstan">Kazakhstan</option>
-      <option value="Kyrgyzstan">Kyrgyzstan</option>
-      <option value="Laos">Laos</option>
-      <option value="Malaysia">Malaysia</option>
-      <option value="Maldives">Maldives</option>
-      <option value="Mongolia">Mongolia</option>
-      <option value="Myanmar">Myanmar</option>
-      <option value="Nepal">Nepal</option>
-      <option value="North Korea">North Korea</option>
-      <option value="Pakistan">Pakistan</option>
-      <option value="Philippines">Philippines</option>
-      <option value="Singapore">Singapore</option>
-      <option value="South Korea">South Korea</option>
-      <option value="Sri Lanka">Sri Lanka</option>
-      <option value="Taiwan">Taiwan</option>
-      <option value="Tajikistan">Tajikistan</option>
-      <option value="Thailand">Thailand</option>
-      <option value="Timor-Leste">Timor-Leste</option>
-      <option value="Turkmenistan">Turkmenistan</option>
-      <option value="Uzbekistan">Uzbekistan</option>
-      <option value="Vietnam">Vietnam</option>
-      </optgroup>
-      <optgroup label="── Middle East ──">
-      <option value="Bahrain">Bahrain</option>
-      <option value="Cyprus">Cyprus</option>
-      <option value="Iran">Iran</option>
-      <option value="Iraq">Iraq</option>
-      <option value="Israel">Israel</option>
-      <option value="Jordan">Jordan</option>
-      <option value="Kuwait">Kuwait</option>
-      <option value="Lebanon">Lebanon</option>
-      <option value="Oman">Oman</option>
-      <option value="Palestine">Palestine</option>
-      <option value="Qatar">Qatar</option>
-      <option value="Saudi Arabia">Saudi Arabia</option>
-      <option value="Syria">Syria</option>
-      <option value="Turkey">Turkey</option>
-      <option value="UAE">UAE</option>
-      <option value="Yemen">Yemen</option>
-      </optgroup>
-      <optgroup label="── Europe ──">
-      <option value="Albania">Albania</option>
-      <option value="Andorra">Andorra</option>
-      <option value="Armenia">Armenia</option>
-      <option value="Austria">Austria</option>
-      <option value="Azerbaijan">Azerbaijan</option>
-      <option value="Belarus">Belarus</option>
-      <option value="Belgium">Belgium</option>
-      <option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
-      <option value="Bulgaria">Bulgaria</option>
-      <option value="Croatia">Croatia</option>
-      <option value="Czech Republic">Czech Republic</option>
-      <option value="Denmark">Denmark</option>
-      <option value="Estonia">Estonia</option>
-      <option value="Finland">Finland</option>
-      <option value="France">France</option>
-      <option value="Georgia">Georgia</option>
-      <option value="Germany">Germany</option>
-      <option value="Greece">Greece</option>
-      <option value="Hungary">Hungary</option>
-      <option value="Iceland">Iceland</option>
-      <option value="Ireland">Ireland</option>
-      <option value="Italy">Italy</option>
-      <option value="Kosovo">Kosovo</option>
-      <option value="Latvia">Latvia</option>
-      <option value="Liechtenstein">Liechtenstein</option>
-      <option value="Lithuania">Lithuania</option>
-      <option value="Luxembourg">Luxembourg</option>
-      <option value="Malta">Malta</option>
-      <option value="Moldova">Moldova</option>
-      <option value="Monaco">Monaco</option>
-      <option value="Montenegro">Montenegro</option>
-      <option value="Netherlands">Netherlands</option>
-      <option value="North Macedonia">North Macedonia</option>
-      <option value="Norway">Norway</option>
-      <option value="Poland">Poland</option>
-      <option value="Portugal">Portugal</option>
-      <option value="Romania">Romania</option>
-      <option value="Russia">Russia</option>
-      <option value="San Marino">San Marino</option>
-      <option value="Serbia">Serbia</option>
-      <option value="Slovakia">Slovakia</option>
-      <option value="Slovenia">Slovenia</option>
-      <option value="Spain">Spain</option>
-      <option value="Sweden">Sweden</option>
-      <option value="Switzerland">Switzerland</option>
-      <option value="Ukraine">Ukraine</option>
-      <option value="United Kingdom">United Kingdom</option>
-      </optgroup>
-      <optgroup label="── North America ──">
-      <option value="Antigua and Barbuda">Antigua and Barbuda</option>
-      <option value="Bahamas">Bahamas</option>
-      <option value="Barbados">Barbados</option>
-      <option value="Belize">Belize</option>
-      <option value="Canada">Canada</option>
-      <option value="Costa Rica">Costa Rica</option>
-      <option value="Cuba">Cuba</option>
-      <option value="Dominican Republic">Dominican Republic</option>
-      <option value="El Salvador">El Salvador</option>
-      <option value="Grenada">Grenada</option>
-      <option value="Guatemala">Guatemala</option>
-      <option value="Haiti">Haiti</option>
-      <option value="Honduras">Honduras</option>
-      <option value="Jamaica">Jamaica</option>
-      <option value="Mexico">Mexico</option>
-      <option value="Nicaragua">Nicaragua</option>
-      <option value="Panama">Panama</option>
-      <option value="Puerto Rico">Puerto Rico</option>
-      <option value="Trinidad and Tobago">Trinidad and Tobago</option>
-      <option value="USA">USA</option>
-      </optgroup>
-      <optgroup label="── South America ──">
-      <option value="Argentina">Argentina</option>
-      <option value="Bolivia">Bolivia</option>
-      <option value="Brazil">Brazil</option>
-      <option value="Chile">Chile</option>
-      <option value="Colombia">Colombia</option>
-      <option value="Ecuador">Ecuador</option>
-      <option value="Guyana">Guyana</option>
-      <option value="Paraguay">Paraguay</option>
-      <option value="Peru">Peru</option>
-      <option value="Suriname">Suriname</option>
-      <option value="Uruguay">Uruguay</option>
-      <option value="Venezuela">Venezuela</option>
-      </optgroup>
-      <optgroup label="── Oceania ──">
-      <option value="Australia">Australia</option>
-      <option value="Fiji">Fiji</option>
-      <option value="Kiribati">Kiribati</option>
-      <option value="Marshall Islands">Marshall Islands</option>
-      <option value="Micronesia">Micronesia</option>
-      <option value="Nauru">Nauru</option>
-      <option value="New Zealand">New Zealand</option>
-      <option value="Palau">Palau</option>
-      <option value="Papua New Guinea">Papua New Guinea</option>
-      <option value="Samoa">Samoa</option>
-      <option value="Solomon Islands">Solomon Islands</option>
-      <option value="Tonga">Tonga</option>
-      <option value="Tuvalu">Tuvalu</option>
-      <option value="Vanuatu">Vanuatu</option>
-      </optgroup>
-      <optgroup label="── Africa ──">
-      <option value="Algeria">Algeria</option>
-      <option value="Angola">Angola</option>
-      <option value="Benin">Benin</option>
-      <option value="Botswana">Botswana</option>
-      <option value="Burkina Faso">Burkina Faso</option>
-      <option value="Burundi">Burundi</option>
-      <option value="Cabo Verde">Cabo Verde</option>
-      <option value="Cameroon">Cameroon</option>
-      <option value="Central African Republic">Central African Republic</option>
-      <option value="Chad">Chad</option>
-      <option value="Comoros">Comoros</option>
-      <option value="Congo">Congo</option>
-      <option value="DRC">DRC (Dem. Rep. Congo)</option>
-      <option value="Djibouti">Djibouti</option>
-      <option value="Egypt">Egypt</option>
-      <option value="Equatorial Guinea">Equatorial Guinea</option>
-      <option value="Eritrea">Eritrea</option>
-      <option value="Eswatini">Eswatini</option>
-      <option value="Ethiopia">Ethiopia</option>
-      <option value="Gabon">Gabon</option>
-      <option value="Gambia">Gambia</option>
-      <option value="Ghana">Ghana</option>
-      <option value="Guinea">Guinea</option>
-      <option value="Guinea-Bissau">Guinea-Bissau</option>
-      <option value="Ivory Coast">Ivory Coast</option>
-      <option value="Kenya">Kenya</option>
-      <option value="Lesotho">Lesotho</option>
-      <option value="Liberia">Liberia</option>
-      <option value="Libya">Libya</option>
-      <option value="Madagascar">Madagascar</option>
-      <option value="Malawi">Malawi</option>
-      <option value="Mali">Mali</option>
-      <option value="Mauritania">Mauritania</option>
-      <option value="Mauritius">Mauritius</option>
-      <option value="Morocco">Morocco</option>
-      <option value="Mozambique">Mozambique</option>
-      <option value="Namibia">Namibia</option>
-      <option value="Niger">Niger</option>
-      <option value="Nigeria">Nigeria</option>
-      <option value="Rwanda">Rwanda</option>
-      <option value="Sao Tome and Principe">Sao Tome and Principe</option>
-      <option value="Senegal">Senegal</option>
-      <option value="Seychelles">Seychelles</option>
-      <option value="Sierra Leone">Sierra Leone</option>
-      <option value="Somalia">Somalia</option>
-      <option value="South Africa">South Africa</option>
-      <option value="South Sudan">South Sudan</option>
-      <option value="Sudan">Sudan</option>
-      <option value="Tanzania">Tanzania</option>
-      <option value="Togo">Togo</option>
-      <option value="Tunisia">Tunisia</option>
-      <option value="Uganda">Uganda</option>
-      <option value="Zambia">Zambia</option>
-      <option value="Zimbabwe">Zimbabwe</option>
-      </optgroup>
-    </select>
-    </div>
-    <button id="searchBtn" onclick="runSearch()" aria-label="Search for products">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-2px;margin-right:7px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Search Now
-    </button>
-  </div>
-
-  <div class="search-box" id="companySearchBox" style="display:none;" role="tabpanel">
-    <div class="search-field">
-      <label for="companyQuery">Company Name</label>
-      <input id="companyQuery" type="text" placeholder="Company" autocomplete="organization" />
-    </div>
-    <div class="search-select-field">
-      <label for="companyCountry">Country</label>
-      <select id="companyCountry">
-        <option value="">Any country</option>
-        <optgroup label="── Asia ──">
-        <option value="Afghanistan">Afghanistan</option><option value="Bangladesh">Bangladesh</option>
-        <option value="Bhutan">Bhutan</option><option value="Brunei">Brunei</option>
-        <option value="Cambodia">Cambodia</option><option value="China">China</option>
-        <option value="India">India</option><option value="Indonesia">Indonesia</option>
-        <option value="Japan">Japan</option><option value="Kazakhstan">Kazakhstan</option>
-        <option value="Kyrgyzstan">Kyrgyzstan</option><option value="Laos">Laos</option>
-        <option value="Malaysia">Malaysia</option><option value="Maldives">Maldives</option>
-        <option value="Mongolia">Mongolia</option><option value="Myanmar">Myanmar</option>
-        <option value="Nepal">Nepal</option><option value="North Korea">North Korea</option>
-        <option value="Pakistan">Pakistan</option><option value="Philippines">Philippines</option>
-        <option value="Singapore">Singapore</option><option value="South Korea">South Korea</option>
-        <option value="Sri Lanka">Sri Lanka</option><option value="Taiwan">Taiwan</option>
-        <option value="Tajikistan">Tajikistan</option><option value="Thailand">Thailand</option>
-        <option value="Timor-Leste">Timor-Leste</option><option value="Turkmenistan">Turkmenistan</option>
-        <option value="Uzbekistan">Uzbekistan</option><option value="Vietnam">Vietnam</option>
-        </optgroup>
-        <optgroup label="── Middle East ──">
-        <option value="Bahrain">Bahrain</option><option value="Cyprus">Cyprus</option>
-        <option value="Iran">Iran</option><option value="Iraq">Iraq</option>
-        <option value="Israel">Israel</option><option value="Jordan">Jordan</option>
-        <option value="Kuwait">Kuwait</option><option value="Lebanon">Lebanon</option>
-        <option value="Oman">Oman</option><option value="Palestine">Palestine</option>
-        <option value="Qatar">Qatar</option><option value="Saudi Arabia">Saudi Arabia</option>
-        <option value="Syria">Syria</option><option value="Turkey">Turkey</option>
-        <option value="UAE">UAE</option><option value="Yemen">Yemen</option>
-        </optgroup>
-        <optgroup label="── Europe ──">
-        <option value="Albania">Albania</option><option value="Andorra">Andorra</option>
-        <option value="Armenia">Armenia</option><option value="Austria">Austria</option>
-        <option value="Azerbaijan">Azerbaijan</option><option value="Belarus">Belarus</option>
-        <option value="Belgium">Belgium</option><option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
-        <option value="Bulgaria">Bulgaria</option><option value="Croatia">Croatia</option>
-        <option value="Czech Republic">Czech Republic</option><option value="Denmark">Denmark</option>
-        <option value="Estonia">Estonia</option><option value="Finland">Finland</option>
-        <option value="France">France</option><option value="Georgia">Georgia</option>
-        <option value="Germany">Germany</option><option value="Greece">Greece</option>
-        <option value="Hungary">Hungary</option><option value="Iceland">Iceland</option>
-        <option value="Ireland">Ireland</option><option value="Italy">Italy</option>
-        <option value="Kosovo">Kosovo</option><option value="Latvia">Latvia</option>
-        <option value="Liechtenstein">Liechtenstein</option><option value="Lithuania">Lithuania</option>
-        <option value="Luxembourg">Luxembourg</option><option value="Malta">Malta</option>
-        <option value="Moldova">Moldova</option><option value="Monaco">Monaco</option>
-        <option value="Montenegro">Montenegro</option><option value="Netherlands">Netherlands</option>
-        <option value="North Macedonia">North Macedonia</option><option value="Norway">Norway</option>
-        <option value="Poland">Poland</option><option value="Portugal">Portugal</option>
-        <option value="Romania">Romania</option><option value="Russia">Russia</option>
-        <option value="Serbia">Serbia</option><option value="Slovakia">Slovakia</option>
-        <option value="Slovenia">Slovenia</option><option value="Spain">Spain</option>
-        <option value="Sweden">Sweden</option><option value="Switzerland">Switzerland</option>
-        <option value="Ukraine">Ukraine</option><option value="United Kingdom">United Kingdom</option>
-        </optgroup>
-        <optgroup label="── North America ──">
-        <option value="Belize">Belize</option><option value="Canada">Canada</option>
-        <option value="Costa Rica">Costa Rica</option><option value="Cuba">Cuba</option>
-        <option value="Dominican Republic">Dominican Republic</option><option value="El Salvador">El Salvador</option>
-        <option value="Guatemala">Guatemala</option><option value="Haiti">Haiti</option>
-        <option value="Honduras">Honduras</option><option value="Jamaica">Jamaica</option>
-        <option value="Mexico">Mexico</option><option value="Nicaragua">Nicaragua</option>
-        <option value="Panama">Panama</option><option value="Trinidad and Tobago">Trinidad and Tobago</option>
-        <option value="USA">USA</option>
-        </optgroup>
-        <optgroup label="── South America ──">
-        <option value="Argentina">Argentina</option><option value="Bolivia">Bolivia</option>
-        <option value="Brazil">Brazil</option><option value="Chile">Chile</option>
-        <option value="Colombia">Colombia</option><option value="Ecuador">Ecuador</option>
-        <option value="Guyana">Guyana</option><option value="Paraguay">Paraguay</option>
-        <option value="Peru">Peru</option><option value="Suriname">Suriname</option>
-        <option value="Uruguay">Uruguay</option><option value="Venezuela">Venezuela</option>
-        </optgroup>
-        <optgroup label="── Oceania ──">
-        <option value="Australia">Australia</option><option value="Fiji">Fiji</option>
-        <option value="New Zealand">New Zealand</option><option value="Papua New Guinea">Papua New Guinea</option>
-        <option value="Solomon Islands">Solomon Islands</option><option value="Vanuatu">Vanuatu</option>
-        </optgroup>
-        <optgroup label="── Africa ──">
-        <option value="Algeria">Algeria</option><option value="Angola">Angola</option>
-        <option value="Benin">Benin</option><option value="Botswana">Botswana</option>
-        <option value="Burkina Faso">Burkina Faso</option><option value="Burundi">Burundi</option>
-        <option value="Cabo Verde">Cabo Verde</option><option value="Cameroon">Cameroon</option>
-        <option value="Central African Republic">Central African Republic</option><option value="Chad">Chad</option>
-        <option value="Comoros">Comoros</option><option value="Congo">Congo</option>
-        <option value="DRC">DRC (Dem. Rep. Congo)</option><option value="Djibouti">Djibouti</option>
-        <option value="Egypt">Egypt</option><option value="Eritrea">Eritrea</option>
-        <option value="Eswatini">Eswatini</option><option value="Ethiopia">Ethiopia</option>
-        <option value="Gabon">Gabon</option><option value="Gambia">Gambia</option>
-        <option value="Ghana">Ghana</option><option value="Guinea">Guinea</option>
-        <option value="Guinea-Bissau">Guinea-Bissau</option><option value="Ivory Coast">Ivory Coast</option>
-        <option value="Kenya">Kenya</option><option value="Lesotho">Lesotho</option>
-        <option value="Liberia">Liberia</option><option value="Libya">Libya</option>
-        <option value="Madagascar">Madagascar</option><option value="Malawi">Malawi</option>
-        <option value="Mali">Mali</option><option value="Mauritania">Mauritania</option>
-        <option value="Mauritius">Mauritius</option><option value="Morocco">Morocco</option>
-        <option value="Mozambique">Mozambique</option><option value="Namibia">Namibia</option>
-        <option value="Niger">Niger</option><option value="Nigeria">Nigeria</option>
-        <option value="Rwanda">Rwanda</option><option value="Senegal">Senegal</option>
-        <option value="Seychelles">Seychelles</option><option value="Sierra Leone">Sierra Leone</option>
-        <option value="Somalia">Somalia</option><option value="South Africa">South Africa</option>
-        <option value="South Sudan">South Sudan</option><option value="Sudan">Sudan</option>
-        <option value="Tanzania">Tanzania</option><option value="Togo">Togo</option>
-        <option value="Tunisia">Tunisia</option><option value="Uganda">Uganda</option>
-        <option value="Zambia">Zambia</option><option value="Zimbabwe">Zimbabwe</option>
-        </optgroup>
-      </select>
-    </div>
-    <div class="search-field">
-      <label for="companyWebsite">Website <span style="opacity:.6;font-weight:500">(optional — for exact match)</span></label>
-      <input id="companyWebsite" type="text" placeholder="e.g. www.erez-group.com" autocomplete="url" />
-    </div>
-    <button id="companySearchBtn" onclick="runSearch()" aria-label="Search for company">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Search
-    </button>
-  </div>
-
-  <div class="search-box" id="personSearchBox" style="display:none;" role="tabpanel">
-    <div class="search-field">
-      <label for="personQuery">Person Name</label>
-      <input id="personQuery" type="text" placeholder="Name" autocomplete="name" />
-    </div>
-    <div class="search-select-field">
-      <label for="personCountry">Country</label>
-      <select id="personCountry">
-        <option value="">Any country</option>
-        <optgroup label="── Asia ──">
-        <option value="Afghanistan">Afghanistan</option><option value="Bangladesh">Bangladesh</option>
-        <option value="Bhutan">Bhutan</option><option value="Brunei">Brunei</option>
-        <option value="Cambodia">Cambodia</option><option value="China">China</option>
-        <option value="India">India</option><option value="Indonesia">Indonesia</option>
-        <option value="Japan">Japan</option><option value="Kazakhstan">Kazakhstan</option>
-        <option value="Kyrgyzstan">Kyrgyzstan</option><option value="Laos">Laos</option>
-        <option value="Malaysia">Malaysia</option><option value="Maldives">Maldives</option>
-        <option value="Mongolia">Mongolia</option><option value="Myanmar">Myanmar</option>
-        <option value="Nepal">Nepal</option><option value="North Korea">North Korea</option>
-        <option value="Pakistan">Pakistan</option><option value="Philippines">Philippines</option>
-        <option value="Singapore">Singapore</option><option value="South Korea">South Korea</option>
-        <option value="Sri Lanka">Sri Lanka</option><option value="Taiwan">Taiwan</option>
-        <option value="Tajikistan">Tajikistan</option><option value="Thailand">Thailand</option>
-        <option value="Timor-Leste">Timor-Leste</option><option value="Turkmenistan">Turkmenistan</option>
-        <option value="Uzbekistan">Uzbekistan</option><option value="Vietnam">Vietnam</option>
-        </optgroup>
-        <optgroup label="── Middle East ──">
-        <option value="Bahrain">Bahrain</option><option value="Cyprus">Cyprus</option>
-        <option value="Iran">Iran</option><option value="Iraq">Iraq</option>
-        <option value="Israel">Israel</option><option value="Jordan">Jordan</option>
-        <option value="Kuwait">Kuwait</option><option value="Lebanon">Lebanon</option>
-        <option value="Oman">Oman</option><option value="Palestine">Palestine</option>
-        <option value="Qatar">Qatar</option><option value="Saudi Arabia">Saudi Arabia</option>
-        <option value="Syria">Syria</option><option value="Turkey">Turkey</option>
-        <option value="UAE">UAE</option><option value="Yemen">Yemen</option>
-        </optgroup>
-        <optgroup label="── Europe ──">
-        <option value="Albania">Albania</option><option value="Andorra">Andorra</option>
-        <option value="Armenia">Armenia</option><option value="Austria">Austria</option>
-        <option value="Azerbaijan">Azerbaijan</option><option value="Belarus">Belarus</option>
-        <option value="Belgium">Belgium</option><option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
-        <option value="Bulgaria">Bulgaria</option><option value="Croatia">Croatia</option>
-        <option value="Czech Republic">Czech Republic</option><option value="Denmark">Denmark</option>
-        <option value="Estonia">Estonia</option><option value="Finland">Finland</option>
-        <option value="France">France</option><option value="Georgia">Georgia</option>
-        <option value="Germany">Germany</option><option value="Greece">Greece</option>
-        <option value="Hungary">Hungary</option><option value="Iceland">Iceland</option>
-        <option value="Ireland">Ireland</option><option value="Italy">Italy</option>
-        <option value="Kosovo">Kosovo</option><option value="Latvia">Latvia</option>
-        <option value="Liechtenstein">Liechtenstein</option><option value="Lithuania">Lithuania</option>
-        <option value="Luxembourg">Luxembourg</option><option value="Malta">Malta</option>
-        <option value="Moldova">Moldova</option><option value="Monaco">Monaco</option>
-        <option value="Montenegro">Montenegro</option><option value="Netherlands">Netherlands</option>
-        <option value="North Macedonia">North Macedonia</option><option value="Norway">Norway</option>
-        <option value="Poland">Poland</option><option value="Portugal">Portugal</option>
-        <option value="Romania">Romania</option><option value="Russia">Russia</option>
-        <option value="Serbia">Serbia</option><option value="Slovakia">Slovakia</option>
-        <option value="Slovenia">Slovenia</option><option value="Spain">Spain</option>
-        <option value="Sweden">Sweden</option><option value="Switzerland">Switzerland</option>
-        <option value="Ukraine">Ukraine</option><option value="United Kingdom">United Kingdom</option>
-        </optgroup>
-        <optgroup label="── North America ──">
-        <option value="Belize">Belize</option><option value="Canada">Canada</option>
-        <option value="Costa Rica">Costa Rica</option><option value="Cuba">Cuba</option>
-        <option value="Dominican Republic">Dominican Republic</option><option value="El Salvador">El Salvador</option>
-        <option value="Guatemala">Guatemala</option><option value="Haiti">Haiti</option>
-        <option value="Honduras">Honduras</option><option value="Jamaica">Jamaica</option>
-        <option value="Mexico">Mexico</option><option value="Nicaragua">Nicaragua</option>
-        <option value="Panama">Panama</option><option value="Trinidad and Tobago">Trinidad and Tobago</option>
-        <option value="USA">USA</option>
-        </optgroup>
-        <optgroup label="── South America ──">
-        <option value="Argentina">Argentina</option><option value="Bolivia">Bolivia</option>
-        <option value="Brazil">Brazil</option><option value="Chile">Chile</option>
-        <option value="Colombia">Colombia</option><option value="Ecuador">Ecuador</option>
-        <option value="Guyana">Guyana</option><option value="Paraguay">Paraguay</option>
-        <option value="Peru">Peru</option><option value="Suriname">Suriname</option>
-        <option value="Uruguay">Uruguay</option><option value="Venezuela">Venezuela</option>
-        </optgroup>
-        <optgroup label="── Oceania ──">
-        <option value="Australia">Australia</option><option value="Fiji">Fiji</option>
-        <option value="New Zealand">New Zealand</option><option value="Papua New Guinea">Papua New Guinea</option>
-        <option value="Solomon Islands">Solomon Islands</option><option value="Vanuatu">Vanuatu</option>
-        </optgroup>
-        <optgroup label="── Africa ──">
-        <option value="Algeria">Algeria</option><option value="Angola">Angola</option>
-        <option value="Benin">Benin</option><option value="Botswana">Botswana</option>
-        <option value="Burkina Faso">Burkina Faso</option><option value="Burundi">Burundi</option>
-        <option value="Cabo Verde">Cabo Verde</option><option value="Cameroon">Cameroon</option>
-        <option value="Central African Republic">Central African Republic</option><option value="Chad">Chad</option>
-        <option value="Comoros">Comoros</option><option value="Congo">Congo</option>
-        <option value="DRC">DRC (Dem. Rep. Congo)</option><option value="Djibouti">Djibouti</option>
-        <option value="Egypt">Egypt</option><option value="Eritrea">Eritrea</option>
-        <option value="Eswatini">Eswatini</option><option value="Ethiopia">Ethiopia</option>
-        <option value="Gabon">Gabon</option><option value="Gambia">Gambia</option>
-        <option value="Ghana">Ghana</option><option value="Guinea">Guinea</option>
-        <option value="Guinea-Bissau">Guinea-Bissau</option><option value="Ivory Coast">Ivory Coast</option>
-        <option value="Kenya">Kenya</option><option value="Lesotho">Lesotho</option>
-        <option value="Liberia">Liberia</option><option value="Libya">Libya</option>
-        <option value="Madagascar">Madagascar</option><option value="Malawi">Malawi</option>
-        <option value="Mali">Mali</option><option value="Mauritania">Mauritania</option>
-        <option value="Mauritius">Mauritius</option><option value="Morocco">Morocco</option>
-        <option value="Mozambique">Mozambique</option><option value="Namibia">Namibia</option>
-        <option value="Niger">Niger</option><option value="Nigeria">Nigeria</option>
-        <option value="Rwanda">Rwanda</option><option value="Senegal">Senegal</option>
-        <option value="Seychelles">Seychelles</option><option value="Sierra Leone">Sierra Leone</option>
-        <option value="Somalia">Somalia</option><option value="South Africa">South Africa</option>
-        <option value="South Sudan">South Sudan</option><option value="Sudan">Sudan</option>
-        <option value="Tanzania">Tanzania</option><option value="Togo">Togo</option>
-        <option value="Tunisia">Tunisia</option><option value="Uganda">Uganda</option>
-        <option value="Zambia">Zambia</option><option value="Zimbabwe">Zimbabwe</option>
-        </optgroup>
-      </select>
-    </div>
-    <div class="search-select-field" style="min-width:120px;">
-      <label for="personGender">Gender</label>
-      <select id="personGender">
-        <option value="">Any</option>
-        <option value="male">Male</option>
-        <option value="female">Female</option>
-      </select>
-    </div>
-    <button id="personSearchBtn" onclick="runSearch()" aria-label="Search for person">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Search
-    </button>
-  </div>
-
-  <div class="search-box" id="stockSearchBox" style="display:none;" role="tabpanel">
-    <div class="search-field">
-      <label for="stockQuery">Product Name</label>
-      <input id="stockQuery" type="text" placeholder="Stock" />
-    </div>
-    <div class="search-select-field" style="min-width:110px;">
-      <label for="stockMinQty">Min Quantity</label>
-      <input id="stockMinQty" type="number" min="1" placeholder="e.g. 1000" style="width:100%;" />
-    </div>
-    <div class="search-select-field" style="min-width:90px;">
-      <label for="stockUnit">Unit</label>
-      <select id="stockUnit">
-        <option value="pcs">pcs</option>
-        <option value="kg">kg</option>
-        <option value="mt">MT</option>
-        <option value="yards">yards</option>
-        <option value="sets">sets</option>
-      </select>
-    </div>
-    <div class="search-select-field">
-      <label for="stockCountry">Country</label>
-      <select id="stockCountry">
-        <option value="">Any Country</option>
-        <optgroup label="── Asia ──">
-        <option value="Afghanistan">Afghanistan</option><option value="Bangladesh">Bangladesh</option>
-        <option value="Bhutan">Bhutan</option><option value="Brunei">Brunei</option>
-        <option value="Cambodia">Cambodia</option><option value="China">China</option>
-        <option value="India">India</option><option value="Indonesia">Indonesia</option>
-        <option value="Japan">Japan</option><option value="Kazakhstan">Kazakhstan</option>
-        <option value="Kyrgyzstan">Kyrgyzstan</option><option value="Laos">Laos</option>
-        <option value="Malaysia">Malaysia</option><option value="Maldives">Maldives</option>
-        <option value="Mongolia">Mongolia</option><option value="Myanmar">Myanmar</option>
-        <option value="Nepal">Nepal</option><option value="Pakistan">Pakistan</option>
-        <option value="Philippines">Philippines</option><option value="Singapore">Singapore</option>
-        <option value="South Korea">South Korea</option><option value="Sri Lanka">Sri Lanka</option>
-        <option value="Taiwan">Taiwan</option><option value="Tajikistan">Tajikistan</option>
-        <option value="Thailand">Thailand</option><option value="Timor-Leste">Timor-Leste</option>
-        <option value="Turkmenistan">Turkmenistan</option><option value="Uzbekistan">Uzbekistan</option>
-        <option value="Vietnam">Vietnam</option>
-        </optgroup>
-        <optgroup label="── Middle East ──">
-        <option value="Bahrain">Bahrain</option><option value="Cyprus">Cyprus</option>
-        <option value="Iran">Iran</option><option value="Iraq">Iraq</option>
-        <option value="Israel">Israel</option><option value="Jordan">Jordan</option>
-        <option value="Kuwait">Kuwait</option><option value="Lebanon">Lebanon</option>
-        <option value="Oman">Oman</option><option value="Qatar">Qatar</option>
-        <option value="Saudi Arabia">Saudi Arabia</option><option value="Turkey">Turkey</option>
-        <option value="UAE">UAE</option><option value="Yemen">Yemen</option>
-        </optgroup>
-        <optgroup label="── Europe ──">
-        <option value="Albania">Albania</option><option value="Armenia">Armenia</option>
-        <option value="Austria">Austria</option><option value="Azerbaijan">Azerbaijan</option>
-        <option value="Belarus">Belarus</option><option value="Belgium">Belgium</option>
-        <option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option><option value="Bulgaria">Bulgaria</option>
-        <option value="Croatia">Croatia</option><option value="Czech Republic">Czech Republic</option>
-        <option value="Denmark">Denmark</option><option value="Estonia">Estonia</option>
-        <option value="Finland">Finland</option><option value="France">France</option>
-        <option value="Georgia">Georgia</option><option value="Germany">Germany</option>
-        <option value="Greece">Greece</option><option value="Hungary">Hungary</option>
-        <option value="Ireland">Ireland</option><option value="Italy">Italy</option>
-        <option value="Latvia">Latvia</option><option value="Lithuania">Lithuania</option>
-        <option value="Luxembourg">Luxembourg</option><option value="Moldova">Moldova</option>
-        <option value="Netherlands">Netherlands</option><option value="Norway">Norway</option>
-        <option value="Poland">Poland</option><option value="Portugal">Portugal</option>
-        <option value="Romania">Romania</option><option value="Russia">Russia</option>
-        <option value="Serbia">Serbia</option><option value="Slovakia">Slovakia</option>
-        <option value="Slovenia">Slovenia</option><option value="Spain">Spain</option>
-        <option value="Sweden">Sweden</option><option value="Switzerland">Switzerland</option>
-        <option value="Ukraine">Ukraine</option><option value="United Kingdom">United Kingdom</option>
-        </optgroup>
-        <optgroup label="── North America ──">
-        <option value="Canada">Canada</option><option value="Costa Rica">Costa Rica</option>
-        <option value="Cuba">Cuba</option><option value="Dominican Republic">Dominican Republic</option>
-        <option value="El Salvador">El Salvador</option><option value="Guatemala">Guatemala</option>
-        <option value="Honduras">Honduras</option><option value="Jamaica">Jamaica</option>
-        <option value="Mexico">Mexico</option><option value="Nicaragua">Nicaragua</option>
-        <option value="Panama">Panama</option><option value="USA">USA</option>
-        </optgroup>
-        <optgroup label="── South America ──">
-        <option value="Argentina">Argentina</option><option value="Bolivia">Bolivia</option>
-        <option value="Brazil">Brazil</option><option value="Chile">Chile</option>
-        <option value="Colombia">Colombia</option><option value="Ecuador">Ecuador</option>
-        <option value="Paraguay">Paraguay</option><option value="Peru">Peru</option>
-        <option value="Uruguay">Uruguay</option><option value="Venezuela">Venezuela</option>
-        </optgroup>
-        <optgroup label="── Oceania ──">
-        <option value="Australia">Australia</option><option value="Fiji">Fiji</option>
-        <option value="New Zealand">New Zealand</option><option value="Papua New Guinea">Papua New Guinea</option>
-        </optgroup>
-        <optgroup label="── Africa ──">
-        <option value="Algeria">Algeria</option><option value="Angola">Angola</option>
-        <option value="Benin">Benin</option><option value="Botswana">Botswana</option>
-        <option value="Burkina Faso">Burkina Faso</option><option value="Burundi">Burundi</option>
-        <option value="Cameroon">Cameroon</option><option value="Central African Republic">Central African Republic</option>
-        <option value="Chad">Chad</option><option value="Congo">Congo</option>
-        <option value="DRC">DRC (Dem. Rep. Congo)</option><option value="Egypt">Egypt</option>
-        <option value="Eritrea">Eritrea</option><option value="Ethiopia">Ethiopia</option>
-        <option value="Gabon">Gabon</option><option value="Gambia">Gambia</option>
-        <option value="Ghana">Ghana</option><option value="Guinea">Guinea</option>
-        <option value="Ivory Coast">Ivory Coast</option><option value="Kenya">Kenya</option>
-        <option value="Liberia">Liberia</option><option value="Libya">Libya</option>
-        <option value="Madagascar">Madagascar</option><option value="Malawi">Malawi</option>
-        <option value="Mali">Mali</option><option value="Mauritania">Mauritania</option>
-        <option value="Mauritius">Mauritius</option><option value="Morocco">Morocco</option>
-        <option value="Mozambique">Mozambique</option><option value="Namibia">Namibia</option>
-        <option value="Niger">Niger</option><option value="Nigeria">Nigeria</option>
-        <option value="Rwanda">Rwanda</option><option value="Senegal">Senegal</option>
-        <option value="Sierra Leone">Sierra Leone</option><option value="Somalia">Somalia</option>
-        <option value="South Africa">South Africa</option><option value="South Sudan">South Sudan</option>
-        <option value="Sudan">Sudan</option><option value="Tanzania">Tanzania</option>
-        <option value="Togo">Togo</option><option value="Tunisia">Tunisia</option>
-        <option value="Uganda">Uganda</option><option value="Zambia">Zambia</option>
-        <option value="Zimbabwe">Zimbabwe</option>
-        </optgroup>
-      </select>
-    </div>
-    <button id="stockSearchBtn" onclick="runStockSearch()" aria-label="Search for product stock">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Search Stock
-    </button>
-  </div>
-
-  <div id="imageSearchBox" style="display:none; flex-direction:column; gap:12px; width:100%;">
-    <div class="img-type-picker">
-      <div class="img-type-card selected" id="itc-card" onclick="setImageType('card')">
-        <div class="itc-icon">💼</div>
-        <div class="itc-label">Business Card</div>
-        <div class="itc-desc">Extract contact details automatically</div>
-      </div>
-      <div class="img-type-card" id="itc-person" onclick="setImageType('person')">
-        <div class="itc-icon">👤</div>
-        <div class="itc-label">Person Photo</div>
-        <div class="itc-desc">Reverse-search to identify the person</div>
-      </div>
-      <div class="img-type-card" id="itc-company" onclick="setImageType('company')">
-        <div class="itc-icon">🏢</div>
-        <div class="itc-label">Company / Logo</div>
-        <div class="itc-desc">Reverse-search by company image or logo</div>
-      </div>
-    </div>
-
-    <div class="upload-zone" id="uploadZone"
-         onclick="document.getElementById('imgFileInput').click()"
-         ondragover="event.preventDefault();this.classList.add('dragover')"
-         ondragleave="this.classList.remove('dragover')"
-         ondrop="handleImageDrop(event)">
-      <div class="uz-icon">📁</div>
-      <div class="uz-label">Click to upload or drag &amp; drop an image</div>
-      <div class="uz-hint">JPG, PNG, WEBP — also supports camera on mobile</div>
-    </div>
-    <input type="file" id="imgFileInput" accept="image/*" capture="environment" style="display:none" onchange="handleImageFile(this.files[0])">
-
-    <div id="imgResultArea"></div>
-  </div>
-
-  <div class="search-box" id="tradeSearchBox" style="display:none;" role="tabpanel">
-    <div class="search-field">
-      <label for="tradeProduct">Product / Commodity</label>
-      <input id="tradeProduct" type="text" placeholder="Trade" autocomplete="off" />
-    </div>
-    <div class="search-field" style="max-width:160px;">
-      <label for="tradeHS">HS Code (optional)</label>
-      <input id="tradeHS" type="text" placeholder="e.g. 7208, 8542" autocomplete="off" />
-    </div>
-    <div class="search-select-field">
-      <label for="tradeCountry">Country</label>
-      <select id="tradeCountry">
-        <option value="">Any country</option>
-        <optgroup label="── Asia ──"><option value="China">China</option><option value="India">India</option><option value="Japan">Japan</option><option value="South Korea">South Korea</option><option value="Taiwan">Taiwan</option><option value="Vietnam">Vietnam</option><option value="Indonesia">Indonesia</option><option value="Bangladesh">Bangladesh</option><option value="Pakistan">Pakistan</option><option value="Thailand">Thailand</option><option value="Malaysia">Malaysia</option><option value="Philippines">Philippines</option><option value="Singapore">Singapore</option></optgroup>
-        <optgroup label="── Middle East ──"><option value="UAE">UAE</option><option value="Saudi Arabia">Saudi Arabia</option><option value="Turkey">Turkey</option><option value="Israel">Israel</option></optgroup>
-        <optgroup label="── Europe ──"><option value="Germany">Germany</option><option value="France">France</option><option value="Italy">Italy</option><option value="Netherlands">Netherlands</option><option value="Spain">Spain</option><option value="Poland">Poland</option><option value="United Kingdom">United Kingdom</option><option value="Belgium">Belgium</option></optgroup>
-        <optgroup label="── Americas ──"><option value="USA">USA</option><option value="Canada">Canada</option><option value="Mexico">Mexico</option><option value="Brazil">Brazil</option><option value="Argentina">Argentina</option></optgroup>
-        <optgroup label="── Africa ──"><option value="South Africa">South Africa</option><option value="Egypt">Egypt</option><option value="Nigeria">Nigeria</option><option value="Kenya">Kenya</option></optgroup>
-        <optgroup label="── Oceania ──"><option value="Australia">Australia</option><option value="New Zealand">New Zealand</option></optgroup>
-      </select>
-    </div>
-    <div class="search-select-field" style="min-width:130px;">
-      <label for="tradeDir">Trade Direction</label>
-      <select id="tradeDir">
-        <option value="">Import &amp; Export</option>
-        <option value="import">Importers</option>
-        <option value="export">Exporters</option>
-      </select>
-    </div>
-    <button id="tradeSearchBtn" onclick="runTradeSearch()" aria-label="Search trade data">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-      Search Trade
-    </button>
-  </div>
-
-  <div class="search-box" id="buyersSearchBox" style="display:none;" role="tabpanel" aria-labelledby="tab-buyers">
-    <div class="search-field">
-      <label for="buyersProduct">Product / Keyword</label>
-      <input id="buyersProduct" type="text" placeholder="Buyers" autocomplete="off" />
-    </div>
-    <div class="search-select-field">
-      <label for="buyersCountry">Country</label>
-      <select id="buyersCountry">
-        <option value="">Any country</option>
-        <optgroup label="── Asia ──">
-        <option value="China">China</option><option value="India">India</option>
-        <option value="Japan">Japan</option><option value="South Korea">South Korea</option>
-        <option value="Taiwan">Taiwan</option><option value="Vietnam">Vietnam</option>
-        <option value="Indonesia">Indonesia</option><option value="Bangladesh">Bangladesh</option>
-        <option value="Pakistan">Pakistan</option><option value="Thailand">Thailand</option>
-        <option value="Malaysia">Malaysia</option><option value="Philippines">Philippines</option>
-        <option value="Singapore">Singapore</option>
-        </optgroup>
-        <optgroup label="── Middle East ──">
-        <option value="UAE">UAE</option><option value="Saudi Arabia">Saudi Arabia</option>
-        <option value="Turkey">Turkey</option><option value="Israel">Israel</option>
-        <option value="Qatar">Qatar</option><option value="Kuwait">Kuwait</option>
-        </optgroup>
-        <optgroup label="── Europe ──">
-        <option value="Germany">Germany</option><option value="France">France</option>
-        <option value="Italy">Italy</option><option value="Netherlands">Netherlands</option>
-        <option value="Spain">Spain</option><option value="Poland">Poland</option>
-        <option value="United Kingdom">United Kingdom</option><option value="Belgium">Belgium</option>
-        <option value="Sweden">Sweden</option><option value="Switzerland">Switzerland</option>
-        <option value="Austria">Austria</option><option value="Czech Republic">Czech Republic</option>
-        </optgroup>
-        <optgroup label="── Americas ──">
-        <option value="USA">USA</option><option value="Canada">Canada</option>
-        <option value="Mexico">Mexico</option><option value="Brazil">Brazil</option>
-        <option value="Argentina">Argentina</option><option value="Colombia">Colombia</option>
-        </optgroup>
-        <optgroup label="── Africa ──">
-        <option value="South Africa">South Africa</option><option value="Egypt">Egypt</option>
-        <option value="Nigeria">Nigeria</option><option value="Kenya">Kenya</option>
-        <option value="Morocco">Morocco</option>
-        </optgroup>
-        <optgroup label="── Oceania ──">
-        <option value="Australia">Australia</option><option value="New Zealand">New Zealand</option>
-        </optgroup>
-      </select>
-    </div>
-    <div class="search-select-field" style="min-width:140px;">
-      <label for="buyersType">Buyer Type</label>
-      <select id="buyersType">
-        <option value="">All Types</option>
-        <option value="importer">Importers</option>
-        <option value="retailer">Retailers</option>
-        <option value="wholesaler">Wholesalers</option>
-        <option value="procurement">Procurement</option>
-      </select>
-    </div>
-    <button id="buyersSearchBtn" onclick="runBuyersSearch()" aria-label="Search for buyers">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      Find Buyers
-    </button>
-  </div>
-
-  <div class="search-box" id="marketSearchBox" style="display:none;" role="tabpanel">
-    <div class="search-field">
-      <label for="marketIndustry">Industry / Sector</label>
-      <input id="marketIndustry" type="text" placeholder="Market" autocomplete="off" />
-    </div>
-    <div class="search-select-field">
-      <label for="marketCountry">Region / Country</label>
-      <select id="marketCountry">
-        <option value="">Global</option>
-        <optgroup label="── Regions ──"><option value="Asia Pacific">Asia Pacific</option><option value="Europe">Europe</option><option value="North America">North America</option><option value="Middle East">Middle East</option><option value="Latin America">Latin America</option><option value="Africa">Africa</option></optgroup>
-        <optgroup label="── Asia ──"><option value="China">China</option><option value="India">India</option><option value="Japan">Japan</option><option value="South Korea">South Korea</option><option value="Southeast Asia">Southeast Asia</option></optgroup>
-        <optgroup label="── Europe ──"><option value="Germany">Germany</option><option value="France">France</option><option value="United Kingdom">United Kingdom</option><option value="Italy">Italy</option></optgroup>
-        <optgroup label="── Americas ──"><option value="USA">USA</option><option value="Brazil">Brazil</option><option value="Canada">Canada</option></optgroup>
-      </select>
-    </div>
-    <div class="search-select-field" style="min-width:160px;">
-      <label for="marketFocus">Research Focus</label>
-      <select id="marketFocus">
-        <option value="">All Insights</option>
-        <option value="size">Market Size &amp; Value</option>
-        <option value="trends">Trends &amp; Forecast</option>
-        <option value="players">Key Players</option>
-      </select>
-    </div>
-    <button id="marketSearchBtn" onclick="runMarketSearch()" aria-label="Search market data">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-      Search Market
-    </button>
-  </div>
-
-</div>
-<p class="hint" id="searchHint">Search by product, by country, or both — leave either field blank to broaden the search.</p>
-
-<div class="chips" id="chips"></div>
-
-<div class="toolbar" id="toolbar" style="display:none;">
-  <div class="filters" id="filters">
-    <button class="active" data-filter="all" onclick="setFilter('all')">All</button>
-    <button data-filter="manufacturer" onclick="setFilter('manufacturer')">Manufacturers</button>
-    <button data-filter="distributor" onclick="setFilter('distributor')">Distributors</button>
-    <button data-filter="unclassified" onclick="setFilter('unclassified')">Unclassified</button>
-  </div>
-  <select id="sortBy" onchange="render()">
-    <option value="relevance">Sort: Relevance</option>
-    <option value="confidence">Sort: Confidence</option>
-    <option value="name">Sort: Name (A-Z)</option>
-  </select>
-  <button class="export-btn" onclick="exportCsv()">⬇ CSV</button>
-  <button class="export-btn" onclick="exportWord()">📄 Word</button>
-  <button class="export-btn" onclick="exportEmail()">📧 Email</button>
-</div>
-
-<div id="aiPanelWrap" style="display:none;"></div>
-
-<div class="results-wrap" id="resultsWrap" aria-live="polite" aria-atomic="false">
-  <div class="state-empty">
-    <div class="welcome-orb"></div>
-    <div class="welcome-icon">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    </div>
-    <h2 class="welcome-title">Start Your Global Search</h2>
-    <p class="welcome-sub">Find manufacturers, distributors, and decision-makers across 195+ countries instantly.</p>
-    <div class="welcome-modes">
-      <div class="welcome-mode" onclick="setMode('product');document.getElementById('query').focus()">
-        <span class="wm-icon">🏭</span><span class="wm-label">Product Search</span>
-      </div>
-      <div class="welcome-mode" onclick="setMode('company');document.getElementById('companyQuery').focus()">
-        <span class="wm-icon">🏢</span><span class="wm-label">Company Lookup</span>
-      </div>
-      <div class="welcome-mode" onclick="setMode('person');document.getElementById('personQuery').focus()">
-        <span class="wm-icon">👤</span><span class="wm-label">Person Search</span>
-      </div>
-      <div class="welcome-mode" onclick="setMode('stock');document.getElementById('stockQuery').focus()">
-        <span class="wm-icon">📦</span><span class="wm-label">Stock Finder</span>
-      </div>
-    </div>
-  </div>
-</div>
-
-<footer>Classification is heuristic and may be imperfect — always verify suppliers independently.</footer>
-
-<!-- Hidden form for Google reverse image search -->
-<form id="gLensForm" method="POST" action="https://lens.google.com/upload" enctype="multipart/form-data" target="_blank" style="display:none">
-  <input type="file" id="gLensFile" name="encoded_image" accept="image/*">
-</form>
-
-<script>
-const SUGGESTIONS = ["LED bulbs", "plastic bottles", "steel pipes", "textile fabric", "electronics PCB", "wood furniture", "pharma tablets", "solar panels"];
-const RECENT_KEY = "pse_recent_searches";
-let currentFilter = "all";
-let lastResults = [];
-let lastSubject = "";
-
-function escapeHtml(str){
-  return String(str ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function getRecent(){
-  try{ return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); }catch{ return []; }
-}
-
-function addRecent(q){
-  let recent = getRecent().filter(r => r.toLowerCase() !== q.toLowerCase());
-  recent.unshift(q);
-  recent = recent.slice(0, 5);
-  localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
-  renderChips();
-}
-
-function renderChips(){
-  const chips = document.getElementById('chips');
-  const recent = getRecent();
-  let html = '';
-  if(recent.length){
-    html += recent.map(r => {
-      const display = r.startsWith('🏢:') ? `🏢 ${r.slice(3)}` : r.startsWith('👤:') ? `👤 ${r.slice(3)}` : r;
-      return `<span class="chip recent" onclick="quickSearch('${escapeHtml(r)}')">🕘 ${escapeHtml(display)}</span>`;
-    }).join('');
-  }
-  html += SUGGESTIONS.map(s => `<span class="chip" onclick="quickSearch('${escapeHtml(s)}')">${escapeHtml(s)}</span>`).join('');
-  chips.innerHTML = html;
-}
-
-let searchMode = 'product';
-
-function setMode(mode){
-  searchMode = mode;
-  document.querySelectorAll('.mode-tab').forEach(b => {
-    const active = b.dataset.mode === mode;
-    b.classList.toggle('active', active);
-    b.setAttribute('aria-selected', active ? 'true' : 'false');
-  });
-  document.getElementById('productSearchBox').style.display   = mode === 'product'   ? 'flex' : 'none';
-  document.getElementById('companySearchBox').style.display   = mode === 'company'   ? 'flex' : 'none';
-  document.getElementById('personSearchBox').style.display    = mode === 'person'    ? 'flex' : 'none';
-  document.getElementById('stockSearchBox').style.display     = mode === 'stock'     ? 'flex' : 'none';
-  document.getElementById('imageSearchBox').style.display     = mode === 'image'     ? 'flex' : 'none';
-  document.getElementById('tradeSearchBox').style.display     = mode === 'trade'     ? 'flex' : 'none';
-  document.getElementById('marketSearchBox').style.display    = mode === 'market'    ? 'flex' : 'none';
-  document.getElementById('buyersSearchBox').style.display    = mode === 'buyers'    ? 'flex' : 'none';
-  const hints = {
-    product:   'Search by product, by country, or both — leave either field blank to broaden the search.',
-    company:   'Search for a specific company by name to find its details directly.',
-    person:    'Search by a person\'s name to find which company they work for and their role.',
-    stock:     'Search for a specific product to find suppliers who have it physically in stock right now — inventory, MOQ, unit price, and ready-to-ship status.',
-    image:     'Upload a business card to extract details, or a photo to reverse-search on Google Lens.',
-    trade:     'Find importers, exporters, and trade data by product or HS code — with optional country and direction filters.',
-    market:    'Explore market size, key players, trends, and industry outlook for any sector or region.',
-    buyers:    'Find companies that BUY your product — importers, retailers, wholesalers, and procurement teams by country.'
-  };
-  document.getElementById('searchHint').textContent = hints[mode];
-  if(mode !== 'image'){
-    document.getElementById('imgResultArea').innerHTML = '';
-    document.getElementById('imgFileInput').value = '';
-  }
-  if(mode !== 'stock'){
-    document.getElementById('resultsWrap').innerHTML = '<p class="empty">Type a subject and click Search to see segregated results.</p>';
-    document.getElementById('toolbar').style.display = 'none';
-    lastResults = [];
-  }
-}
-
-function quickSearch(q){
-  if(q.startsWith('🏢:')){
-    setMode('company');
-    document.getElementById('companyQuery').value = q.slice(3);
-  }else if(q.startsWith('👤:')){
-    setMode('person');
-    document.getElementById('personQuery').value = q.slice(3);
-  }else if(q.includes(' — ')){
-    setMode('product');
-    const [product, country] = q.split(' — ');
-    document.getElementById('query').value = product;
-    document.getElementById('country').value = country;
-  }else{
-    setMode('product');
-    document.getElementById('query').value = q;
-  }
-  runSearch();
-}
-
-async function runSearch(){
-  const wrap = document.getElementById('resultsWrap');
-  const toolbar = document.getElementById('toolbar');
-  const banner = document.getElementById('demoBanner');
-  const btn = searchMode === 'company' ? document.getElementById('companySearchBtn')
-            : searchMode === 'person'  ? document.getElementById('personSearchBtn')
-            : document.getElementById('searchBtn');
-
-  const q       = searchMode === 'product' ? document.getElementById('query').value.trim() : '';
-  const country = searchMode === 'product' ? document.getElementById('country').value.trim()
-                : searchMode === 'company' ? document.getElementById('companyCountry').value.trim()
-                : searchMode === 'person'  ? document.getElementById('personCountry').value.trim() : '';
-  const company = searchMode === 'company' ? document.getElementById('companyQuery').value.trim() : '';
-  const website = searchMode === 'company' ? document.getElementById('companyWebsite').value.trim() : '';
-  const person  = searchMode === 'person'  ? document.getElementById('personQuery').value.trim() : '';
-  const gender  = searchMode === 'person'  ? document.getElementById('personGender').value.trim() : '';
-
-  if(searchMode === 'product' && !q && !country){
-    wrap.innerHTML = '<p class="empty">Type a product, pick a country, or both — then click Search.</p>';
-    toolbar.style.display = 'none';
-    return;
-  }
-  if(searchMode === 'company' && !company){
-    wrap.innerHTML = '<p class="empty">Type a company name, then click Search.</p>';
-    toolbar.style.display = 'none';
-    return;
-  }
-  if(searchMode === 'person' && !person){
-    wrap.innerHTML = '<p class="empty">Type a person\'s name, then click Search.</p>';
-    toolbar.style.display = 'none';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.classList.add('btn-loading');
-  hideAIPanel();
-  wrap.innerHTML = buildSkeleton(6);
-  toolbar.style.display = 'none';
-  banner.style.display = 'none';
-
-  try{
-    const params = new URLSearchParams();
-    if(q) params.set('q', q);
-    if(country) params.set('country', country);
-    if(company) params.set('company', company);
-    if(website) params.set('website', website);
-    if(person) params.set('person', person);
-    if(gender) params.set('gender', gender);
-    const res = await fetch('/api/search?' + params.toString());
-    const data = await res.json();
-
-    if(!res.ok || data.error){
-      wrap.innerHTML = `<p class="error">${escapeHtml(data.error || 'Search failed.')}</p>`;
-      return;
-    }
-
-    lastResults = data.results || [];
-    lastSubject = data.subject || company || q;
-    banner.style.display = data.demoMode ? 'block' : 'none';
-    toolbar.style.display = lastResults.length ? 'flex' : 'none';
-    currentFilter = 'all';
-    setActiveFilterButton('all');
-    document.getElementById('sortBy').value = 'relevance';
-
-    const label = person ? `👤:${person}` : company ? `🏢:${company}` : (q && country ? `${q} — ${country}` : (q || country));
-    addRecent(label);
-    render();
-    showCountryNote(data.countryNote);
-    // AI analysis runs after render so it can highlight cards
-    if (lastResults.length) {
-      const aiQuery = person || company || (q && country ? `${q} ${country}` : q || country);
-      runAIAnalysis(aiQuery, lastResults, searchMode);
-    }
-  }catch(err){
-    wrap.innerHTML = buildErrorState(err.message, ()=>runSearch());
-  }finally{
-    btn.disabled = false;
-    btn.classList.remove('btn-loading');
-  }
-}
-
-// ── Physical Stock Search ─────────────────────────────────────────────────────
-async function runStockSearch(){
-  const wrap    = document.getElementById('resultsWrap');
-  const toolbar = document.getElementById('toolbar');
-  const banner  = document.getElementById('demoBanner');
-  const btn     = document.getElementById('stockSearchBtn');
-
-  const product = document.getElementById('stockQuery').value.trim();
-  const minQty  = document.getElementById('stockMinQty').value.trim();
-  const unit    = document.getElementById('stockUnit').value.trim();
-  const country = document.getElementById('stockCountry').value.trim();
-
-  if(!product){
-    wrap.innerHTML = '<p class="empty">Enter a product name, then click Search Stock.</p>';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.classList.add('btn-loading');
-  hideAIPanel();
-  wrap.innerHTML = buildSkeleton(4);
-  toolbar.style.display = 'none';
-  banner.style.display = 'none';
-
-  try{
-    const params = new URLSearchParams();
-    params.set('product', product);
-    if(country) params.set('country', country);
-    if(minQty)  params.set('minQty', minQty);
-    if(unit)    params.set('unit', unit);
-    const res  = await fetch('/api/stock?' + params.toString());
-    const data = await res.json();
-
-    if(!res.ok || data.error){
-      wrap.innerHTML = `<p class="error">${escapeHtml(data.error || 'Search failed.')}</p>`;
-      return;
-    }
-
-    banner.style.display = data.demoMode ? 'block' : 'none';
-    renderStockTable(data);
-    if (data.results && data.results.length) {
-      runAIAnalysis(product + (country ? ' ' + country : ''), data.results, 'stock');
-    }
-
-  }catch(err){
-    wrap.innerHTML = buildErrorState(err.message, ()=>runStockSearch());
-  }finally{
-    btn.disabled = false;
-    btn.classList.remove('btn-loading');
-  }
-}
-
-const STOCK_SUBTYPE_LABELS = { direct:'In Stock', warehouse:'Warehouse Stock', surplus:'Surplus / Clearance', listing:'General Listing' };
-const STOCK_SUBTYPE_ICONS  = { direct:'✅', warehouse:'🏭', surplus:'🏷️', listing:'📋' };
-
-function extractAvailability(snippet){
-  const s = (snippet || '').toLowerCase();
-  if(/in stock|ex.?stock|ready to ship|available now|immediate delivery/.test(s)) return '✅ In Stock';
-  if(/warehouse|bulk stock|stock available/.test(s)) return '🏭 Warehouse';
-  if(/surplus|clearance|overstocked/.test(s)) return '🏷️ Surplus';
-  const moq = snippet.match(/MOQ[:\s]*[\d,]+\s*\w+/i);
-  if(moq) return moq[0];
-  return '';
-}
-
-function renderStockTable(data){
-  const wrap    = document.getElementById('resultsWrap');
-  const results = data.results || [];
-  if(!results.length){
-    wrap.innerHTML = '<p class="empty">No stock listings found. Try a different product name or remove the country filter.</p>';
-    return;
-  }
-
-  const inStock   = results.filter(r => r.subtype === 'direct');
-  const warehouse = results.filter(r => r.subtype === 'warehouse');
-  const surplus   = results.filter(r => r.subtype === 'surplus');
-  const general   = results.filter(r => !['direct','warehouse','surplus'].includes(r.subtype));
-
-  let html = `
-    <div class="stock-stats">
-      <div style="font-size:13px;"><strong style="color:var(--text)">${results.length}</strong> listings for <strong style="color:#34d399">${escapeHtml(data.product || '')}</strong>${data.country ? ' · <span style="color:#60a5fa">' + escapeHtml(data.country) + '</span>' : ''}</div>
-      <div class="ss-item"><span class="ss-badge">✅ ${inStock.length} In Stock</span></div>
-      <div class="ss-item"><span class="ss-badge warehouse">🏭 ${warehouse.length} Warehouse</span></div>
-      <div class="ss-item"><span class="ss-badge surplus">🏷️ ${surplus.length} Surplus</span></div>
-    </div>`;
-
-  const sections = [
-    { label:'✅ In Stock — Ready to Ship',   subtype:'direct',    items:inStock },
-    { label:'🏭 Warehouse & Bulk Inventory', subtype:'warehouse', items:warehouse },
-    { label:'🏷️ Surplus & Clearance',        subtype:'surplus',   items:surplus },
-    { label:'📋 General Listings',           subtype:'listing',   items:general }
-  ];
-
-  for(const sec of sections){
-    if(!sec.items.length) continue;
-    html += `<div class="group-title">${sec.label}</div><div class="stock-grid">`;
-
-    for(const r of sec.items){
-      const subtype = r.subtype || 'listing';
-      const label   = STOCK_SUBTYPE_LABELS[subtype] || 'Listing';
-      const icon    = STOCK_SUBTYPE_ICONS[subtype]  || '📋';
-      const avail   = extractAvailability(r.snippet || '');
-      const domain  = r.displayLink || '';
-      const snippet = (r.snippet || '').slice(0, 160) + ((r.snippet||'').length > 160 ? '…' : '');
-      const faviconSrc = domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32` : '';
-      const faviconImg = faviconSrc
-        ? `<img src="${faviconSrc}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span style=font-size:18px>${icon}</span>'" />`
-        : `<span style="font-size:18px">${icon}</span>`;
-
-      html += `
-        <div class="stock-card ${subtype}">
-          <div class="stock-card-top">
-            <div class="stock-card-favicon">${faviconImg}</div>
-            <div class="stock-card-title-wrap">
-              <a class="stock-card-title" href="${escapeHtml(r.link)}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a>
-              <div class="stock-card-domain">${escapeHtml(domain)}</div>
-            </div>
-            ${avail ? `<div class="stock-card-avail ${subtype}">${escapeHtml(avail)}</div>` : ''}
-          </div>
-          ${snippet ? `<div class="stock-card-snippet">${escapeHtml(snippet)}</div>` : ''}
-          <div class="stock-card-footer">
-            <span class="stock-card-badge">${icon} ${escapeHtml(label)}</span>
-            <a class="stock-card-link" href="${escapeHtml(r.link)}" target="_blank" rel="noopener">
-              Visit →
-            </a>
-          </div>
-        </div>`;
-    }
-
-    html += `</div>`;
-  }
-
-  wrap.innerHTML = html;
-}
-
-// ── Trade Search ─────────────────────────────────────────────────────────────
-async function runTradeSearch(){
-  const wrap    = document.getElementById('resultsWrap');
-  const toolbar = document.getElementById('toolbar');
-  const banner  = document.getElementById('demoBanner');
-  const btn     = document.getElementById('tradeSearchBtn');
-
-  const product  = document.getElementById('tradeProduct').value.trim();
-  const hsCode   = document.getElementById('tradeHS').value.trim();
-  const country  = document.getElementById('tradeCountry').value.trim();
-  const tradeDir = document.getElementById('tradeDir').value.trim();
-
-  if(!product && !hsCode){
-    wrap.innerHTML = '<p class="empty">Enter a product or HS code, then click Search Trade.</p>';
-    return;
-  }
-
-  btn.disabled = true; btn.classList.add('btn-loading');
-  hideAIPanel();
-  wrap.innerHTML = buildSkeleton(5);
-  toolbar.style.display = 'none'; banner.style.display = 'none';
-
-  try{
-    const params = new URLSearchParams();
-    if(product)  params.set('product', product);
-    if(hsCode)   params.set('hs', hsCode);
-    if(country)  params.set('country', country);
-    if(tradeDir) params.set('dir', tradeDir);
-    const res  = await fetch('/api/trade?' + params.toString());
-    const data = await res.json();
-    if(!res.ok || data.error){ wrap.innerHTML = `<p class="error">${escapeHtml(data.error || 'Trade search failed.')}</p>`; return; }
-    banner.style.display = data.demoMode ? 'block' : 'none';
-    renderTradeResults(data);
-    if(data.results && data.results.length) runAIAnalysis((product || hsCode) + (country ? ' ' + country : ''), data.results, 'trade');
-  }catch(err){
-    wrap.innerHTML = buildErrorState(err.message, ()=>runTradeSearch());
-  }finally{
-    btn.disabled = false; btn.classList.remove('btn-loading');
-  }
-}
-
-function renderTradeResults(data){
-  const wrap = document.getElementById('resultsWrap');
-  const results = data.results || [];
-  if(!results.length){
-    if(data.message){ wrap.innerHTML = `<p class="empty">${escapeHtml(data.message)}</p>`; return; }
-    wrap.innerHTML = '<p class="empty">No trade data found. Try a different product or remove filters.</p>';
-    return;
-  }
-  const dirLabel = data.tradeDir === 'import' ? '📥 Importers' : data.tradeDir === 'export' ? '📤 Exporters' : '🔄 Trade Data';
-  let html = `<div class="stats">
-    <div style="font-size:13px;"><strong style="color:var(--text)">${results.length}</strong> results for <strong style="color:#22d3ee">${escapeHtml(data.product || data.hsCode || '')}</strong>${data.country ? ' · <span style="color:#60a5fa">' + escapeHtml(data.country) + '</span>' : ''} — ${dirLabel}</div>
-  </div><div class="card-grid">`;
-  for(const r of results){
-    const id = 'tc-' + Math.random().toString(36).slice(2,8);
-    const domain = r.displayLink || '';
-    const favicon = domain ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" onerror="this.style.display='none'" loading="lazy" />` : '';
-    const dirIcon = (r.snippet||'').toLowerCase().includes('import') ? '📥' : (r.snippet||'').toLowerCase().includes('export') ? '📤' : '🔄';
-    html += `<div class="card trade-card" id="${id}">
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="card-favicon">${favicon || '<span class="card-favicon-fallback">🔄</span>'}</div>
-          <div class="card-header-info">
-            <div class="card-title"><a href="${escapeHtml(r.link||'#')}" target="_blank" rel="noopener">${escapeHtml(r.title||'')}</a></div>
-            <div class="card-domain">${escapeHtml(domain)}</div>
-          </div>
-          <span class="card-badge trade-badge">${dirIcon} Trade</span>
-        </div>
-        <p class="card-snippet">${escapeHtml(r.snippet||'')}</p>
-        <div class="card-actions">
-          <a class="card-btn" href="${escapeHtml(r.link||'#')}" target="_blank" rel="noopener">View Source</a>
-        </div>
-      </div>
-    </div>`;
-  }
-  html += '</div>';
-  wrap.innerHTML = html;
-}
-
-// ── Market Search ─────────────────────────────────────────────────────────────
-async function runMarketSearch(){
-  const wrap    = document.getElementById('resultsWrap');
-  const toolbar = document.getElementById('toolbar');
-  const banner  = document.getElementById('demoBanner');
-  const btn     = document.getElementById('marketSearchBtn');
-
-  const industry = document.getElementById('marketIndustry').value.trim();
-  const country  = document.getElementById('marketCountry').value.trim();
-  const focus    = document.getElementById('marketFocus').value.trim();
-
-  if(!industry){
-    wrap.innerHTML = '<p class="empty">Enter an industry or sector, then click Search Market.</p>';
-    return;
-  }
-
-  btn.disabled = true; btn.classList.add('btn-loading');
-  hideAIPanel();
-  wrap.innerHTML = buildSkeleton(5);
-  toolbar.style.display = 'none'; banner.style.display = 'none';
-
-  try{
-    const params = new URLSearchParams();
-    params.set('industry', industry);
-    if(country) params.set('country', country);
-    if(focus)   params.set('focus', focus);
-    const res  = await fetch('/api/market?' + params.toString());
-    const data = await res.json();
-    if(!res.ok || data.error){ wrap.innerHTML = `<p class="error">${escapeHtml(data.error || 'Market search failed.')}</p>`; return; }
-    banner.style.display = data.demoMode ? 'block' : 'none';
-    renderMarketResults(data);
-    if(data.results && data.results.length) runAIAnalysis(industry + (country ? ' ' + country : ''), data.results, 'market');
-  }catch(err){
-    wrap.innerHTML = buildErrorState(err.message, ()=>runMarketSearch());
-  }finally{
-    btn.disabled = false; btn.classList.remove('btn-loading');
-  }
-}
-
-function renderMarketResults(data){
-  const wrap = document.getElementById('resultsWrap');
-  const results = data.results || [];
-  if(!results.length){
-    if(data.message){ wrap.innerHTML = `<p class="empty">${escapeHtml(data.message)}</p>`; return; }
-    wrap.innerHTML = '<p class="empty">No market data found. Try a different industry term.</p>';
-    return;
-  }
-  const focusLabel = data.focus === 'size' ? '📊 Market Size' : data.focus === 'trends' ? '📈 Trends' : data.focus === 'players' ? '🏆 Key Players' : '🔍 Market Intelligence';
-  let html = `<div class="stats">
-    <div style="font-size:13px;"><strong style="color:var(--text)">${results.length}</strong> results for <strong style="color:#a78bfa">${escapeHtml(data.industry||'')}</strong>${data.country ? ' · <span style="color:#60a5fa">' + escapeHtml(data.country) + '</span>' : ''} — ${focusLabel}</div>
-  </div><div class="card-grid">`;
-  for(const r of results){
-    const id = 'mc-' + Math.random().toString(36).slice(2,8);
-    const domain = r.displayLink || '';
-    const favicon = domain ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" onerror="this.style.display='none'" loading="lazy" />` : '';
-    const isReport = /statista|grandview|mordor|marketsandmarkets|ibisworld|precedence|fortune|coherent|verified/i.test(domain);
-    html += `<div class="card market-card" id="${id}">
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="card-favicon">${favicon || '<span class="card-favicon-fallback">📊</span>'}</div>
-          <div class="card-header-info">
-            <div class="card-title"><a href="${escapeHtml(r.link||'#')}" target="_blank" rel="noopener">${escapeHtml(r.title||'')}</a></div>
-            <div class="card-domain">${escapeHtml(domain)}</div>
-          </div>
-          <span class="card-badge market-badge">${isReport ? '📊 Report' : '🔍 Insight'}</span>
-        </div>
-        <p class="card-snippet">${escapeHtml(r.snippet||'')}</p>
-        <div class="card-actions">
-          <a class="card-btn" href="${escapeHtml(r.link||'#')}" target="_blank" rel="noopener">View Report</a>
-        </div>
-      </div>
-    </div>`;
-  }
-  html += '</div>';
-  wrap.innerHTML = html;
-}
-
-// ── Buyers / Customers Search ─────────────────────────────────────────────────
-
-async function runBuyersSearch(){
-  const wrap    = document.getElementById('resultsWrap');
-  const toolbar = document.getElementById('toolbar');
-  const banner  = document.getElementById('demoBanner');
-  const btn     = document.getElementById('buyersSearchBtn');
-
-  const product = document.getElementById('buyersProduct').value.trim();
-  const country = document.getElementById('buyersCountry').value.trim();
-  const btype   = document.getElementById('buyersType').value.trim();
-
-  if(!product){
-    wrap.innerHTML = '<p class="empty">Enter a product name, then click Find Buyers.</p>';
-    return;
-  }
-
-  btn.disabled = true; btn.classList.add('btn-loading');
-  hideAIPanel();
-  wrap.innerHTML = buildSkeleton(6);
-  toolbar.style.display = 'none'; banner.style.display = 'none';
-
-  try{
-    const params = new URLSearchParams({ product });
-    if(country) params.set('country', country);
-    const res  = await fetch('/api/search-customers?' + params.toString());
-    const data = await res.json();
-    if(!res.ok || data.error){
-      wrap.innerHTML = `<p class="error">${escapeHtml(data.error || 'Buyers search failed.')}</p>`;
-      return;
-    }
-    banner.style.display = data.demoMode ? 'block' : 'none';
-    let results = data.results || [];
-    if(btype) results = results.filter(r => r.type === btype);
-    renderBuyerResults(results, { product, country, total: data.total, note: data.note });
-  }catch(err){
-    wrap.innerHTML = buildErrorState(err.message, ()=>runBuyersSearch());
-  }finally{
-    btn.disabled = false; btn.classList.remove('btn-loading');
-  }
-}
-
-const BUYER_TYPE_META = {
-  importer:    { label:'Importer',    icon:'🚢', color:'#38bdf8' },
-  retailer:    { label:'Retailer',    icon:'🛒', color:'#a5b4fc' },
-  wholesaler:  { label:'Wholesaler',  icon:'📦', color:'#67e8f9' },
-  procurement: { label:'Procurement', icon:'📋', color:'#d8b4fe' },
-  buyer:       { label:'Buyer',       icon:'🏢', color:'#7dd3fc' }
-};
-
-function renderBuyerResults(results, { product, country, total, note }){
-  const wrap = document.getElementById('resultsWrap');
-  if(!results.length){
-    wrap.innerHTML = '<p class="empty">No buyers found. Try a broader product term or remove the country filter.</p>';
-    return;
-  }
-
-  const countryLabel = country ? ` in <strong style="color:#38bdf8">${escapeHtml(country)}</strong>` : '';
-  let html = `<div class="stats">`;
-  if(note) html += `<div class="country-note" style="margin:0 0 8px;font-size:12px;">${escapeHtml(note)}</div>`;
-  html += `<div style="font-size:13px;">Found <strong style="color:var(--text)">${results.length}</strong> buyers for <strong style="color:#38bdf8">${escapeHtml(product)}</strong>${countryLabel}</div>
-    <div class="stats-counts">
-      ${Object.entries(BUYER_TYPE_META).map(([t,m]) => {
-        const n = results.filter(r=>r.type===t).length;
-        return n ? `<span class="stats-pill" style="background:${m.color}18;color:${m.color};border:1px solid ${m.color}33">${m.icon} ${n} ${m.label}${n>1?'s':''}</span>` : '';
-      }).join('')}
-    </div>
-  </div><div class="card-grid">`;
-
-  // Assign stable IDs before rendering so we can reference them after innerHTML
-  const enrichQueue = [];
-
-  for(const r of results){
-    const id   = 'byr-' + Math.random().toString(36).slice(2,8);
-    const meta = BUYER_TYPE_META[r.type] || BUYER_TYPE_META.buyer;
-    const domain = r.displayLink || '';
-    const favicon = domain
-      ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" onerror="this.parentElement.innerHTML='<span class=\\'card-favicon-fallback\\'>${meta.icon}</span>'" loading="lazy" />`
-      : `<span class="card-favicon-fallback">${meta.icon}</span>`;
-
-    // Register card — _id is required by autoEnrichCard
-    const regEntry = { link: r.link, title: r.title, type: r.type, _id: id };
-    cardRegistry[id] = regEntry;
-    enrichQueue.push(regEntry);
-
-    html += `<div class="card buyer-card" id="${id}" style="animation-delay:${results.indexOf(r)*0.05}s">
-      <div class="card-inner">
-        <div class="card-header">
-          <div class="card-favicon">${favicon}</div>
-          <div class="card-header-info">
-            <h3><a href="${escapeHtml(r.link||'#')}" target="_blank" rel="noopener">${escapeHtml(r.title||'Unnamed Company')}</a></h3>
-            <div class="card-domain">
-              <a href="${escapeHtml(r.link||'#')}" target="_blank" rel="noopener">${escapeHtml(domain)}</a>
-            </div>
-          </div>
-        </div>
-        <div class="badge-row">
-          <span class="badge ${r.type||'buyer'}" style="gap:5px">${meta.icon} ${meta.label}</span>
-          ${r.confidence ? `<span class="confidence" style="font-size:11px;color:var(--muted)">${r.confidence}% match</span>` : ''}
-        </div>
-        <p class="desc">${escapeHtml(r.snippet||'')}</p>
-        <div class="card-divider"></div>
-        <div class="qc-loading" id="${id}-loading" style="font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:5px;margin-top:4px">
-          <span class="loading-dot"></span> Loading contact info…
-        </div>
-        <div class="quick-contact" id="${id}-qc"></div>
-        <div class="details-slot" id="${id}-slot"></div>
-      </div>
-    </div>`;
-  }
-
-  html += '</div>';
-  wrap.innerHTML = html;
-
-  // Auto-enrich all buyer cards in batches (same as product search)
-  (async () => {
-    const BATCH = 8;
-    for(let i = 0; i < enrichQueue.length; i += BATCH){
-      await Promise.allSettled(enrichQueue.slice(i, i + BATCH).map(r => autoEnrichCard(r)));
-    }
-  })();
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-function setFilter(f){
-  currentFilter = f;
-  setActiveFilterButton(f);
-  render();
-}
-
-function setActiveFilterButton(f){
-  document.querySelectorAll('#filters button').forEach(b=>{
-    b.classList.toggle('active', b.dataset.filter === f);
-  });
-}
-
-function sortResults(list){
-  const sortBy = document.getElementById('sortBy').value;
-  const copy = [...list];
-  if(sortBy === 'confidence') copy.sort((a,b) => (b.confidence ?? 0) - (a.confidence ?? 0));
-  else if(sortBy === 'name') copy.sort((a,b) => (a.title || '').localeCompare(b.title || ''));
-  return copy;
-}
-
-// Prepend a small banner when the country filter couldn't confirm matches.
-function showCountryNote(note){
-  if(!note) return;
-  const wrap = document.getElementById('resultsWrap');
-  if(!wrap || !wrap.firstChild) return;
-  const div = document.createElement('div');
-  div.className = 'country-note';
-  div.innerHTML = `🌍 ${escapeHtml(note)}`;
-  wrap.insertBefore(div, wrap.firstChild);
-}
-
-function renderCompany(){
-  const wrap = document.getElementById('resultsWrap');
-  // Keep the server's relevance order; just float the official site to the very top
-  // and push directory/aggregator listings to the bottom.
-  const list = [...lastResults].sort((a,b) => {
-    const rank = r => (r.isOfficial ? 0 : (r.isAggregator ? 2 : 1));
-    return rank(a) - rank(b);
-  });
-  const official = list.filter(r => r.isOfficial);
-  const profiles = list.filter(r => !r.isOfficial && !r.isAggregator);
-  const directory = list.filter(r => r.isAggregator);
-
-  let html = `<div class="stats"><span><strong>${list.length}</strong> result${list.length!==1?'s':''} for this company</span>`
-    + `<div class="stats-counts">`
-    + (official.length ? `<span class="stats-pill manu">🏢 Official site</span>` : '')
-    + (profiles.length ? `<span class="stats-pill person">🔗 ${profiles.length} Profile${profiles.length>1?'s':''}</span>` : '')
-    + (directory.length ? `<span class="stats-pill unk">📇 ${directory.length} Director${directory.length>1?'ies':'y'}</span>` : '')
-    + `</div></div>`;
-
-  if(official.length)  html += `<div class="group-title"><span class="group-title-dot manu"></span>Official Company Website</div><div class="card-grid">${official.map(cardHtml).join('')}</div>`;
-  if(profiles.length)  html += `<div class="group-title"><span class="group-title-dot dist"></span>Company Pages &amp; Mentions</div><div class="card-grid">${profiles.map(cardHtml).join('')}</div>`;
-  if(directory.length) html += `<div class="group-title"><span class="group-title-dot mkt"></span>Directory &amp; Data Listings</div><div class="card-grid">${directory.map(cardHtml).join('')}</div>`;
-
-  wrap.innerHTML = html;
-  staggerCards(wrap);
-  autoEnrichAll();
-}
-
-function render(){
-  const wrap = document.getElementById('resultsWrap');
-
-  if(lastResults.length === 0){
-    wrap.innerHTML = '<p class="empty">No results found for that subject.</p>';
-    return;
-  }
-
-  // Company lookup: render a single relevance-ranked list (official site first, then
-  // profiles, then directory listings) instead of supplier-style manufacturer/
-  // distributor grouping — which doesn't apply to a company search and can promote a
-  // misclassified directory page above the real company site.
-  if(searchMode === 'company'){
-    renderCompany();
-    return;
-  }
-
-  let filtered = currentFilter === 'all' ? lastResults : lastResults.filter(r => r.type === currentFilter);
-  filtered = sortResults(filtered);
-
-  const people = filtered.filter(r => r.type === 'person');
-  const manus = filtered.filter(r => r.type === 'manufacturer');
-  const dists = filtered.filter(r => r.type === 'distributor');
-  const unk = filtered.filter(r => r.type === 'unclassified');
-
-  const total = filtered.length;
-  let statsPills = '';
-  if(people.length) statsPills += `<span class="stats-pill person">👤 ${people.length} Profile${people.length>1?'s':''}</span>`;
-  if(manus.length)  statsPills += `<span class="stats-pill manu">🏭 ${manus.length} Manufacturer${manus.length>1?'s':''}</span>`;
-  if(dists.length)  statsPills += `<span class="stats-pill dist">📦 ${dists.length} Distributor${dists.length>1?'s':''}</span>`;
-  if(unk.length)    statsPills += `<span class="stats-pill unk">🔍 ${unk.length} Other</span>`;
-  let html = `<div class="stats"><span><strong>${total}</strong> result${total!==1?'s':''} found</span><div class="stats-counts">${statsPills}</div></div>`;
-
-  if(people.length){
-    html += `<div class="group-title">👤 People / Profiles</div><div class="card-grid">${people.map(personCardHtml).join('')}</div>`;
-  }
-
-  // Split non-person results: direct company sites first, marketplace listings after
-  const nonPeople = [...manus, ...dists, ...unk];
-  const directResults = nonPeople.filter(r => r.category !== 'marketplace');
-  const mktplResults  = nonPeople.filter(r => r.category === 'marketplace');
-
-  if(directResults.length){
-    const manuDirect = directResults.filter(r => r.type === 'manufacturer');
-    const distDirect = directResults.filter(r => r.type !== 'manufacturer');
-    if(manuDirect.length) html += `<div class="group-title"><span class="group-title-dot manu"></span>Manufacturers — Direct Websites</div><div class="card-grid">${manuDirect.map(cardHtml).join('')}</div>`;
-    if(distDirect.length) html += `<div class="group-title"><span class="group-title-dot dist"></span>Distributors &amp; Suppliers — Direct Websites</div><div class="card-grid">${distDirect.map(cardHtml).join('')}</div>`;
-  }
-  if(mktplResults.length){
-    html += `<div class="group-title"><span class="group-title-dot mkt"></span>Marketplace &amp; Directory Listings</div><div class="card-grid">${mktplResults.map(cardHtml).join('')}</div>`;
-  }
-
-  wrap.innerHTML = html;
-  staggerCards(wrap);
-  // Auto-fetch contact details for all live results in background
-  autoEnrichAll();
-}
-
-let cardCounter = 0;
-const cardRegistry = {};
-
-function faviconHtml(domain, fallback){
-  if(!domain) return `<div class="card-favicon"><span class="card-favicon-fallback">${fallback}</span></div>`;
-  const src = `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32`;
-  return `<div class="card-favicon"><img src="${src}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span class=card-favicon-fallback>${fallback}</span>'" /></div>`;
-}
-
-function personCardHtml(r){
-  const id = 'card-' + (cardCounter++);
-  r._id = id;
-  cardRegistry[id] = r;
-
-  const domain = r.displayLink || '';
-  const snippet = r.snippet || '';
-  const initials = (r.title || '?').split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
-  const photoHtml = r.thumbnail
-    ? `<img class="person-photo" src="${escapeHtml(r.thumbnail)}" alt="profile photo"
-         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
-       /><div class="person-avatar" style="display:none">${escapeHtml(initials)}</div>`
-    : `<div class="person-avatar">${escapeHtml(initials)}</div>`;
-
-  return `
-    <div class="card person-card" id="${id}">
-      <div class="card-inner">
-        <div class="person-header">
-          <div class="person-photo-wrap">${photoHtml}</div>
-          <div class="person-info">
-            <div class="badge-row">
-              <span class="badge person-badge">👤 Profile</span>
-            </div>
-            <h3><a href="${escapeHtml(r.link)}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a></h3>
-            <div class="card-domain">
-              ${faviconHtml(domain,'🌐')}
-              <span class="card-domain-dot"></span>
-              <a href="${escapeHtml(r.link)}" target="_blank" rel="noopener">${escapeHtml(domain)}</a>
-            </div>
-          </div>
-        </div>
-        <div class="card-divider"></div>
-        <div class="desc">${escapeHtml(snippet)}</div>
-        <div class="details-slot" id="${id}-slot"></div>
-        <button class="trust-btn" onclick="runTrustCheck('${id}', this)">🛡 Check Trust &amp; Reputation</button>
-        <div class="trust-slot" id="${id}-trust"></div>
-      </div>
-    </div>
-  `;
-}
-
-const SIGNAL_ICONS = { price:'💰', moq:'📦', cert:'✅', leadtime:'🚚', since:'📅', capacity:'🏭', location:'📍', export:'🌍' };
-
-function signalsHtml(signals) {
-  if (!signals || !signals.length) return '';
-  return '<div class="signals-row">' +
-    signals.map(s => `<span class="signal-chip ${escapeHtml(s.type)}" title="${escapeHtml(s.label)}">${SIGNAL_ICONS[s.type]||''} ${escapeHtml(s.label)}</span>`).join('') +
-    '</div>';
-}
-
-function quickContactHtml(r) {
-  let btns = '';
-  if (r.email)    btns += `<a class="qc-btn email"    href="mailto:${escapeHtml(r.email)}"    title="${escapeHtml(r.email)}">✉️ Email</a>`;
-  if (r.phone)    btns += `<a class="qc-btn phone"    href="tel:${escapeHtml(r.phone)}"       title="${escapeHtml(r.phone)}">📞 Call</a>`;
-  if (r.whatsapp) btns += `<a class="qc-btn whatsapp" href="https://wa.me/${escapeHtml(r.whatsapp.replace(/[^\d]/g,''))}" target="_blank" rel="noopener" title="WhatsApp ${escapeHtml(r.whatsapp)}">💬 WhatsApp</a>`;
-  if (!btns) return '';
-  return `<div class="quick-contact">${btns}</div>`;
-}
-
-function cardHtml(r){
-  const labels    = { manufacturer:'Manufacturer', distributor:'Distributor', unclassified:'Supplier' };
-  const typeIcons = { manufacturer:'🏭', distributor:'📦', unclassified:'🔍' };
-  const conf = (r.confidence != null && r.type !== 'unclassified') ? `<span class="confidence">${r.confidence}%</span>` : '';
-
-  const id = 'card-' + (cardCounter++);
-  r._id = id;
-  cardRegistry[id] = r;
-
-  const domain  = r.displayLink || '';
-  const snippet = r.snippet || '';
-  const isMktpl = r.category === 'marketplace';
-  const snippetShort = snippet.length > 220 ? snippet.slice(0, 220) + '…' : snippet;
-  const hasLong = snippet.length > 220;
-
-  const hasInlineContact = r.phone || r.email || r.address || r.whatsapp || r.employeeCount || r.founded || (r.keyPeople && r.keyPeople.length);
-  const detailsInner = hasInlineContact ? renderDetailsHtml(r, r.link) : '';
-
-  return `
-    <div class="card ${r.type}${isMktpl ? ' marketplace-card' : ''}" id="${id}">
-      <div class="card-inner">
-        <div class="card-header">
-          ${faviconHtml(domain, typeIcons[r.type]||'🔍')}
-          <div class="card-header-info">
-            <div class="badge-row">
-              <span class="badge ${r.type}">${typeIcons[r.type]} ${labels[r.type]||'Supplier'}</span>
-              ${isMktpl ? '<span class="badge unclassified">🏪 Directory</span>' : ''}
-              ${conf}
-            </div>
-            <h3><a href="${escapeHtml(r.link)}" target="_blank" rel="noopener">${escapeHtml(r.title)}</a></h3>
-            <div class="card-domain">
-              <a href="${escapeHtml(r.link)}" target="_blank" rel="noopener">${escapeHtml(domain)}</a>
-            </div>
-          </div>
-        </div>
-        ${signalsHtml(r.signals)}
-        <div class="desc">
-          <span class="snippet-short" id="${id}-short">${escapeHtml(snippetShort)}</span>
-          ${hasLong ? `<span class="snippet-full" id="${id}-full">${escapeHtml(snippet)}</span>
-          <button class="snippet-toggle" onclick="toggleSnippet('${id}')">Show more ▾</button>` : ''}
-        </div>
-        <div class="qc-loading" id="${id}-loading"><span class="loading-dot"></span> Loading contact info…</div>
-        <div id="${id}-qc"></div>
-        <div class="details-slot" id="${id}-slot">${detailsInner}</div>
-        <div class="card-divider"></div>
-        <button class="people-btn" onclick="loadKeyPeople('${id}', this)">👥 Find Key People</button>
-        <div class="people-slot" id="${id}-people"></div>
-        <div class="card-export-row">
-          <button class="card-export-btn" onclick="exportCardWord('${id}')">📄 Word</button>
-          <button class="card-export-btn" onclick="exportCardEmail('${id}')">📧 Email</button>
-          <button class="card-export-btn card-copy-btn" onclick="copyCard('${id}', this)" title="Copy all details to clipboard">📋 Copy</button>
-          <button class="card-export-btn card-cut-btn" onclick="cutCard('${id}')" title="Remove this card">✂️ Cut</button>
-        </div>
-        <button class="trust-btn" onclick="runTrustCheck('${id}', this)">🛡 Trust Check</button>
-        <div class="trust-slot" id="${id}-trust"></div>
-      </div>
-    </div>
-  `;
-}
-
-function toggleSnippet(id) {
-  const s = document.getElementById(id + '-short');
-  const f = document.getElementById(id + '-full');
-  const btn = s && s.parentElement.querySelector('.snippet-toggle');
-  if (!s || !f) return;
-  const isExpanded = f.style.display === 'block';
-  f.style.display = isExpanded ? 'none' : 'block';
-  s.style.display = isExpanded ? 'block' : 'none';
-  if (btn) btn.textContent = isExpanded ? 'Show more ▾' : 'Show less ▴';
-}
-
-function renderDetailsHtml(d, website){
-  const rows = [];
-
-  // Description from Wikipedia / DuckDuckGo
-  if(d.description){
-    const srcLinks = [];
-    if(d.wikipedia) srcLinks.push(`<a href="${escapeHtml(d.wikipedia)}" target="_blank" rel="noopener">Wikipedia ↗</a>`);
-    const srcNote = srcLinks.length ? ` <span style="font-size:11px;color:var(--muted)">(${srcLinks.join(', ')})</span>` : '';
-    rows.push(['📝 Overview', `<span style="font-size:12.5px;line-height:1.6;color:var(--text-2)">${escapeHtml(d.description)}</span>${srcNote}`]);
-  }
-
-  if(d.phone) rows.push(['📞 Tel', escapeHtml(d.phone)]);
-  if(d.fax) rows.push(['📠 Fax', escapeHtml(d.fax)]);
-  if(d.whatsapp){
-    const waLink = 'https://wa.me/' + d.whatsapp.replace(/[^\d]/g, '');
-    rows.push(['💬 WhatsApp', `<a href="${waLink}" target="_blank" rel="noopener">${escapeHtml(d.whatsapp)}</a>`]);
-  }
-  if(d.email) rows.push(['✉️ Email', `<a href="mailto:${escapeHtml(d.email)}">${escapeHtml(d.email)}</a>`]);
-  if(website) rows.push(['🌐 Website', `<a href="${escapeHtml(website)}" target="_blank" rel="noopener">${escapeHtml(website)}</a>`]);
-  if(d.linkedin) rows.push(['in LinkedIn', `<a href="${escapeHtml(d.linkedin)}" target="_blank" rel="noopener">${escapeHtml(d.linkedin.replace(/^https?:\/\//,''))}</a>`]);
-  if(d.address) rows.push(['📍 Address', escapeHtml(d.address)]);
-  if(d.founders && d.founders.length){
-    rows.push(['🚀 Founders', escapeHtml(d.founders.join(', '))]);
-  }
-  if(d.fundingStage) rows.push(['💼 Funding', escapeHtml(d.fundingStage)]);
-  if(d.industry) rows.push(['🏭 Industry', escapeHtml(d.industry)]);
-  if(d.revenue) rows.push(['💰 Revenue', escapeHtml(d.revenue)]);
-  if(d.companySize){
-    const sizeLabel = d.companySize.replace(/\s*\(.*?\)\s*$/, '');
-    rows.push(['🏢 Company Size', escapeHtml(sizeLabel) + (d.employeeCount ? ` — ~${escapeHtml(d.employeeCount)} employees` : '')]);
-  }else if(d.employeeCount){
-    rows.push(['🏢 Employees', `~${escapeHtml(d.employeeCount)}`]);
-  }
-  if(d.founded) rows.push(['📅 Founded', escapeHtml(d.founded)]);
-  if(d.hiringStatus){
-    const isHiring = d.hiringStatus === 'Actively hiring';
-    rows.push(['💼 Hiring', `<span style="color:${isHiring?'#047857':'#b45309'};font-weight:600">${escapeHtml(d.hiringStatus)}</span>`]);
-  }
-  if(d.keyPeople && d.keyPeople.length){
-    rows.push(['👤 Key People', d.keyPeople.map(p => `${escapeHtml(p.name)} (${escapeHtml(p.title)})`).join(', ')]);
-  }
-
-  // Directory/aggregator listing — warn that details may belong to a different entity.
-  const aggregatorNote = d.isAggregator
-    ? `<div class="detail-note" style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.07);color:#fcd34d">⚠️ ${escapeHtml(d.note || 'Third-party directory listing — details may not match this exact company.')}</div>`
-    : '';
-
-  const hasContact = rows.length > 0;
-  if(!hasContact && !d.news?.length){
-    const msg = d.note || 'No contact details were published on this website.';
-    const visit = website ? ` <a href="${escapeHtml(website)}" target="_blank" rel="noopener" style="color:#60a5fa;font-weight:600">Open website ↗</a>` : '';
-    return `<div class="detail-note"${d.isAggregator ? ' style="border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.07);color:#fcd34d"':''}>${d.isAggregator?'⚠️ ':''}${escapeHtml(msg)}${visit}</div>`;
-  }
-
-  const grid = hasContact
-    ? `<div class="details-grid">${rows.map(([label,val]) => `<div class="detail-row"><span class="detail-label">${label}</span><span class="detail-value">${val}</span></div>`).join('')}</div>`
-    : '';
-
-  // Recent news section
-  let newsHtml = '';
-  if(d.news && d.news.length){
-    const newsItems = d.news.map(n =>
-      `<div class="detail-row" style="flex-direction:column;gap:2px;padding:6px 0;border-bottom:1px solid var(--line)">` +
-      `<a href="${escapeHtml(n.url)}" target="_blank" rel="noopener" style="color:var(--accent-hi);font-size:13px;font-weight:500;line-height:1.4">${escapeHtml(n.title)}</a>` +
-      (n.age ? `<span style="font-size:11px;color:var(--muted)">${escapeHtml(n.age)}</span>` : '') +
-      (n.snippet ? `<span style="font-size:12px;color:var(--text-2)">${escapeHtml(n.snippet)}</span>` : '') +
-      `</div>`
-    ).join('');
-    newsHtml = `<div style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(15,23,42,.08)">` +
-      `<div style="font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">Recent News</div>` +
-      newsItems + `</div>`;
-  }
-
-  return aggregatorNote + grid + newsHtml;
-}
-
-async function loadDetails(id, btn){
-  const r = cardRegistry[id];
-  if(!r) return;
-  const card = document.getElementById(id);
-  const slot = card.querySelector('.details-slot');
-
-  btn.disabled = true;
-  btn.textContent = 'Looking up...';
-
-  try{
-    const enrichUrl = '/api/enrich?url=' + encodeURIComponent(r.link) + (r.title ? '&name=' + encodeURIComponent(r.title) : '');
-    const res = await fetch(enrichUrl);
-    const data = await res.json();
-
-    if(!res.ok || data.error){
-      slot.innerHTML = `<div class="detail-error">${escapeHtml(data.error || 'Lookup failed.')}</div>`;
-      btn.remove();
-      return;
-    }
-
-    slot.innerHTML = renderDetailsHtml(data, data.website || r.link);
-    btn.remove();
-  }catch(err){
-    slot.innerHTML = `<div class="detail-error">Lookup failed: ${escapeHtml(err.message)}</div>`;
-    btn.remove();
-  }
-}
-
-function exportCsv(){
-  if(!lastResults.length) return;
-  const rows = [["Type","Confidence","Title","Link","Snippet","Domain","Phone","WhatsApp","Email","Address","Company Size","Employees","Founded","Key People"]];
-  sortResults(currentFilter === 'all' ? lastResults : lastResults.filter(r => r.type === currentFilter))
-    .forEach(r => rows.push([
-      r.type, r.confidence ?? '', r.title, r.link, r.snippet, r.displayLink,
-      r.phone ?? '', r.whatsapp ?? '', r.email ?? '', r.address ?? '',
-      r.companySize ?? '', r.employeeCount ?? '', r.founded ?? '',
-      (r.keyPeople || []).map(p => `${p.name} (${p.title})`).join('; ')
-    ]));
-
-  const csv = rows.map(row =>
-    row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(',')
-  ).join('\n');
-
-  const blob = new Blob([csv], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${(lastSubject || 'results').replace(/[^a-z0-9]+/gi, '_')}_results.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function buildResultsText(includeHtml){
-  const results = currentFilter === 'all' ? lastResults : lastResults.filter(r => r.type === currentFilter);
-  const sorted = sortResults(results);
-  const manus = sorted.filter(r=>r.type==='manufacturer');
-  const dists = sorted.filter(r=>r.type==='distributor');
-  const unk   = sorted.filter(r=>r.type==='unclassified');
-  const date  = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
-
-  if(includeHtml){
-    const cardBlock = (r,idx) => {
-      const typeLabel = r.type==='manufacturer'?'MANUFACTURER':r.type==='distributor'?'DISTRIBUTOR':'UNCLASSIFIED';
-      const typeColor = r.type==='manufacturer'?'#1a7a4a':r.type==='distributor'?'#b87a00':'#666';
-      const rows = [];
-      if(r.phone)        rows.push(['Tel', r.phone]);
-      if(r.whatsapp)     rows.push(['WhatsApp', r.whatsapp]);
-      if(r.email)        rows.push(['Email', r.email]);
-      if(r.link)         rows.push(['Website', r.link]);
-      if(r.address)      rows.push(['Address', r.address]);
-      if(r.companySize)  rows.push(['Company Size', r.companySize.replace(/\s*\(.*?\)\s*$/,'') + (r.employeeCount?` — ~${r.employeeCount} employees`:'')]);
-      if(r.founded)      rows.push(['Founded', r.founded]);
-      if(r.keyPeople&&r.keyPeople.length) rows.push(['Key People', r.keyPeople.map(p=>`${p.name} (${p.title})`).join(', ')]);
-      const tableRows = rows.map(([l,v])=>`<tr><td style="font-weight:600;color:#555;width:110px;padding:4px 8px;border:1px solid #ddd;">${l}</td><td style="padding:4px 8px;border:1px solid #ddd;">${v}</td></tr>`).join('');
-      return `<div style="margin-bottom:18px;padding:14px;border:1px solid #ddd;border-left:4px solid ${typeColor};border-radius:4px;page-break-inside:avoid;">
-        <div style="margin-bottom:6px;"><span style="background:${typeColor}22;color:${typeColor};font-weight:700;font-size:10px;padding:2px 10px;border-radius:20px;letter-spacing:.5px;">${typeLabel}</span>${r.confidence?`<span style="font-size:10px;color:#888;margin-left:8px;">${r.confidence}% confidence</span>`:''}</div>
-        <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${r.title||''}</div>
-        <div style="font-size:11px;color:#555;margin-bottom:4px;">${r.displayLink||''}</div>
-        <div style="font-size:12px;color:#444;margin-bottom:8px;">${r.snippet||''}</div>
-        ${tableRows?`<table style="border-collapse:collapse;width:100%;font-size:12px;">${tableRows}</table>`:''}
-      </div>`;
-    };
-    const section = (title,color,items) => items.length?`<h2 style="font-size:14pt;color:${color};border-bottom:2px solid ${color};padding-bottom:4px;margin-top:24px;">${title}</h2>${items.map((r,i)=>cardBlock(r,i)).join('')}`:'';
-    return `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset='utf-8'><title>Search Results</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
-<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#222;margin:40px;}h1{font-size:18pt;}p{margin:4px 0;}</style>
-</head><body>
-<h1 style="color:#1a2040;">Product Source Search Results</h1>
-<p style="color:#666;font-size:10pt;">Subject: <b>${escapeHtml(lastSubject)}</b> &nbsp;|&nbsp; Generated: ${date} &nbsp;|&nbsp; ${sorted.length} result(s)</p>
-<hr style="border:none;border-top:1px solid #ddd;margin:12px 0;">
-${section('🏭 Manufacturers','#1a7a4a',manus)}
-${section('📦 Distributors','#b87a00',dists)}
-${section('❓ Unclassified','#666',unk)}
-<p style="font-size:9pt;color:#999;margin-top:30px;border-top:1px solid #eee;padding-top:8px;">Generated by Product Source Search Engine. Classification is heuristic — always verify independently.</p>
-</body></html>`;
-  }
-
-  // Plain text version for email
-  const fmt = (r) => {
-    const lines = [`${r.title||''} [${(r.type||'').toUpperCase()}${r.confidence?` ${r.confidence}%`:''}]`];
-    if(r.displayLink) lines.push(`Website: ${r.displayLink}`);
-    if(r.phone)       lines.push(`Tel: ${r.phone}`);
-    if(r.whatsapp)    lines.push(`WhatsApp: ${r.whatsapp}`);
-    if(r.email)       lines.push(`Email: ${r.email}`);
-    if(r.address)     lines.push(`Address: ${r.address}`);
-    if(r.founded)     lines.push(`Founded: ${r.founded}`);
-    if(r.keyPeople&&r.keyPeople.length) lines.push(`Key People: ${r.keyPeople.map(p=>`${p.name} (${p.title})`).join(', ')}`);
-    if(r.snippet)     lines.push(`About: ${r.snippet}`);
-    return lines.join('\n');
-  };
-  const sections = [];
-  if(manus.length) sections.push(`===== MANUFACTURERS (${manus.length}) =====\n\n${manus.map((r,i)=>`${i+1}. ${fmt(r)}`).join('\n\n')}`);
-  if(dists.length) sections.push(`===== DISTRIBUTORS (${dists.length}) =====\n\n${dists.map((r,i)=>`${i+1}. ${fmt(r)}`).join('\n\n')}`);
-  if(unk.length)   sections.push(`===== UNCLASSIFIED (${unk.length}) =====\n\n${unk.map((r,i)=>`${i+1}. ${fmt(r)}`).join('\n\n')}`);
-  return `Product Source Search Results\nSubject: ${lastSubject}\nDate: ${date}\nTotal: ${sorted.length} result(s)\n\n${sections.join('\n\n')}\n\n---\nClassification is heuristic — always verify independently.`;
-}
-
-// ── Single-card export helpers ────────────────────────────
-function buildCardHtmlBlock(r) {
-  const typeLabel = r.type==='manufacturer'?'MANUFACTURER':r.type==='distributor'?'DISTRIBUTOR':r.type==='person'?'PROFILE':'UNCLASSIFIED';
-  const typeColor = r.type==='manufacturer'?'#1a7a4a':r.type==='distributor'?'#b87a00':r.type==='person'?'#7c3aed':'#666';
-  const rows = [];
-  if(r.phone)       rows.push(['Tel', r.phone]);
-  if(r.whatsapp)    rows.push(['WhatsApp', r.whatsapp]);
-  if(r.email)       rows.push(['Email', r.email]);
-  if(r.link)        rows.push(['Website', r.link]);
-  if(r.address)     rows.push(['Address', r.address]);
-  if(r.companySize) rows.push(['Company Size', r.companySize.replace(/\s*\(.*?\)\s*$/,'') + (r.employeeCount?` — ~${r.employeeCount} employees`:'')]);
-  if(r.founded)     rows.push(['Founded', r.founded]);
-  if(r.keyPeople&&r.keyPeople.length) rows.push(['Key People', r.keyPeople.map(p=>`${p.name} (${p.title})`).join(', ')]);
-  const tableRows = rows.map(([l,v])=>`<tr><td style="font-weight:600;color:#555;width:110px;padding:4px 8px;border:1px solid #ddd;">${l}</td><td style="padding:4px 8px;border:1px solid #ddd;">${v}</td></tr>`).join('');
-  return `<div style="margin-bottom:18px;padding:14px;border:1px solid #ddd;border-left:4px solid ${typeColor};border-radius:4px;">
-    <div style="margin-bottom:6px;"><span style="background:${typeColor}22;color:${typeColor};font-weight:700;font-size:10px;padding:2px 10px;border-radius:20px;letter-spacing:.5px;">${typeLabel}</span></div>
-    <div style="font-size:14px;font-weight:700;margin-bottom:4px;">${r.title||''}</div>
-    <div style="font-size:11px;color:#555;margin-bottom:4px;">${r.displayLink||''}</div>
-    <div style="font-size:12px;color:#444;margin-bottom:8px;">${r.snippet||''}</div>
-    ${tableRows?`<table style="border-collapse:collapse;width:100%;font-size:12px;">${tableRows}</table>`:''}
-  </div>`;
-}
-
-function buildCardPlainText(r) {
-  const lines = [`${r.title||''} [${(r.type||'').toUpperCase()}]`];
-  if(r.displayLink) lines.push(`Website: ${r.displayLink}`);
-  if(r.phone)       lines.push(`Tel: ${r.phone}`);
-  if(r.whatsapp)    lines.push(`WhatsApp: ${r.whatsapp}`);
-  if(r.email)       lines.push(`Email: ${r.email}`);
-  if(r.address)     lines.push(`Address: ${r.address}`);
-  if(r.companySize) lines.push(`Company Size: ${r.companySize.replace(/\s*\(.*?\)\s*$/,'')}`);
-  if(r.founded)     lines.push(`Founded: ${r.founded}`);
-  if(r.keyPeople&&r.keyPeople.length) lines.push(`Key People: ${r.keyPeople.map(p=>`${p.name} (${p.title})`).join(', ')}`);
-  if(r.snippet)     lines.push(`About: ${r.snippet}`);
-  return lines.join('\n');
-}
-
-function copyInputValue(inputId, btn) {
-  const val = document.getElementById(inputId)?.value || '';
-  if (!val) return;
-  navigator.clipboard.writeText(val).then(() => {
-    const orig = btn.innerHTML;
-    btn.innerHTML = '✅ Copied!';
-    setTimeout(() => { btn.innerHTML = orig; }, 1800);
-  });
-}
-
-async function pasteInputValue(inputId) {
-  try {
-    const text = await navigator.clipboard.readText();
-    const el = document.getElementById(inputId);
-    if (el && text) { el.value = text; el.focus(); }
-  } catch { alert('Paste blocked by browser — use Ctrl+V instead.'); }
-}
-
-function copyCard(id, btn) {
-  const r = cardRegistry[id];
-  if (!r) return;
-  const lines = [];
-  if (r.title)   lines.push(r.title);
-  if (r.link)    lines.push(r.link);
-  if (r.snippet) lines.push(r.snippet);
-  if (r.phone)   lines.push('Tel: ' + r.phone);
-  if (r.fax)     lines.push('Fax: ' + r.fax);
-  if (r.whatsapp) lines.push('WhatsApp: ' + r.whatsapp);
-  if (r.email)   lines.push('Email: ' + r.email);
-  if (r.address) lines.push('Address: ' + r.address);
-  if (r.founded) lines.push('Founded: ' + r.founded);
-  if (r.founders && r.founders.length) lines.push('Founders: ' + r.founders.join(', '));
-  if (r.industry) lines.push('Industry: ' + r.industry);
-  navigator.clipboard.writeText(lines.join('\n')).then(() => {
-    const orig = btn.innerHTML;
-    btn.innerHTML = '✅ Copied!';
-    btn.disabled = true;
-    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 2000);
-  });
-}
-
-function cutCard(id) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.style.transition = 'opacity .25s, transform .25s';
-  el.style.opacity = '0';
-  el.style.transform = 'scale(.95)';
-  setTimeout(() => el.remove(), 260);
-  delete cardRegistry[id];
-}
-
-function exportCardWord(id) {
-  const r = cardRegistry[id];
-  if (!r) return;
-  const date = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'});
-  const body = buildCardHtmlBlock(r);
-  const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-<head><meta charset='utf-8'><title>${r.title||'Company'}</title>
-<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->
-<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#222;margin:40px;}</style>
 </head><body>
 <h1 style="color:#1a2040;">${r.title||'Company Details'}</h1>
 <p style="color:#666;font-size:10pt;">Generated: ${date}</p>
@@ -4834,6 +2755,7 @@ function staggerCards(container){
 </script>
 </body>
 </html>
+
 
 
 
