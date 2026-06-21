@@ -11,7 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 <style>
   :root{
-    --bg:#080d1a; --bg2:#0d1326; --card:#111827; --card-hover:#151e30;
+    --bg:#141c2e; --bg2:#1a2540; --card:#1e2b42; --card-hover:#243350;
     --accent:#6366f1; --accent-hi:#818cf8; --accent2:#a855f7; --accent3:#22d3ee;
     --text:#f1f5f9; --text-2:#94a3b8; --muted:#64748b; --line:rgba(255,255,255,.07);
     --manu:#10b981; --dist:#f59e0b; --unk:#64748b;
@@ -31,11 +31,11 @@
   body{
     font-family:'DM Sans',-apple-system,'Segoe UI',Arial,sans-serif;
     color:var(--text); padding:0 0 80px; min-height:100vh;
-    background:#080d1a;
+    background:#141c2e;
     background-image:
-      radial-gradient(ellipse 80% 50% at 0% 0%, rgba(99,102,241,.12), transparent),
-      radial-gradient(ellipse 60% 45% at 100% 0%, rgba(168,85,247,.1), transparent),
-      radial-gradient(ellipse 50% 60% at 50% 100%, rgba(34,211,238,.05), transparent);
+      radial-gradient(ellipse 80% 50% at 0% 0%, rgba(99,102,241,.1), transparent),
+      radial-gradient(ellipse 60% 45% at 100% 0%, rgba(168,85,247,.08), transparent),
+      radial-gradient(ellipse 50% 60% at 50% 100%, rgba(34,211,238,.04), transparent);
     background-attachment:fixed;
   }
 
@@ -56,11 +56,11 @@
   /* ── Topbar ──────────────────────────────────────────────── */
   .topbar{
     position:sticky; top:0; z-index:100;
-    background:rgba(8,13,26,.85); backdrop-filter:blur(24px) saturate(180%);
+    background:rgba(20,28,46,.9); backdrop-filter:blur(24px) saturate(180%);
     border-bottom:1px solid rgba(255,255,255,.07);
     padding:0 36px; height:64px;
     display:flex; align-items:center; justify-content:space-between;
-    box-shadow:0 1px 0 rgba(255,255,255,.04), 0 4px 20px rgba(0,0,0,.3);
+    box-shadow:0 1px 0 rgba(255,255,255,.04), 0 4px 20px rgba(15,22,45,.5);
   }
   .topbar::after{
     content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
@@ -149,10 +149,10 @@
   /* Hero stats row */
   .hero-stats{
     display:flex; align-items:center; gap:0; margin:0 0 28px;
-    background:rgba(17,24,39,.8); border:1px solid rgba(255,255,255,.08);
+    background:rgba(26,37,64,.85); border:1px solid rgba(255,255,255,.08);
     border-radius:16px; padding:14px 22px;
     max-width:440px;
-    box-shadow:0 2px 8px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.3);
+    box-shadow:0 2px 8px rgba(15,22,45,.5), 0 8px 24px rgba(15,22,45,.5);
     backdrop-filter:blur(12px);
   }
   .hero-stat{ display:flex; flex-direction:column; align-items:center; flex:1; gap:3px; }
@@ -318,10 +318,10 @@
   /* ── Search Panel ────────────────────────────────────────── */
   .panel{
     max-width:820px; margin:0 auto 20px; padding:28px 30px; border-radius:22px;
-    background:rgba(17,24,39,.8);
+    background:rgba(26,37,64,.85);
     backdrop-filter:blur(12px);
-    border:1px solid rgba(255,255,255,.08);
-    box-shadow:0 2px 8px rgba(0,0,0,.3), 0 8px 32px rgba(0,0,0,.4), 0 0 0 1px rgba(99,102,241,.08);
+    border:1px solid rgba(255,255,255,.09);
+    box-shadow:0 2px 8px rgba(0,0,0,.2), 0 8px 32px rgba(0,0,0,.25), 0 0 0 1px rgba(99,102,241,.08);
     position:relative; z-index:1;
   }
   .panel::before{ content:none; }
@@ -342,9 +342,9 @@
   /* ── Mode Tabs ───────────────────────────────────────────── */
   .mode-tabs{
     display:flex; gap:3px; margin-bottom:24px;
-    background:rgba(0,0,0,.3); padding:4px; border-radius:15px;
+    background:rgba(15,22,45,.5); padding:4px; border-radius:15px;
     border:1px solid rgba(255,255,255,.07); width:100%;
-    box-shadow:inset 0 1px 4px rgba(0,0,0,.3);
+    box-shadow:inset 0 1px 4px rgba(15,22,45,.5);
   }
   .mode-tab{
     flex:1; padding:10px 6px 9px; border-radius:11px; border:1px solid transparent;
@@ -362,7 +362,7 @@
   /* Active states — dark glass card */
   .mode-tab.active{
     background:rgba(99,102,241,.15); color:var(--text);
-    box-shadow:0 1px 4px rgba(0,0,0,.3), 0 2px 8px rgba(0,0,0,.2), 0 0 0 1px rgba(99,102,241,.2);
+    box-shadow:0 1px 4px rgba(15,22,45,.5), 0 2px 8px rgba(0,0,0,.2), 0 0 0 1px rgba(99,102,241,.2);
   }
   .mode-tab[data-mode="product"].active  { border-color:rgba(37,99,235,.25);  color:#1d4ed8; }
   .mode-tab[data-mode="company"].active  { border-color:rgba(5,150,105,.25);   color:#047857; }
@@ -384,7 +384,7 @@
   .search-box input, .search-box select{
     padding:13px 16px; border-radius:12px;
     border:1px solid rgba(255,255,255,.1);
-    background:rgba(0,0,0,.3); color:var(--text);
+    background:rgba(15,22,45,.5); color:var(--text);
     font-size:14px; font-family:'DM Sans',inherit;
     transition:border-color .18s ease, box-shadow .18s ease;
     width:100%;
@@ -447,7 +447,7 @@
   }
   .filters{
     display:flex; gap:2px; flex-wrap:wrap;
-    background:rgba(0,0,0,.3); padding:3px; border-radius:22px;
+    background:rgba(15,22,45,.5); padding:3px; border-radius:22px;
     border:1px solid rgba(255,255,255,.08);
     box-shadow:0 1px 4px rgba(0,0,0,.2);
   }
@@ -463,7 +463,7 @@
 
   select#sortBy, .export-btn{
     padding:8px 16px; border-radius:20px;
-    border:1px solid rgba(255,255,255,.08); background:rgba(0,0,0,.3);
+    border:1px solid rgba(255,255,255,.08); background:rgba(15,22,45,.5);
     color:var(--text); font-size:13px; font-family:inherit; cursor:pointer; transition:all .15s;
     box-shadow:0 1px 4px rgba(0,0,0,.2);
   }
@@ -493,7 +493,7 @@
     to{ opacity:1; transform:translateY(0) scale(1); }
   }
   .card{
-    background:linear-gradient(160deg, rgba(22,30,50,.95) 0%, rgba(13,19,38,.95) 100%);
+    background:linear-gradient(160deg, rgba(30,43,66,1) 0%, rgba(26,37,60,1) 100%);
     border-radius:var(--radius-card); padding:0;
     border:1px solid rgba(255,255,255,.07);
     position:relative; overflow:hidden;
@@ -519,7 +519,7 @@
   /* Type-specific: manufacturer — emerald */
   .card.manufacturer{
     border-color:rgba(16,185,129,.2);
-    background:linear-gradient(160deg, rgba(16,185,129,.07) 0%, rgba(13,19,38,.95) 50%);
+    background:linear-gradient(160deg, rgba(16,185,129,.07) 0%, rgba(26,37,60,1) 50%);
   }
   .card.manufacturer::before{
     background:linear-gradient(90deg, transparent 0%, rgba(5,150,105,.6) 30%, rgba(52,211,153,.45) 60%, transparent 100%);
@@ -533,7 +533,7 @@
   /* Type-specific: distributor — amber */
   .card.distributor{
     border-color:rgba(245,158,11,.2);
-    background:linear-gradient(160deg, rgba(245,158,11,.07) 0%, rgba(13,19,38,.95) 50%);
+    background:linear-gradient(160deg, rgba(245,158,11,.07) 0%, rgba(26,37,60,1) 50%);
   }
   .card.distributor::before{
     background:linear-gradient(90deg, transparent 0%, rgba(217,119,6,.6) 30%, rgba(251,191,36,.45) 60%, transparent 100%);
@@ -547,7 +547,7 @@
   /* Type-specific: trade — cyan */
   .card.trade-card{
     border-color:rgba(34,211,238,.2);
-    background:linear-gradient(160deg, rgba(34,211,238,.07) 0%, rgba(13,19,38,.95) 50%);
+    background:linear-gradient(160deg, rgba(34,211,238,.07) 0%, rgba(26,37,60,1) 50%);
   }
   .card.trade-card::before{
     background:linear-gradient(90deg, transparent 0%, rgba(8,145,178,.6) 30%, rgba(34,211,238,.4) 60%, transparent 100%);
@@ -560,7 +560,7 @@
   /* Type-specific: market — purple */
   .card.market-card{
     border-color:rgba(168,85,247,.2);
-    background:linear-gradient(160deg, rgba(168,85,247,.07) 0%, rgba(13,19,38,.95) 50%);
+    background:linear-gradient(160deg, rgba(168,85,247,.07) 0%, rgba(26,37,60,1) 50%);
   }
   .card.market-card::before{
     background:linear-gradient(90deg, transparent 0%, rgba(109,40,217,.55) 30%, rgba(139,92,246,.4) 60%, transparent 100%);
@@ -573,7 +573,7 @@
   /* ── Buyer / Customer cards ──────────────────────────────── */
   .card.buyer-card{
     border-color:rgba(14,165,233,.2);
-    background:linear-gradient(160deg, rgba(14,165,233,.07) 0%, rgba(13,19,38,.95) 50%);
+    background:linear-gradient(160deg, rgba(14,165,233,.07) 0%, rgba(26,37,60,1) 50%);
   }
   .card.buyer-card::before{
     background:linear-gradient(90deg, transparent 0%, rgba(14,165,233,.6) 30%, rgba(56,189,248,.45) 60%, transparent 100%);
@@ -787,7 +787,7 @@
     display:flex; align-items:center; gap:9px;
     padding:12px 20px; border-radius:13px; cursor:pointer;
     background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08);
-    box-shadow:0 1px 4px rgba(0,0,0,.3);
+    box-shadow:0 1px 4px rgba(15,22,45,.5);
     transition:all .2s ease; min-width:145px; justify-content:center;
   }
   .welcome-mode:hover{
@@ -808,11 +808,11 @@
   .stats{
     color:var(--muted); margin-bottom:28px; font-size:13px;
     padding:14px 22px;
-    background:rgba(17,24,39,.8);
+    background:rgba(26,37,64,.85);
     border-radius:16px;
     border:1px solid rgba(255,255,255,.07);
     display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-    box-shadow:0 1px 4px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.3);
+    box-shadow:0 1px 4px rgba(15,22,45,.5), 0 4px 16px rgba(15,22,45,.5);
     position:relative; overflow:hidden;
   }
   .stats::before{
@@ -892,7 +892,7 @@
   .person-chip{
     padding:12px; border-radius:12px;
     background:rgba(17,24,39,.9); border:1px solid rgba(168,85,247,.18);
-    box-shadow:0 1px 4px rgba(0,0,0,.3);
+    box-shadow:0 1px 4px rgba(15,22,45,.5);
     transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
     display:flex; flex-direction:column;
   }
@@ -931,7 +931,7 @@
   }
   .trust-btn:hover{ border-color:rgba(5,150,105,.4); background:rgba(5,150,105,.1); }
   .trust-btn:disabled{ opacity:.6; cursor:wait; }
-  .trust-panel{ margin-top:12px; padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,.07); background:rgba(0,0,0,.3); }
+  .trust-panel{ margin-top:12px; padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,.07); background:rgba(15,22,45,.5); }
   .trust-badge{
     display:inline-flex; align-items:center; gap:6px; padding:5px 14px;
     border-radius:20px; font-size:12px; font-weight:700; margin-bottom:10px;
@@ -1021,7 +1021,7 @@
   /* ── Stock cards grid ───────────────────────────────────── */
   .stock-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-top:10px; }
   .stock-card{
-    background:linear-gradient(160deg, rgba(22,30,50,.95) 0%, rgba(13,19,38,.95) 100%);
+    background:linear-gradient(160deg, rgba(30,43,66,1) 0%, rgba(26,37,60,1) 100%);
     border-radius:16px; padding:18px 20px;
     border:1px solid rgba(15,23,42,.08);
     box-shadow:var(--shadow-card);
@@ -1075,7 +1075,7 @@
   .stock-stats{
     display:flex; align-items:center; gap:12px; margin-bottom:24px;
     padding:14px 20px; border-radius:16px;
-    background:rgba(17,24,39,.8); border:1px solid rgba(255,255,255,.07);
+    background:rgba(26,37,64,.85); border:1px solid rgba(255,255,255,.07);
     box-shadow:var(--shadow-card);
     font-size:13px; color:var(--muted); flex-wrap:wrap;
   }
@@ -1094,10 +1094,10 @@
   .ai-panel{
     max-width:960px; margin:0 auto 24px; padding:22px 28px;
     border-radius:20px; position:relative; z-index:1;
-    background:rgba(17,24,39,.85);
+    background:rgba(26,37,64,.9);
     backdrop-filter:blur(12px);
     border:1px solid rgba(168,85,247,.2);
-    box-shadow:0 2px 8px rgba(0,0,0,.3), 0 8px 32px rgba(168,85,247,.1);
+    box-shadow:0 2px 8px rgba(15,22,45,.5), 0 8px 32px rgba(168,85,247,.1);
     animation:card-enter .35s cubic-bezier(0.0,0.0,0.2,1) both;
   }
   .ai-panel::before{ content:none; }
@@ -1265,7 +1265,7 @@
   .skeleton-wrap{ display:grid; grid-template-columns:repeat(auto-fill, minmax(290px,1fr)); gap:16px; }
   .skeleton-card{
     border-radius:var(--radius-card); padding:20px 22px;
-    background:rgba(17,24,39,.8); border:1px solid rgba(255,255,255,.07);
+    background:rgba(26,37,64,.85); border:1px solid rgba(255,255,255,.07);
     height:170px; overflow:hidden; position:relative;
   }
   .skeleton-card::after{
