@@ -765,9 +765,12 @@
       <label for="tradeProduct">Product / Commodity</label>
       <input id="tradeProduct" type="text" placeholder="Trade" autocomplete="off" />
     </div>
-    <div class="search-field" style="max-width:160px;">
+    <div class="search-field" style="max-width:220px;">
       <label for="tradeHS">HS Code (optional)</label>
-      <input id="tradeHS" type="text" placeholder="e.g. 7208, 8542" autocomplete="off" />
+      <div style="display:flex;gap:6px;">
+        <input id="tradeHS" type="text" placeholder="e.g. 7208, 8542" autocomplete="off" style="flex:1;min-width:0;" />
+        <button type="button" class="hs-find-btn" onclick="findHSCode(this)" title="Let AI suggest the HS code from the product name">✨ Find</button>
+      </div>
     </div>
     <div class="search-select-field">
       <label for="tradeCountry">Country</label>

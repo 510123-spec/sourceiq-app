@@ -2788,6 +2788,15 @@ app.patch('/api/saved', (req, res) => {
   if (!item) return res.status(404).json({ error: 'Not found' });
   if (typeof notes === 'string') item.notes = notes.slice(0, 2000);
   if (typeof status === 'string' && PIPELINE_STATUSES.includes(status)) item.status = status;
+  // Trust verdict from the background check run at save time
+  const trust = req.body.trust;
+  if (trust && typeof trust === 'object') {
+    item.trust = {
+      score: typeof trust.score === 'number' ? trust.score : null,
+      rating: String(trust.rating || '').slice(0, 40),
+      checkedAt: new Date().toISOString()
+    };
+  }
   writeSaved(list);
   res.json({ saved: list });
 });
@@ -2833,6 +2842,45 @@ Return ONLY valid JSON: {"subject": "...", "body": "..."}`;
     res.json({ subject: draft.subject, body: draft.body });
   } catch (err) {
     res.status(500).json({ error: 'AI draft failed: ' + err.message });
+  }
+});
+
+// ── HS code lookup ────────────────────────────────────────────────────────────
+// Suggests the Harmonized System code for a product description. HS codes are a
+// stable international standard (the first 6 digits are universal), which is
+// exactly the kind of well-established knowledge an LLM answers reliably.
+const hsCodeCache = new Map();
+
+app.get('/api/hs-code', async (req, res) => {
+  const product = (req.query.product || '').trim();
+  if (!product) return res.status(400).json({ error: 'product is required' });
+  if (!AI_PROVIDER) return res.status(503).json({ error: 'No AI key configured' });
+
+  const cacheKey = product.toLowerCase();
+  if (hsCodeCache.has(cacheKey)) return res.json({ ...hsCodeCache.get(cacheKey), cached: true });
+
+  const prompt = `What is the Harmonized System (HS) code for this product: "${product}"
+
+Rules:
+- Give the most specific 6-digit HS code (format: XXXX.XX)
+- If the product is ambiguous, pick the most common commercial interpretation
+- Include a one-line official-style description of that heading
+- If you also know a common alternative code, include it
+
+Return ONLY valid JSON: {"code": "XXXX.XX", "description": "...", "alternative": "XXXX.XX or empty string"}`;
+
+  try {
+    const result = await callAI(prompt);
+    if (!result.code) throw new Error('AI returned no code');
+    const payload = {
+      code: String(result.code).slice(0, 12),
+      description: String(result.description || '').slice(0, 200),
+      alternative: String(result.alternative || '').slice(0, 12)
+    };
+    hsCodeCache.set(cacheKey, payload);
+    res.json(payload);
+  } catch (err) {
+    res.status(500).json({ error: 'HS code lookup failed: ' + err.message });
   }
 });
 

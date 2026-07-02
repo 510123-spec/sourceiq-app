@@ -2076,3 +2076,26 @@
   padding:5px 11px; color:#4f46e5; text-decoration:none; font-weight:600; font-size:12.5px;
 }
 .trade-db-link:hover{ border-color:#c7d2fe; background:#eef2ff; }
+
+/* ============ Shortlist export, trust badges, HS assistant ============ */
+.saved-export-btn{
+  border:1.5px solid #e2e8f0; background:#fff; border-radius:9px;
+  padding:6px 12px; font-size:12.5px; font-weight:600; color:#4f46e5;
+  cursor:pointer; font-family:inherit;
+}
+.saved-export-btn:hover{ border-color:#c7d2fe; background:#eef2ff; }
+
+.saved-trust{ border-radius:8px; padding:2px 8px; font-size:11.5px; font-weight:700; }
+.saved-trust.trust-good{ background:#d1fae5; color:#047857; }
+.saved-trust.trust-mid{ background:#fef3c7; color:#b45309; }
+.saved-trust.trust-bad{ background:#fee2e2; color:#b91c1c; }
+.saved-trust.trust-unknown{ background:#f1f5f9; color:#64748b; }
+
+.hs-find-btn{
+  border:1.5px solid #e2e8f0; background:#fff; border-radius:9px;
+  padding:0 10px; font-size:12px; font-weight:600; color:#7c3aed;
+  cursor:pointer; font-family:inherit; white-space:nowrap;
+}
+.hs-find-btn:hover{ border-color:#ddd6fe; background:#f5f3ff; }
+.hs-find-btn:disabled{ opacity:.6; cursor:wait; }
+.hs-hint{ font-size:11.5px; color:#059669; margin-top:4px; font-weight:600; }

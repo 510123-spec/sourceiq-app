@@ -42,6 +42,7 @@ async function toggleSave(id, btn){
       savedLinks.add(r.link);
       btn.textContent = '★'; btn.classList.add('saved');
       updateSavedCount((data.saved||[]).length);
+      runTrustOnSave(r); // background — no await, star responds instantly
     }
   }catch(e){}
 }
@@ -63,6 +64,7 @@ async function showSavedPanel(){
         ${s.country ? `<span>🌍 ${escapeHtml(s.country)}</span>` : ''}
         ${s.phone ? `<span>📞 ${escapeHtml(s.phone)}</span>` : ''}
         ${s.email ? `<span>✉️ <a href="mailto:${escapeHtml(s.email)}">${escapeHtml(s.email)}</a></span>` : ''}
+        ${trustBadgeHtml(s.trust)}
       </div>
       <div class="pipeline-row">${pipelinePillsHtml(s)}</div>
       <textarea class="saved-notes" placeholder="Notes (e.g. quoted $6,400/MT, slow to reply)…"
@@ -76,12 +78,97 @@ async function showSavedPanel(){
     <div class="modal-box">
       <div class="modal-head">
         <h2>⭐ Saved Suppliers <span style="font-weight:400;font-size:13px;color:var(--muted)">(shared with your team)</span></h2>
-        <button class="modal-close" onclick="document.getElementById('savedOverlay').remove()">✕</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          ${list.length ? '<button class="saved-export-btn" onclick="exportSavedExcel()">📊 Export</button>' : ''}
+          <button class="modal-close" onclick="document.getElementById('savedOverlay').remove()">✕</button>
+        </div>
       </div>
       <div class="modal-body">${rows}</div>
     </div>`;
   overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
+}
+
+// -- Trust badge for saved items (populated by the auto check at save time) --
+function trustBadgeHtml(trust){
+  if(!trust || !trust.rating) return '';
+  const cls = trust.score == null ? 'trust-unknown'
+    : trust.score >= 70 ? 'trust-good'
+    : trust.score >= 40 ? 'trust-mid' : 'trust-bad';
+  const scoreTxt = trust.score != null ? ' ' + trust.score + '/100' : '';
+  return `<span class="saved-trust ${cls}" title="Automatic trust check run when saved">🛡 ${escapeHtml(trust.rating)}${scoreTxt}</span>`;
+}
+
+// -- Auto trust check: runs in the background when a supplier is starred, so the
+//    shortlist accumulates risk signals without extra clicks --
+async function runTrustOnSave(r){
+  try{
+    const params = new URLSearchParams({ url: r.link, name: r.title || '' });
+    const res = await fetch('/api/trust-check?' + params.toString());
+    const data = await res.json();
+    if(!res.ok || data.demoMode || !data.rating) return;
+    await fetch('/api/saved', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ link: r.link, trust: { score: data.score, rating: data.rating } })
+    });
+    // If the Saved panel happens to be open, refresh it to show the new badge
+    if(document.getElementById('savedOverlay')) showSavedPanel();
+  }catch(e){}
+}
+
+// -- Excel export of the shared shortlist (incl. pipeline status + notes) --
+function exportSavedExcel(){
+  if(typeof XLSX === 'undefined'){ alert('Excel library still loading — try again in a second.'); return; }
+  fetch('/api/saved').then(r => r.json()).then(data => {
+    const list = data.saved || [];
+    if(!list.length) return;
+    const rows = list.map(s => ({
+      'Company':  s.title || '',
+      'Status':   (s.status || 'new').toUpperCase(),
+      'Type':     s.type || '',
+      'Country':  s.country || '',
+      'Phone':    s.phone || '',
+      'Email':    s.email || '',
+      'WhatsApp': s.whatsapp || '',
+      'Address':  s.address || '',
+      'Trust':    s.trust ? (s.trust.rating + (s.trust.score != null ? ' (' + s.trust.score + '/100)' : '')) : '',
+      'Notes':    s.notes || '',
+      'Website':  s.link || '',
+      'Saved on': (s.savedAt || '').slice(0, 10)
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.min(50, Math.max(k.length, ...rows.map(r => String(r[k]).length))) }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Shortlist');
+    XLSX.writeFile(wb, 'sourceiq_shortlist_' + new Date().toISOString().slice(0,10) + '.xlsx');
+  });
+}
+
+// -- HS code assistant (Trade tab): AI suggests the code from the product name --
+async function findHSCode(btn){
+  const product = document.getElementById('tradeProduct').value.trim();
+  if(!product){ alert('Type a product name first, then I can suggest its HS code.'); return; }
+  const hsInput = document.getElementById('tradeHS');
+  btn.disabled = true; const orig = btn.textContent; btn.textContent = '✨ Looking up…';
+  try{
+    const res = await fetch('/api/hs-code?product=' + encodeURIComponent(product));
+    const data = await res.json();
+    if(!res.ok || !data.code) throw new Error(data.error || 'lookup failed');
+    hsInput.value = data.code;
+    let hint = document.getElementById('hsHint');
+    if(!hint){
+      hint = document.createElement('div');
+      hint.id = 'hsHint';
+      hint.className = 'hs-hint';
+      hsInput.parentElement.appendChild(hint);
+    }
+    hint.textContent = '✓ ' + data.code + ' — ' + (data.description || '') +
+      (data.alternative ? ' (alt: ' + data.alternative + ')' : '');
+  }catch(e){
+    alert('Could not look up the HS code: ' + e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = orig;
+  }
 }
 
 // -- Sourcing pipeline: each saved supplier moves through workflow stages --
