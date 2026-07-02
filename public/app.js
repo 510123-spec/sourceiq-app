@@ -150,6 +150,8 @@ async function runSearch(){
 
     lastResults = data.results || [];
     lastSubject = data.subject || company || q;
+    window.lastRegistry = data.registry || null;
+    window.lastCompanyName = company || '';
     banner.style.display = data.demoMode ? 'block' : 'none';
     toolbar.style.display = lastResults.length ? 'flex' : 'none';
     currentFilter = 'all';
@@ -164,6 +166,8 @@ async function runSearch(){
     if (lastResults.length) {
       const aiQuery = person || company || (q && country ? `${q} ${country}` : q || country);
       runAIAnalysis(aiQuery, lastResults, searchMode);
+      // Person mode also gets a synthesized profile panel above the raw results
+      if (person) runPersonProfile(person, lastResults);
     }
   }catch(err){
     wrap.innerHTML = buildErrorState(err.message, ()=>runSearch());
@@ -655,7 +659,21 @@ function renderCompany(){
     + (official.length ? `<span class="stats-pill manu">🏢 Official site</span>` : '')
     + (profiles.length ? `<span class="stats-pill person">🔗 ${profiles.length} Profile${profiles.length>1?'s':''}</span>` : '')
     + (directory.length ? `<span class="stats-pill unk">📇 ${directory.length} Director${directory.length>1?'ies':'y'}</span>` : '')
+    + `<button class="dossier-btn" onclick="generateDossier(this)">📋 Full Dossier</button>`
     + `</div></div>`;
+
+  // Verified registry facts parsed from official-registry listings (ACRA etc.)
+  const reg = window.lastRegistry;
+  if(reg){
+    const cells = [];
+    if(reg.uen)          cells.push(`<span class="reg-cell"><span class="reg-label">Reg. No / UEN</span><strong>${escapeHtml(reg.uen)}</strong></span>`);
+    if(reg.incorporated) cells.push(`<span class="reg-cell"><span class="reg-label">Incorporated</span><strong>${escapeHtml(reg.incorporated)}</strong></span>`);
+    if(reg.status)       cells.push(`<span class="reg-cell"><span class="reg-label">Status</span><strong class="${/live|active/i.test(reg.status)?'reg-ok':'reg-warn'}">${escapeHtml(reg.status)}</strong></span>`);
+    if(reg.entityType)   cells.push(`<span class="reg-cell"><span class="reg-label">Entity Type</span><strong>${escapeHtml(reg.entityType)}</strong></span>`);
+    html += `<div class="registry-strip">🏛 <span class="reg-title">Official Registry</span>${cells.join('')}`
+      + (reg.sourceLink ? `<a class="reg-src" href="${escapeHtml(reg.sourceLink)}" target="_blank" rel="noopener">source: ${escapeHtml(reg.source||'')} ↗</a>` : '')
+      + `</div>`;
+  }
 
   if(official.length)  html += `<div class="group-title"><span class="group-title-dot manu"></span>Official Company Website</div><div class="card-grid">${official.map(cardHtml).join('')}</div>`;
   if(profiles.length)  html += `<div class="group-title"><span class="group-title-dot dist"></span>Company Pages &amp; Mentions</div><div class="card-grid">${profiles.map(cardHtml).join('')}</div>`;
@@ -766,6 +784,7 @@ function personCardHtml(r){
         </div>
         <div class="card-divider"></div>
         <div class="desc">${escapeHtml(snippet)}</div>
+        ${personAffiliationHtml(r)}
         <div class="details-slot" id="${id}-slot"></div>
         <button class="trust-btn" onclick="runTrustCheck('${id}', this)">🛡 Check Trust &amp; Reputation</button>
         <div class="trust-slot" id="${id}-trust"></div>

@@ -2099,3 +2099,49 @@
 .hs-find-btn:hover{ border-color:#ddd6fe; background:#f5f3ff; }
 .hs-find-btn:disabled{ opacity:.6; cursor:wait; }
 .hs-hint{ font-size:11.5px; color:#059669; margin-top:4px; font-weight:600; }
+
+/* ============ Dossier, registry strip, person profile ============ */
+.dossier-btn{
+  border:1.5px solid #c7d2fe; background:linear-gradient(135deg,#eef2ff,#f5f3ff);
+  border-radius:9px; padding:6px 13px; font-size:12.5px; font-weight:700;
+  color:#4f46e5; cursor:pointer; font-family:inherit; margin-left:8px;
+}
+.dossier-btn:hover{ background:#e0e7ff; }
+.dossier-btn:disabled{ opacity:.65; cursor:wait; }
+
+.registry-strip{
+  display:flex; align-items:center; flex-wrap:wrap; gap:14px;
+  background:#f0fdf4; border:1.5px solid #bbf7d0; border-radius:12px;
+  padding:10px 16px; margin:0 0 16px; font-size:13px;
+}
+.reg-title{ font-weight:700; color:#166534; margin-right:2px; }
+.reg-cell{ display:flex; flex-direction:column; gap:1px; }
+.reg-label{ font-size:10.5px; color:#64748b; text-transform:uppercase; letter-spacing:.04em; }
+.reg-cell strong{ color:#1e293b; font-size:13px; }
+.reg-ok{ color:#059669 !important; }
+.reg-warn{ color:#dc2626 !important; }
+.reg-src{ margin-left:auto; font-size:11.5px; color:#64748b; text-decoration:none; }
+.reg-src:hover{ color:#4f46e5; }
+
+.person-profile-panel{
+  background:#fff; border:1.5px solid #e0e7ff; border-radius:14px;
+  padding:14px 18px; margin-bottom:16px;
+  box-shadow:0 2px 12px rgba(79,70,229,.06);
+}
+.person-profile-panel.loading{ color:#64748b; font-size:13px; display:flex; align-items:center; gap:8px; }
+.profile-head{ display:flex; align-items:center; flex-wrap:wrap; gap:10px; font-size:15px; color:#1e293b; }
+.profile-role{ font-size:12.5px; color:#4f46e5; font-weight:600; background:#eef2ff; border-radius:8px; padding:2px 9px; }
+.profile-conf{ font-size:11px; font-weight:700; border-radius:8px; padding:2px 8px; text-transform:uppercase; letter-spacing:.03em; }
+.profile-conf.conf-high{ background:#d1fae5; color:#047857; }
+.profile-conf.conf-mid{ background:#fef3c7; color:#b45309; }
+.profile-conf.conf-low{ background:#fee2e2; color:#b91c1c; }
+.profile-summary{ font-size:13.5px; color:#334155; line-height:1.6; margin:8px 0; }
+.profile-companies{ display:flex; flex-wrap:wrap; gap:6px; margin:6px 0; }
+.profile-company-chip{
+  border:1.5px solid #e2e8f0; background:#fff; border-radius:9px;
+  padding:4px 11px; font-size:12px; font-weight:600; color:#4f46e5;
+  cursor:pointer; font-family:inherit;
+}
+.profile-company-chip:hover{ border-color:#c7d2fe; background:#eef2ff; }
+.profile-note{ font-size:11px; color:#94a3b8; margin-top:4px; }
+.person-affiliation{ margin:8px 0 2px; }

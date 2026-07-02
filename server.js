@@ -1966,6 +1966,45 @@ app.get('/api/company-people', async (req, res) => {
 // currently re-run the whole multi-query pipeline — wasted seconds and, once the
 // Brave subscription is active, wasted paid quota. 10 min is short enough that
 // results stay fresh, long enough to absorb the repeat-search pattern.
+// ── Company registry extraction ───────────────────────────────────────────────
+// Registry-listing sites (ACRA resellers for SG, OpenCorporates, etc.) publish
+// structured facts in their snippets: registration number, incorporation date,
+// entity status. Parse those out into a verified "registry" block instead of
+// leaving them buried in result text. Only trusted registry domains are read.
+const REGISTRY_DOMAINS = /sgpbusiness\.com|opengovsg\.com|companies\.sg|sgpgrid\.com|ltddir\.com|singapore-corp\.com|opencorporates\.com|recordowl\.com|zaubacorp\.com|tofler\.in/i;
+
+function extractRegistryInfo(results) {
+  const reg = { uen: null, incorporated: null, status: null, entityType: null, source: null, sourceLink: null };
+  for (const r of results) {
+    if (!REGISTRY_DOMAINS.test(r.displayLink || '')) continue;
+    const text = `${r.title || ''} ${r.snippet || ''}`;
+
+    if (!reg.uen) {
+      // SG UEN in a title like "EREZ IMPEX PTE. LTD. (200702352E)" or "UEN 200702352E";
+      // generic registration-number labels for other registries.
+      const uenM = text.match(/\(([0-9]{8,10}[A-Z])\)/) ||
+                   text.match(/(?:UEN|UEN ID|Registration Number|Reg(?:istration)?\.? No\.?)[:\s]+([0-9]{8,10}[A-Z]?)/i);
+      if (uenM) reg.uen = uenM[1];
+    }
+    if (!reg.incorporated) {
+      const incM = text.match(/incorporat\w*\s+(?:on|in|date is)?\s*([0-9]{1,2}\s+\w+\s+[0-9]{4}|\w+\s+[0-9]{1,2},?\s+[0-9]{4}|[0-9]{4}-[0-9]{2}-[0-9]{2})/i);
+      if (incM) reg.incorporated = incM[1];
+    }
+    if (!reg.status) {
+      const stM = text.match(/status is\s+(Live Company|Live|Struck Off|Dissolved|Active|Inactive|Wound Up|In Liquidation)/i) ||
+                  text.match(/\b(Live Company|Struck Off|In Liquidation|Wound Up)\b/i);
+      if (stM) reg.status = stM[1];
+    }
+    if (!reg.entityType) {
+      const etM = text.match(/\b(Exempt Private Company Limited by Shares|Private Company Limited by Shares|Public Company Limited by Shares|Limited Liability Partnership|Sole Proprietor(?:ship)?|Local Company)\b/i);
+      if (etM) reg.entityType = etM[1];
+    }
+    if (!reg.source) { reg.source = r.displayLink; reg.sourceLink = r.link; }
+    if (reg.uen && reg.incorporated && reg.status && reg.entityType) break;
+  }
+  return reg.uen || reg.incorporated || reg.status ? reg : null;
+}
+
 const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
 const SEARCH_CACHE_MAX = 200;
 const searchCache = new Map();
@@ -2207,7 +2246,8 @@ app.get('/api/search', async (req, res) => {
         .map(r => { const { _qs, _score, _relevant, ...rest } = r; return rest; });
 
       const { results: scored, note: countryNote } = applyCountryFilter(scoredC, country, { keep: r => r.isOfficial });
-      return res.json({ subject: '', country, company, person: '', officialDomain, count: scored.length, results: scored, countryNote, demoMode: false });
+      const registry = extractRegistryInfo(scored);
+      return res.json({ subject: '', country, company, person: '', officialDomain, registry, count: scored.length, results: scored, countryNote, demoMode: false });
     } catch(err) {
       return res.status(500).json({ error: 'Company search failed: ' + err.message });
     }
@@ -2842,6 +2882,52 @@ Return ONLY valid JSON: {"subject": "...", "body": "..."}`;
     res.json({ subject: draft.subject, body: draft.body });
   } catch (err) {
     res.status(500).json({ error: 'AI draft failed: ' + err.message });
+  }
+});
+
+// ── AI person profile summary ─────────────────────────────────────────────────
+// Synthesizes raw person-search results (LinkedIn/directory/news links) into a
+// structured mini-profile. Strictly grounded: only facts present in the
+// provided snippets, so the model can't invent a biography.
+app.post('/api/ai-person-summary', async (req, res) => {
+  const { person, results } = req.body || {};
+  if (!person || !Array.isArray(results) || !results.length) {
+    return res.status(400).json({ error: 'person and results are required' });
+  }
+  if (!AI_PROVIDER) return res.status(503).json({ error: 'No AI key configured' });
+
+  const evidence = results.slice(0, 12).map((r, i) =>
+    `[${i + 1}] ${r.title || ''} — ${(r.snippet || '').slice(0, 200)} (${r.displayLink || ''})`).join('\n');
+
+  const prompt = `You are building a professional profile of a person from search results.
+
+PERSON SEARCHED: ${person}
+
+SEARCH RESULTS:
+${evidence}
+
+Rules:
+- Use ONLY facts stated in the search results above. Never invent roles, companies, or dates.
+- If results appear to describe DIFFERENT people with the same name, say so in the summary.
+- companies: list company names this person is linked to (with their role there if stated).
+- Keep the summary 2-3 sentences, professional tone.
+- confidence: "high" if multiple results agree, "medium" if single-source, "low" if results are thin or conflicting.
+
+Return ONLY valid JSON:
+{"summary":"...","currentRole":"... or empty string","companies":[{"name":"...","role":"..."}],"confidence":"high|medium|low"}`;
+
+  try {
+    const profile = await callAI(prompt);
+    if (!profile.summary) throw new Error('AI returned no summary');
+    res.json({
+      summary: String(profile.summary).slice(0, 600),
+      currentRole: String(profile.currentRole || '').slice(0, 120),
+      companies: (Array.isArray(profile.companies) ? profile.companies : []).slice(0, 6)
+        .map(c => ({ name: String(c.name || '').slice(0, 80), role: String(c.role || '').slice(0, 80) })),
+      confidence: ['high','medium','low'].includes(profile.confidence) ? profile.confidence : 'medium'
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Person summary failed: ' + err.message });
   }
 });
 
