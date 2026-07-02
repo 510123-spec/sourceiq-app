@@ -64,6 +64,7 @@ async function showSavedPanel(){
         ${s.phone ? `<span>📞 ${escapeHtml(s.phone)}</span>` : ''}
         ${s.email ? `<span>✉️ <a href="mailto:${escapeHtml(s.email)}">${escapeHtml(s.email)}</a></span>` : ''}
       </div>
+      <div class="pipeline-row">${pipelinePillsHtml(s)}</div>
       <textarea class="saved-notes" placeholder="Notes (e.g. quoted $6,400/MT, slow to reply)…"
         onblur="saveNotes('${escapeHtml(s.link)}', this)">${escapeHtml(s.notes || '')}</textarea>
     </div>`).join('') : '<p class="empty" style="padding:20px">Nothing saved yet — click the ☆ on any result card to add it here.</p>';
@@ -81,6 +82,35 @@ async function showSavedPanel(){
     </div>`;
   overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
+}
+
+// -- Sourcing pipeline: each saved supplier moves through workflow stages --
+const PIPELINE = [
+  ['new',       '🆕 New'],
+  ['contacted', '📨 Contacted'],
+  ['quoted',    '💰 Quoted'],
+  ['sampled',   '📦 Sampled'],
+  ['ordered',   '✅ Ordered'],
+  ['rejected',  '🚫 Rejected']
+];
+
+function pipelinePillsHtml(s){
+  const current = s.status || 'new';
+  return PIPELINE.map(([key, label]) =>
+    `<button class="pipeline-pill${key === current ? ' active st-' + key : ''}"
+      onclick="setSavedStatus('${escapeHtml(s.link)}', '${key}', this)">${label}</button>`).join('');
+}
+
+async function setSavedStatus(link, status, btn){
+  try{
+    await fetch('/api/saved', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ link, status })
+    });
+    const row = btn.parentElement;
+    row.querySelectorAll('.pipeline-pill').forEach(p => p.className = 'pipeline-pill');
+    btn.className = 'pipeline-pill active st-' + status;
+  }catch(e){}
 }
 
 async function saveNotes(link, ta){
@@ -169,14 +199,10 @@ function showCompare(){
   document.body.appendChild(overlay);
 }
 
-// -- Draft inquiry email (RFQ template) --
-function draftInquiry(id){
-  const r = cardRegistry[id];
-  if(!r) return;
-  const product = lastSubject || 'your products';
-  const to = r.email || '';
-  const subject = encodeURIComponent('Inquiry: ' + product + ' — request for quotation');
-  const bodyLines = [
+// -- Draft inquiry email: AI-personalized via Gemini, static RFQ template as fallback --
+function staticInquiry(r, product){
+  const subject = 'Inquiry: ' + product + ' — request for quotation';
+  const body = [
     'Dear ' + (r.title || 'Sir/Madam') + ',',
     '',
     'We found your company while sourcing ' + product + ' and are interested in receiving a quotation.',
@@ -191,9 +217,36 @@ function draftInquiry(id){
     'We look forward to your reply.',
     '',
     'Best regards,'
-  ];
-  const body = encodeURIComponent(bodyLines.join('\n'));
-  window.location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + subject + '&body=' + body;
+  ].join('\n');
+  return { subject, body };
+}
+
+async function draftInquiry(id, btn){
+  const r = cardRegistry[id];
+  if(!r) return;
+  const product = lastSubject || 'your products';
+  let draft;
+  if(btn){ btn.disabled = true; btn.textContent = '✨ Drafting…'; }
+  try{
+    const res = await fetch('/api/ai-inquiry', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        product,
+        supplier: { title:r.title, type:r.type, country:r.country || '', snippet:r.snippet }
+      })
+    });
+    const data = await res.json();
+    if(!res.ok || !data.subject) throw new Error(data.error || 'no draft');
+    draft = data;
+  }catch(e){
+    // No AI key, quota, or timeout — the static template still gets the job done.
+    draft = staticInquiry(r, product);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '✍️ Inquiry'; }
+  }
+  window.location.href = 'mailto:' + encodeURIComponent(r.email || '') +
+    '?subject=' + encodeURIComponent(draft.subject) +
+    '&body=' + encodeURIComponent(draft.body);
 }
 
 // -- Excel export (.xlsx via SheetJS), includes enriched contact fields --

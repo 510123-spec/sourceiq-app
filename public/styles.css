@@ -2048,3 +2048,31 @@
 .cmp-table th a:hover{ text-decoration:underline; }
 .cmp-domain{ font-weight:400; font-size:11.5px; color:#94a3b8; margin-top:2px; }
 .cmp-field{ font-weight:600; color:#475569; white-space:nowrap; background:#f8fafc; }
+
+/* ============ Sourcing pipeline + trade DB links ============ */
+.pipeline-row{ display:flex; flex-wrap:wrap; gap:5px; margin:8px 0; }
+.pipeline-pill{
+  border:1.5px solid #e2e8f0; background:#fff; border-radius:20px;
+  padding:3px 10px; font-size:11.5px; color:#64748b; cursor:pointer;
+  font-family:inherit; transition:all .15s;
+}
+.pipeline-pill:hover{ border-color:#c7d2fe; color:#4f46e5; }
+.pipeline-pill.active{ font-weight:700; color:#fff; border-color:transparent; }
+.pipeline-pill.st-new{ background:#64748b; }
+.pipeline-pill.st-contacted{ background:#0891b2; }
+.pipeline-pill.st-quoted{ background:#d97706; }
+.pipeline-pill.st-sampled{ background:#7c3aed; }
+.pipeline-pill.st-ordered{ background:#059669; }
+.pipeline-pill.st-rejected{ background:#dc2626; }
+
+.trade-db-row{
+  display:flex; align-items:center; flex-wrap:wrap; gap:8px;
+  background:#f8fafc; border:1.5px solid #eef1f8; border-radius:12px;
+  padding:10px 14px; margin-bottom:16px; font-size:13px;
+}
+.trade-db-label{ color:#64748b; font-weight:600; font-size:12px; }
+.trade-db-link{
+  border:1.5px solid #e2e8f0; background:#fff; border-radius:9px;
+  padding:5px 11px; color:#4f46e5; text-decoration:none; font-weight:600; font-size:12.5px;
+}
+.trade-db-link:hover{ border-color:#c7d2fe; background:#eef2ff; }

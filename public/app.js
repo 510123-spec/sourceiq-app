@@ -349,18 +349,36 @@ async function runTradeSearch(){
   }
 }
 
+function tradeDbLinksHtml(data){
+  // Direct links into the major trade-record databases, pre-filled with this
+  // search — these have actual customs/shipment records that generic web
+  // results can only point at. Shown even (especially) when web search finds
+  // nothing, since these databases are where the real records live.
+  const q = encodeURIComponent(data.product || data.hsCode || '');
+  const links = [
+    ['📦 ImportYeti',  `https://www.importyeti.com/search?q=${q}`,        'US customs records — free'],
+    ['🌐 UN Comtrade', 'https://comtradeplus.un.org/',                     'official global trade statistics'],
+    ['📊 Trade Map',   'https://www.trademap.org/Index.aspx',              'import/export flows by country'],
+    ['🚢 Volza',       `https://www.volza.com/global-trade-data/`,         'global shipment data']
+  ].map(([name, url, tip]) =>
+    `<a class="trade-db-link" href="${url}" target="_blank" rel="noopener" title="${tip}">${name}</a>`).join('');
+  return `<div class="trade-db-row"><span class="trade-db-label">Search trade databases directly:</span>${links}</div>`;
+}
+
 function renderTradeResults(data){
   const wrap = document.getElementById('resultsWrap');
   const results = data.results || [];
   if(!results.length){
-    if(data.message){ wrap.innerHTML = `<p class="empty">${escapeHtml(data.message)}</p>`; return; }
-    wrap.innerHTML = '<p class="empty">No trade data found. Try a different product or remove filters.</p>';
+    const msg = data.message || 'No trade data found on the open web — but the trade databases below have the actual customs records:';
+    wrap.innerHTML = `<p class="empty">${escapeHtml(msg)}</p>` + tradeDbLinksHtml(data);
     return;
   }
   const dirLabel = data.tradeDir === 'import' ? '📥 Importers' : data.tradeDir === 'export' ? '📤 Exporters' : '🔄 Trade Data';
   let html = `<div class="stats">
     <div style="font-size:13px;"><strong style="color:var(--text)">${results.length}</strong> results for <strong style="color:#22d3ee">${escapeHtml(data.product || data.hsCode || '')}</strong>${data.country ? ' · <span style="color:#60a5fa">' + escapeHtml(data.country) + '</span>' : ''} — ${dirLabel}</div>
-  </div><div class="card-grid">`;
+  </div>
+  ${tradeDbLinksHtml(data)}
+  <div class="card-grid">`;
   for(const r of results){
     const id = 'tc-' + Math.random().toString(36).slice(2,8);
     const domain = r.displayLink || '';

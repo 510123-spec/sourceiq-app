@@ -2480,10 +2480,12 @@ app.get('/api/stock', async (req, res) => {
   const q3 = `"${product}" (wholesale OR "price per" OR "unit price" OR MOQ OR "minimum order" OR "FOB price" OR "bulk price")${countryClause}`;
 
   try {
-    const [r1, r2, r3] = await Promise.all([
-      BRAVE_API_KEY ? searchBrave(q1, country || null) : [],
-      BRAVE_API_KEY ? searchBrave(q2, country || null) : [],
-      BRAVE_API_KEY ? searchBrave(q3, country || null) : []
+    // braveMulti (not raw searchBrave) so these searches inherit the same
+    // Google → DuckDuckGo fallback chain as product search when Brave is down.
+    const [r1, r2, r3] = await braveMulti([
+      { q: q1, country: country || null },
+      { q: q2, country: country || null },
+      { q: q3, country: country || null }
     ]);
 
     const seenStock = new Set();
@@ -2610,10 +2612,12 @@ app.get('/api/trade', async (req, res) => {
   const q3 = `${term}${countryClause} (importer exporter OR "trade route" OR "global trade" OR "import export company")`;
 
   try {
-    const [r1, r2, r3] = await Promise.all([
-      BRAVE_API_KEY ? searchBrave(q1, country || null) : [],
-      BRAVE_API_KEY ? searchBrave(q2, country || null) : [],
-      BRAVE_API_KEY ? searchBrave(q3, country || null) : []
+    // braveMulti (not raw searchBrave) so these searches inherit the same
+    // Google → DuckDuckGo fallback chain as product search when Brave is down.
+    const [r1, r2, r3] = await braveMulti([
+      { q: q1, country: country || null },
+      { q: q2, country: country || null },
+      { q: q3, country: country || null }
     ]);
 
     const results = deduplicateResults(
@@ -2662,10 +2666,12 @@ app.get('/api/market', async (req, res) => {
   const q3 = `"${industry}" sector${countryClause} (growth OR "market share" OR competitive OR "leading companies")`;
 
   try {
-    const [r1, r2, r3] = await Promise.all([
-      BRAVE_API_KEY ? searchBrave(q1, country || null) : [],
-      BRAVE_API_KEY ? searchBrave(q2, country || null) : [],
-      BRAVE_API_KEY ? searchBrave(q3, country || null) : []
+    // braveMulti (not raw searchBrave) so these searches inherit the same
+    // Google → DuckDuckGo fallback chain as product search when Brave is down.
+    const [r1, r2, r3] = await braveMulti([
+      { q: q1, country: country || null },
+      { q: q2, country: country || null },
+      { q: q3, country: country || null }
     ]);
 
     const results = deduplicateResults(
@@ -2765,19 +2771,23 @@ app.post('/api/saved', (req, res) => {
     link: item.link, title: item.title, displayLink: item.displayLink || '',
     type: item.type || '', country: item.country || '', snippet: (item.snippet || '').slice(0, 300),
     phone: item.phone || null, email: item.email || null, whatsapp: item.whatsapp || null,
-    address: item.address || null, notes: '', savedAt: new Date().toISOString()
+    address: item.address || null, notes: '', status: 'new', savedAt: new Date().toISOString()
   });
   writeSaved(list);
   res.json({ saved: list });
 });
 
+// Sourcing pipeline stages a saved supplier can be in, in workflow order.
+const PIPELINE_STATUSES = ['new', 'contacted', 'quoted', 'sampled', 'ordered', 'rejected'];
+
 app.patch('/api/saved', (req, res) => {
-  const { link, notes } = req.body || {};
+  const { link, notes, status } = req.body || {};
   if (!link) return res.status(400).json({ error: 'link is required' });
   const list = loadSaved();
   const item = list.find(s => s.link === link);
   if (!item) return res.status(404).json({ error: 'Not found' });
   if (typeof notes === 'string') item.notes = notes.slice(0, 2000);
+  if (typeof status === 'string' && PIPELINE_STATUSES.includes(status)) item.status = status;
   writeSaved(list);
   res.json({ saved: list });
 });
@@ -2787,6 +2797,43 @@ app.delete('/api/saved', (req, res) => {
   if (!link) return res.status(400).json({ error: 'link is required' });
   writeSaved(loadSaved().filter(s => s.link !== link));
   res.json({ saved: loadSaved() });
+});
+
+// ── AI-drafted inquiry email ──────────────────────────────────────────────────
+// Personalizes the RFQ using whatever we know about the supplier (type, country,
+// snippet, scraped contact info). Falls back to the static template client-side
+// if this errors or no AI key is configured.
+app.post('/api/ai-inquiry', async (req, res) => {
+  const { supplier, product } = req.body || {};
+  if (!supplier || !supplier.title) return res.status(400).json({ error: 'supplier is required' });
+  if (!AI_PROVIDER) return res.status(503).json({ error: 'No AI key configured' });
+
+  const prompt = `You are a professional B2B sourcing manager writing a first-contact inquiry email.
+
+SUPPLIER INFO:
+- Company: ${supplier.title}
+- Type: ${supplier.type || 'unknown'}
+- Country: ${supplier.country || 'unknown'}
+- About: ${(supplier.snippet || '').slice(0, 300)}
+
+PRODUCT WE ARE SOURCING: ${product || 'their products'}
+
+Write a concise, professional inquiry email (under 180 words) requesting a quotation.
+Personalize it: reference something specific about THIS supplier (their specialty,
+country, or type) so it doesn't read like a mass template. Ask for: specs/grades,
+pricing (FOB/CIF), MOQ, lead time, and certifications — phrased naturally, not as
+a numbered checklist unless it flows well. Do not invent facts not in SUPPLIER INFO.
+Sign off with "Best regards," and nothing after it (the sender adds their name).
+
+Return ONLY valid JSON: {"subject": "...", "body": "..."}`;
+
+  try {
+    const draft = await callAI(prompt);
+    if (!draft.subject || !draft.body) throw new Error('AI returned incomplete draft');
+    res.json({ subject: draft.subject, body: draft.body });
+  } catch (err) {
+    res.status(500).json({ error: 'AI draft failed: ' + err.message });
+  }
 });
 
 app.listen(PORT, () => {
