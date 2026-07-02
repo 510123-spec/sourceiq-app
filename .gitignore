@@ -3,3 +3,9 @@ node_modules/
 *.log
 .DS_Store
 Thumbs.db
+.gstack/
+# Shared shortlist + notes — commercially sensitive, keep out of the public repo
+data/
+# Local safety backups
+*.bak
+logs/

@@ -9,2600 +9,943 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
-<style>
-  :root{
-    --bg:#eef1f8; --bg2:#e6eaf4; --card:#ffffff; --card-hover:#f9faff;
-    --accent:#4f46e5; --accent-hi:#6366f1; --accent2:#7c3aed; --accent3:#0ea5e9;
-    --text:#0f172a; --text-2:#334155; --muted:#64748b; --line:#e2e8f0;
-    --manu:#059669; --dist:#d97706; --unk:#64748b;
-    --glow-blue:rgba(79,70,229,.12); --glow-purple:rgba(124,58,237,.1);
-    --radius-card:16px;
-    --surface-1:rgba(15,23,42,.02);
-    --surface-2:rgba(15,23,42,.04);
-    --border-subtle:rgba(15,23,42,.07);
-    --border-mid:rgba(15,23,42,.13);
-    --shadow-card:0 1px 3px rgba(15,23,42,.06), 0 6px 20px rgba(15,23,42,.07), 0 0 0 1px rgba(15,23,42,.04);
-    --shadow-card-hover:0 8px 30px rgba(79,70,229,.15), 0 20px 50px rgba(15,23,42,.1);
-    --btn-gradient:linear-gradient(135deg, #4f46e5 0%, #6d28d9 60%, #7c3aed 100%);
-  }
-  *{ box-sizing:border-box; }
-  html,body{ margin:0; }
-
-  body{
-    font-family:'DM Sans',-apple-system,'Segoe UI',Arial,sans-serif;
-    color:var(--text); padding:0 0 80px; min-height:100vh;
-    background:#eef1f8;
-    background-image:
-      radial-gradient(ellipse 80% 50% at 0% 0%, rgba(79,70,229,.06), transparent),
-      radial-gradient(ellipse 60% 45% at 100% 0%, rgba(124,58,237,.05), transparent),
-      radial-gradient(ellipse 50% 60% at 50% 100%, rgba(14,165,233,.04), transparent);
-    background-attachment:fixed;
-  }
-
-  /* Subtle light ambient layer */
-  body::before{
-    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
-    background:
-      radial-gradient(ellipse 55% 38% at 10% 15%, rgba(79,70,229,.05), transparent),
-      radial-gradient(ellipse 42% 30% at 85% 6%, rgba(124,58,237,.04), transparent);
-  }
-  /* Fine dot grid */
-  body::after{
-    content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
-    background-image:radial-gradient(rgba(15,23,42,.05) 1px, transparent 1px);
-    background-size:28px 28px;
-  }
-
-  /* ── Topbar ──────────────────────────────────────────────── */
-  .topbar{
-    position:sticky; top:0; z-index:100;
-    background:rgba(255,255,255,.92); backdrop-filter:blur(24px) saturate(180%);
-    border-bottom:1px solid rgba(15,23,42,.07);
-    padding:0 36px; height:64px;
-    display:flex; align-items:center; justify-content:space-between;
-    box-shadow:0 1px 0 rgba(15,23,42,.05), 0 4px 20px rgba(15,23,42,.06);
-  }
-  .topbar::after{
-    content:''; position:absolute; bottom:0; left:0; right:0; height:1px;
-    background:linear-gradient(90deg, transparent 5%, rgba(37,99,235,.2) 30%, rgba(124,58,237,.18) 55%, rgba(14,165,233,.14) 80%, transparent 95%);
-    pointer-events:none;
-  }
-  .topbar-brand{ display:flex; align-items:center; gap:14px; }
-  .topbar-logo{
-    width:38px; height:38px; border-radius:11px; font-size:18px;
-    display:flex; align-items:center; justify-content:center;
-    background:linear-gradient(140deg, #1d4ed8 0%, #6d28d9 100%);
-    box-shadow:0 0 22px rgba(29,78,216,.45), 0 0 0 1px rgba(99,102,241,.3), inset 0 1px 0 rgba(255,255,255,.2);
-    transition:transform .25s ease, box-shadow .25s ease;
-  }
-  .topbar-logo:hover{ transform:scale(1.09); box-shadow:0 0 32px rgba(109,40,217,.6), 0 0 0 1px rgba(139,92,246,.45); }
-  .topbar-name{
-    font-size:16px; font-weight:800; letter-spacing:-.4px;
-    font-family:'Space Grotesk',sans-serif;
-    background:linear-gradient(135deg,#1d4ed8 0%,#4f46e5 60%,#7c3aed 100%);
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-  }
-  .topbar-tag{ font-size:10px; color:var(--muted); font-weight:600; letter-spacing:.7px; text-transform:uppercase; margin-top:2px; }
-  .topbar-right{ display:flex; align-items:center; gap:8px; }
-  .topbar-tag{ color:var(--muted) !important; }
-  .topbar-pill{
-    display:flex; align-items:center; gap:6px;
-    padding:6px 14px; border-radius:22px; font-size:11.5px; font-weight:600;
-    background:rgba(15,23,42,.04); border:1px solid rgba(15,23,42,.09);
-    color:var(--muted); letter-spacing:.2px; transition:all .15s;
-  }
-  .topbar-pill:hover{ background:rgba(79,70,229,.08); border-color:rgba(79,70,229,.2); color:var(--text-2); }
-  .topbar-pill-dot{ width:6px; height:6px; border-radius:50%; background:#22c55e; animation:pulse 2.5s infinite; box-shadow:0 0 8px rgba(34,197,94,.7); }
-  .topbar-logout{
-    display:flex; align-items:center; gap:6px;
-    padding:6px 14px; border-radius:22px; font-size:11.5px; font-weight:600;
-    background:rgba(239,68,68,.07); border:1px solid rgba(239,68,68,.18);
-    color:#ef4444; letter-spacing:.2px; text-decoration:none;
-    transition:all .15s; cursor:pointer;
-  }
-  .topbar-logout:hover{ background:rgba(239,68,68,.14); border-color:rgba(239,68,68,.35); }
-  @media(max-width:720px){ .topbar-right{ display:none; } .topbar{ padding:0 18px; } }
-
-  /* ── Hero ────────────────────────────────────────────────── */
-  .hero{
-    display:flex; align-items:center; justify-content:center; gap:0;
-    padding:80px 56px 56px; position:relative; z-index:1;
-    max-width:1300px; margin:0 auto;
-  }
-  /* decorative separator below hero */
-  .hero-separator{
-    max-width:1300px; margin:0 auto; padding:0 56px;
-    position:relative; z-index:1;
-  }
-  .hero-separator-line{
-    height:1px;
-    background:linear-gradient(90deg, transparent, rgba(59,130,246,.18) 30%, rgba(139,92,246,.18) 70%, transparent);
-    margin-bottom:8px;
-  }
-  .hero-text{ flex:1; min-width:0; text-align:left; padding-right:56px; }
-  @keyframes eyebrow-shine{
-    0%,100%{ box-shadow:0 0 24px rgba(59,130,246,.1), inset 0 1px 0 rgba(15,23,42,.09); border-color:rgba(59,130,246,.22); }
-    50%{ box-shadow:0 0 40px rgba(99,102,241,.22), inset 0 1px 0 rgba(15,23,42,.12); border-color:rgba(99,102,241,.38); }
-  }
-  .hero-eyebrow{
-    display:inline-flex; align-items:center; gap:8px;
-    padding:6px 18px 6px 10px; border-radius:24px; margin-bottom:28px;
-    background:rgba(37,99,235,.08);
-    border:1px solid rgba(37,99,235,.22);
-    color:#1d4ed8; font-size:11px; font-weight:700; letter-spacing:.9px; text-transform:uppercase;
-    box-shadow:0 2px 12px rgba(37,99,235,.08);
-  }
-  .hero-eyebrow-dot{ width:6px; height:6px; border-radius:50%; background:#22c55e; animation:pulse 2.5s infinite; box-shadow:0 0 10px rgba(34,197,94,.6); }
-  h1{
-    margin:0 0 20px; font-size:62px; font-weight:800; letter-spacing:-2.5px; line-height:1.04;
-    font-family:'Space Grotesk',sans-serif;
-    color:var(--text);
-  }
-  .h1-accent{
-    background:linear-gradient(130deg, #3b82f6 0%, #4f46e5 35%, #7c3aed 70%, #a855f7 100%);
-    -webkit-background-clip:text; background-clip:text; color:transparent;
-    display:inline-block;
-  }
-  p.subtitle{
-    color:var(--text-2); margin:0 0 30px; font-size:16.5px; line-height:1.76; max-width:510px;
-  }
-  /* Hero stats row */
-  .hero-stats{
-    display:flex; align-items:center; gap:0; margin:0 0 28px;
-    background:#ffffff; border:1px solid rgba(15,23,42,.09);
-    border-radius:16px; padding:14px 22px;
-    max-width:440px;
-    box-shadow:0 2px 8px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.06);
-    backdrop-filter:blur(12px);
-  }
-  .hero-stat{ display:flex; flex-direction:column; align-items:center; flex:1; gap:3px; }
-  .hero-stat-num{
-    font-size:22px; font-weight:800; letter-spacing:-.5px; line-height:1;
-    font-family:'Space Grotesk',sans-serif;
-    color:#2563eb;
-  }
-  .hero-stat:nth-child(1) .hero-stat-num{ color:#2563eb; }
-  .hero-stat:nth-child(3) .hero-stat-num{ color:#059669; }
-  .hero-stat:nth-child(5) .hero-stat-num{ color:#7c3aed; }
-  .hero-stat:nth-child(7) .hero-stat-num{ color:#d97706; }
-  .hero-stat-label{ font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:.7px; font-weight:700; white-space:nowrap; }
-  .hero-stat-sep{ width:1px; height:28px; background:rgba(15,23,42,.1); flex-shrink:0; margin:0 2px; }
-
-  /* Hero feature pills */
-  .hero-trust{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
-  .hero-trust-pill{
-    display:inline-flex; align-items:center; gap:6px;
-    padding:5px 13px; border-radius:20px;
-    background:rgba(15,23,42,.04); border:1px solid rgba(15,23,42,.11);
-    color:var(--muted); font-size:11px; font-weight:600; letter-spacing:.2px;
-    transition:all .2s ease; cursor:default;
-    box-shadow:0 1px 4px rgba(15,23,42,.05);
-  }
-  .hero-trust-pill:hover{
-    background:rgba(99,102,241,.12); border-color:rgba(99,102,241,.3);
-    color:#1d4ed8; transform:translateY(-1px);
-  }
-  .hero-trust-pill span{ font-size:13px; }
-  p.hint{ text-align:center; color:var(--muted); margin:0 0 24px; font-size:12.5px; }
-
-  /* ── Globe ───────────────────────────────────────────────── */
-  .globe-wrap{
-    flex:0 0 440px; width:440px; height:440px;
-    position:relative; display:flex; align-items:center; justify-content:center;
-    overflow:visible;
-  }
-  .globe-wrap::before{
-    content:''; position:absolute; inset:-40px;
-    background:radial-gradient(circle at center, rgba(37,99,235,.1) 0%, rgba(99,102,241,.05) 45%, transparent 70%);
-    border-radius:50%; pointer-events:none; animation:globe-pulse 5s ease-in-out infinite alternate;
-  }
-  .globe-wrap::after{
-    content:''; position:absolute; inset:-80px;
-    background:radial-gradient(circle at center, rgba(109,40,217,.05) 0%, transparent 65%);
-    border-radius:50%; pointer-events:none; animation:globe-pulse 5s ease-in-out 2.5s infinite alternate;
-  }
-  @keyframes globe-pulse{
-    0%{ opacity:.5; transform:scale(.93); }
-    100%{ opacity:1; transform:scale(1.06); }
-  }
-  #globeCanvas{
-    border-radius:50%;
-    box-shadow:
-      0 0 0 1px rgba(59,130,246,.25),
-      0 0 60px rgba(59,130,246,.35),
-      0 0 120px rgba(99,102,241,.16),
-      0 28px 80px rgba(0,0,0,.75);
-    cursor:grab; display:block; position:relative; z-index:2;
-  }
-  #globeCanvas:active{ cursor:grabbing; }
-
-  /* Orbit rings */
-  .orbit-ring{
-    position:absolute; border-radius:50%; pointer-events:none; z-index:1;
-    border-style:solid; border-color:transparent;
-  }
-  .orbit-1{
-    width:490px; height:490px;
-    border-top-color:rgba(59,130,246,.18); border-left-color:rgba(59,130,246,.08);
-    border-width:1px;
-    animation:orbit-spin 22s linear infinite;
-  }
-  .orbit-2{
-    width:550px; height:550px;
-    border-top-color:rgba(139,92,246,.14); border-right-color:rgba(139,92,246,.06);
-    border-width:1px;
-    animation:orbit-spin 35s linear infinite reverse;
-  }
-  .orbit-3{
-    width:610px; height:610px;
-    border-bottom-color:rgba(6,182,212,.1); border-left-color:rgba(6,182,212,.04);
-    border-width:1px;
-    animation:orbit-spin 50s linear infinite;
-  }
-  /* Orbit dots */
-  .orbit-1::before{
-    content:''; position:absolute; width:5px; height:5px; border-radius:50%;
-    background:#3b82f6; box-shadow:0 0 8px #3b82f6;
-    top:-3px; left:50%; transform:translateX(-50%);
-  }
-  .orbit-2::after{
-    content:''; position:absolute; width:4px; height:4px; border-radius:50%;
-    background:#a78bfa; box-shadow:0 0 8px #a78bfa;
-    bottom:-2px; right:20%;
-  }
-  @keyframes orbit-spin{
-    from{ transform:rotate(0deg); }
-    to{ transform:rotate(360deg); }
-  }
-  .globe-country-tooltip{
-    position:absolute; bottom:-38px; left:50%; transform:translateX(-50%);
-    background:rgba(15,23,42,.92); border:1px solid rgba(59,130,246,.35);
-    color:#e2e8f0; font-size:12px; font-weight:600; padding:5px 14px;
-    border-radius:20px; white-space:nowrap; pointer-events:none;
-    backdrop-filter:blur(12px);
-    box-shadow:0 4px 20px rgba(0,0,0,.4);
-    opacity:0; transition:opacity .2s;
-    font-family:'Space Grotesk',sans-serif;
-  }
-  .globe-country-toast{
-    position:fixed; bottom:32px; left:50%; transform:translateX(-50%);
-    background:linear-gradient(135deg, rgba(16,185,129,.9), rgba(59,130,246,.9));
-    color:#fff; font-size:13px; font-weight:700; padding:10px 22px;
-    border-radius:24px; white-space:nowrap; z-index:999;
-    box-shadow:0 4px 24px rgba(16,185,129,.4);
-    font-family:'Space Grotesk',sans-serif;
-    animation:toast-in .3s ease; pointer-events:none;
-  }
-  @keyframes toast-in{
-    from{ opacity:0; transform:translateX(-50%) translateY(12px); }
-    to{ opacity:1; transform:translateX(-50%) translateY(0); }
-  }
-  @media(max-width:900px){
-    .hero{ flex-direction:column; padding:52px 24px 28px; gap:0; }
-    .hero-text{ padding-right:0; text-align:center; }
-    .hero-trust{ justify-content:center; }
-    .hero-stats{ margin:0 auto 32px; }
-    .globe-wrap{ flex:none; width:300px; height:300px; margin-top:28px; }
-    .orbit-1{ width:340px; height:340px; }
-    .orbit-2{ width:380px; height:380px; }
-    .orbit-3{ display:none; }
-    h1{ font-size:42px; letter-spacing:-1.8px; }
-    p.subtitle{ margin:0 auto 28px; max-width:400px; }
-    .hero-orb{ display:none; }
-  }
-  @media(max-width:600px){
-    h1{ font-size:32px; letter-spacing:-1px; }
-    .panel{ padding:18px 16px; border-radius:18px; }
-    .mode-tab{ font-size:11px; padding:10px 4px; gap:3px; }
-    .tab-icon{ width:14px; height:14px; }
-    .hero-trust-pill{ font-size:10.5px; padding:4px 10px; }
-    .hero-stats{ padding:12px 16px; }
-    .hero-stat-num{ font-size:20px; }
-    .orbit-1,.orbit-2,.orbit-3{ display:none; }
-    .welcome-modes{ gap:8px; }
-    .welcome-mode{ padding:12px 14px; min-width:130px; }
-  }
-
-  /* ── Banner ──────────────────────────────────────────────── */
-  .banner{
-    max-width:680px; margin:0 auto 24px; padding:12px 20px; border-radius:12px;
-    background:rgba(217,119,6,.06); border:1px solid rgba(217,119,6,.25); color:#b45309;
-    font-size:13px; text-align:center; position:relative; z-index:1;
-  }
-  .banner code{ background:rgba(15,23,42,.04); padding:1px 6px; border-radius:5px; }
-  .country-note{
-    margin:0 0 16px; padding:10px 16px; border-radius:11px; font-size:12.5px; line-height:1.5;
-    background:rgba(37,99,235,.06); border:1px solid rgba(37,99,235,.2); color:#1d4ed8;
-  }
-
-  /* ── Search Panel ────────────────────────────────────────── */
-  .panel{
-    max-width:820px; margin:0 auto 20px; padding:28px 30px; border-radius:22px;
-    background:#ffffff;
-    border:1px solid rgba(15,23,42,.08);
-    box-shadow:0 2px 16px rgba(15,23,42,.06), 0 12px 40px rgba(79,70,229,.05);
-    position:relative; z-index:1;
-  }
-  .panel::before{ content:none; }
-  .panel::after{
-    content:''; position:absolute; top:0; left:8%; right:8%; height:1px; border-radius:100%;
-    background:linear-gradient(90deg, transparent, rgba(37,99,235,.25) 35%, rgba(124,58,237,.22) 55%, rgba(37,99,235,.18) 75%, transparent);
-    pointer-events:none;
-  }
-
-  /* ── Search field labels ─────────────────────────────────── */
-  .search-field{ display:flex; flex-direction:column; gap:6px; flex:2; min-width:200px; }
-  .search-select-field{ display:flex; flex-direction:column; gap:6px; flex:1; min-width:160px; }
-  .search-field label, .search-select-field label{
-    font-size:10.5px; font-weight:700; letter-spacing:.6px; text-transform:uppercase;
-    color:var(--muted); padding:0 4px;
-  }
-
-  /* ── Mode Tabs ───────────────────────────────────────────── */
-  .mode-tabs{
-    display:flex; gap:3px; margin-bottom:24px;
-    background:rgba(15,23,42,.04); padding:4px; border-radius:15px;
-    border:1px solid rgba(15,23,42,.08); width:100%;
-    box-shadow:inset 0 1px 4px rgba(15,23,42,.06);
-  }
-  .mode-tab{
-    flex:1; padding:10px 6px 9px; border-radius:11px; border:1px solid transparent;
-    background:transparent; color:var(--muted); cursor:pointer;
-    font-size:11.5px; font-family:'DM Sans',inherit;
-    font-weight:600; transition:all .18s ease; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:4px; white-space:nowrap;
-    position:relative;
-  }
-  .tab-icon{ width:15px; height:15px; flex-shrink:0; transition:all .18s; }
-  .mode-tab:not(.active):hover{
-    color:var(--text-2); background:rgba(15,23,42,.04);
-    border-color:rgba(15,23,42,.08);
-  }
-  /* Active states — dark glass card */
-  .mode-tab.active{
-    background:#ffffff; color:var(--text);
-    box-shadow:0 1px 4px rgba(15,23,42,.06), 0 2px 8px rgba(15,23,42,.05), 0 0 0 1px rgba(99,102,241,.2);
-  }
-  .mode-tab[data-mode="product"].active  { border-color:rgba(37,99,235,.25);  color:#1d4ed8; }
-  .mode-tab[data-mode="company"].active  { border-color:rgba(5,150,105,.25);   color:#047857; }
-  .mode-tab[data-mode="person"].active   { border-color:rgba(109,40,217,.25);  color:#6d28d9; }
-  .mode-tab[data-mode="stock"].active    { border-color:rgba(5,150,105,.25);   color:#047857; }
-  .mode-tab[data-mode="image"].active    { border-color:rgba(217,119,6,.25);   color:#b45309; }
-  .mode-tab[data-mode="trade"].active    { border-color:rgba(8,145,178,.25);   color:#0e7490; }
-  .mode-tab[data-mode="market"].active   { border-color:rgba(124,58,237,.25);  color:#6d28d9; }
-  .mode-tab[data-mode="buyers"].active   { border-color:rgba(14,165,233,.25);  color:#0369a1; }
-  /* Active indicator dot at bottom */
-  .mode-tab.active::after{
-    content:''; position:absolute; bottom:4px; left:50%; transform:translateX(-50%);
-    width:14px; height:2px; border-radius:2px;
-    background:currentColor; opacity:.55;
-  }
-
-  /* ── Search Inputs ───────────────────────────────────────── */
-  .search-box{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
-  .search-box input, .search-box select{
-    padding:13px 16px; border-radius:12px;
-    border:1px solid rgba(15,23,42,.11);
-    background:rgba(15,23,42,.04); color:var(--text);
-    font-size:14px; font-family:'DM Sans',inherit;
-    transition:border-color .18s ease, box-shadow .18s ease;
-    width:100%;
-  }
-  .search-box input::placeholder{ color:#94a3b8; }
-  .search-box input:focus, .search-box select:focus{
-    outline:none;
-    border-color:rgba(99,102,241,.6);
-    box-shadow:0 0 0 3px rgba(99,102,241,.15);
-  }
-  .search-box select option{ background:#111827; color:#f1f5f9; }
-  @keyframes btn-pulse{
-    0%{ box-shadow:0 6px 28px rgba(59,130,246,.45), 0 0 0 1px rgba(99,102,241,.28), 0 0 0 0 rgba(99,102,241,.5), inset 0 1px 0 rgba(255,255,255,.2); }
-    50%{ box-shadow:0 6px 28px rgba(59,130,246,.5), 0 0 0 1px rgba(99,102,241,.35), 0 0 0 8px rgba(99,102,241,0), inset 0 1px 0 rgba(255,255,255,.2); }
-    100%{ box-shadow:0 6px 28px rgba(59,130,246,.45), 0 0 0 1px rgba(99,102,241,.28), 0 0 0 0 rgba(99,102,241,.5), inset 0 1px 0 rgba(255,255,255,.2); }
-  }
-  .search-box button{
-    padding:13px 34px; border:none; border-radius:12px; cursor:pointer; align-self:flex-end;
-    font-size:14.5px; font-family:'Space Grotesk',inherit; font-weight:700; color:#fff; white-space:nowrap;
-    background:var(--btn-gradient);
-    box-shadow:0 6px 28px rgba(29,78,216,.5), 0 2px 8px rgba(109,40,217,.35), inset 0 1px 0 rgba(255,255,255,.2);
-    transition:transform .18s cubic-bezier(.34,1.4,.64,1), box-shadow .2s ease;
-    position:relative; overflow:hidden; letter-spacing:.3px;
-  }
-  .search-box button::before{
-    content:''; position:absolute; inset:0;
-    background:linear-gradient(105deg, transparent 25%, rgba(255,255,255,.18) 50%, transparent 75%);
-    transform:translateX(-140%); transition:none;
-  }
-  .search-box button:hover{
-    transform:translateY(-2px) scale(1.025);
-    box-shadow:0 14px 40px rgba(29,78,216,.6), 0 4px 12px rgba(109,40,217,.45), inset 0 1px 0 rgba(255,255,255,.25);
-  }
-  .search-box button:hover::before{ transform:translateX(140%); transition:transform .5s ease; }
-  .search-box button:active{ transform:translateY(0) scale(.99); }
-  .search-box button:disabled{ opacity:.4; cursor:not-allowed; transform:none; }
-
-  /* ── Suggestion Chips ────────────────────────────────────── */
-  .chips{ display:flex; flex-wrap:wrap; gap:7px; justify-content:center; max-width:820px; margin:16px auto 26px; position:relative; z-index:1; }
-  .chip{
-    padding:5px 14px; border-radius:20px;
-    background:rgba(15,23,42,.04); border:1px solid rgba(15,23,42,.11);
-    color:var(--muted); font-size:11.5px; cursor:pointer; font-weight:500;
-    transition:all .18s ease;
-    box-shadow:0 1px 3px rgba(15,23,42,.05);
-  }
-  .chip:hover{
-    border-color:rgba(99,102,241,.4); color:#1d4ed8;
-    background:rgba(79,70,229,.07); transform:translateY(-1px);
-    box-shadow:0 3px 10px rgba(99,102,241,.15);
-  }
-  .chip.recent{ border-style:dashed; color:#94a3b8; }
-  .chip.recent:hover{ color:var(--muted); }
-
-  /* ── Toolbar ─────────────────────────────────────────────── */
-  .toolbar{
-    display:flex; justify-content:center; align-items:center;
-    gap:8px; margin-bottom:22px; flex-wrap:wrap;
-    position:relative; z-index:1;
-  }
-  .filters{
-    display:flex; gap:2px; flex-wrap:wrap;
-    background:#ffffff; padding:3px; border-radius:22px;
-    border:1px solid rgba(15,23,42,.09);
-    box-shadow:0 1px 4px rgba(15,23,42,.05);
-  }
-  .filters button{
-    padding:6px 14px; border-radius:18px; border:none; background:transparent;
-    color:var(--muted); cursor:pointer; font-size:12.5px; font-family:inherit;
-    font-weight:600; transition:all .15s;
-  }
-  .filters button.active{
-    background:rgba(99,102,241,.18); color:#1d4ed8; border:1px solid rgba(99,102,241,.3);
-  }
-  .filters button:not(.active):hover{ color:var(--text); background:rgba(15,23,42,.07); }
-
-  select#sortBy, .export-btn{
-    padding:8px 16px; border-radius:20px;
-    border:1px solid rgba(15,23,42,.09); background:rgba(15,23,42,.04);
-    color:var(--text); font-size:13px; font-family:inherit; cursor:pointer; transition:all .15s;
-    box-shadow:0 1px 4px rgba(15,23,42,.05);
-  }
-  select#sortBy:hover, .export-btn:hover{
-    border-color:rgba(99,102,241,.3); background:rgba(99,102,241,.1);
-  }
-
-  /* ── Results ─────────────────────────────────────────────── */
-  .results-wrap{ max-width:1000px; margin:0 auto; padding:0 24px; position:relative; z-index:1; }
-
-  .group-title{
-    font-size:10.5px; text-transform:uppercase; letter-spacing:2.8px;
-    color:rgba(100,128,165,.85); font-weight:700; font-family:'Space Grotesk',sans-serif;
-    margin:40px 2px 18px; display:flex; align-items:center; gap:12px;
-  }
-  .group-title-dot{ width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-  .group-title-dot.manu{ background:#059669; }
-  .group-title-dot.dist{ background:#d97706; }
-  .group-title-dot.mkt{ background:#6366f1; }
-  .group-title::after{ content:''; flex:1; height:1px; background:linear-gradient(90deg, rgba(15,23,42,.08) 0%, transparent 100%); }
-
-  .card-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(330px, 1fr)); gap:18px; }
-
-  /* ── Cards ───────────────────────────────────────────────── */
-  @keyframes card-in{
-    from{ opacity:0; transform:translateY(22px) scale(.98); }
-    to{ opacity:1; transform:translateY(0) scale(1); }
-  }
-  .card{
-    background:#ffffff;
-    border-radius:var(--radius-card); padding:0;
-    border:1px solid rgba(15,23,42,.07);
-    position:relative; overflow:hidden;
-    box-shadow:0 2px 8px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.06);
-    transition:transform .25s cubic-bezier(.34,1.4,.64,1), box-shadow .28s ease, border-color .25s ease;
-    display:flex; flex-direction:column;
-    animation:card-in .4s ease both;
-  }
-  /* top accent stripe */
-  .card::before{
-    content:''; position:absolute; top:0; left:0; right:0; height:3px; z-index:2;
-    background:linear-gradient(90deg, transparent 0%, rgba(79,70,229,.5) 35%, rgba(124,58,237,.45) 65%, transparent 100%);
-    transition:opacity .2s ease;
-  }
-  .card::after{ content:none; }
-  .card-inner{ padding:22px 24px; display:flex; flex-direction:column; flex:1; }
-  .card:hover{
-    transform:translateY(-6px) scale(1.007);
-    box-shadow:0 12px 40px rgba(79,70,229,.14), 0 24px 60px rgba(15,23,42,.1);
-    border-color:rgba(79,70,229,.18);
-  }
-
-  /* Type-specific: manufacturer — emerald */
-  .card.manufacturer{
-    border-color:rgba(16,185,129,.2);
-    background:linear-gradient(160deg, rgba(5,150,105,.05) 0%, #ffffff 55%);
-  }
-  .card.manufacturer::before{
-    background:linear-gradient(90deg, transparent 0%, rgba(5,150,105,.6) 30%, rgba(52,211,153,.45) 60%, transparent 100%);
-  }
-  .card.manufacturer:hover{
-    box-shadow:var(--shadow-card-hover), 0 0 0 1px rgba(5,150,105,.22);
-    border-color:rgba(5,150,105,.3);
-  }
-  .card.manufacturer h3 a:hover{ color:#047857; }
-
-  /* Type-specific: distributor — amber */
-  .card.distributor{
-    border-color:rgba(245,158,11,.2);
-    background:linear-gradient(160deg, rgba(217,119,6,.05) 0%, #ffffff 55%);
-  }
-  .card.distributor::before{
-    background:linear-gradient(90deg, transparent 0%, rgba(217,119,6,.6) 30%, rgba(251,191,36,.45) 60%, transparent 100%);
-  }
-  .card.distributor:hover{
-    box-shadow:var(--shadow-card-hover), 0 0 0 1px rgba(217,119,6,.22);
-    border-color:rgba(217,119,6,.3);
-  }
-  .card.distributor h3 a:hover{ color:#b45309; }
-
-  /* Type-specific: trade — cyan */
-  .card.trade-card{
-    border-color:rgba(34,211,238,.2);
-    background:linear-gradient(160deg, rgba(8,145,178,.05) 0%, #ffffff 55%);
-  }
-  .card.trade-card::before{
-    background:linear-gradient(90deg, transparent 0%, rgba(8,145,178,.6) 30%, rgba(34,211,238,.4) 60%, transparent 100%);
-  }
-  .card.trade-card:hover{ box-shadow:var(--shadow-card-hover), 0 0 0 1px rgba(8,145,178,.22); border-color:rgba(8,145,178,.3); }
-  .card.trade-card h3 a:hover{ color:#0e7490; }
-  .card.trade-card .card-favicon{ background:rgba(8,145,178,.08); border-color:rgba(8,145,178,.14); }
-  .trade-badge{ background:rgba(8,145,178,.08); color:#0e7490; border:1px solid rgba(8,145,178,.22); }
-
-  /* Type-specific: market — purple */
-  .card.market-card{
-    border-color:rgba(168,85,247,.2);
-    background:linear-gradient(160deg, rgba(109,40,217,.05) 0%, #ffffff 55%);
-  }
-  .card.market-card::before{
-    background:linear-gradient(90deg, transparent 0%, rgba(109,40,217,.55) 30%, rgba(139,92,246,.4) 60%, transparent 100%);
-  }
-  .card.market-card:hover{ box-shadow:var(--shadow-card-hover), 0 0 0 1px rgba(109,40,217,.2); border-color:rgba(109,40,217,.28); }
-  .card.market-card h3 a:hover{ color:#6d28d9; }
-  .card.market-card .card-favicon{ background:rgba(109,40,217,.07); border-color:rgba(109,40,217,.14); }
-  .market-badge{ background:rgba(109,40,217,.07); color:#6d28d9; border:1px solid rgba(109,40,217,.2); }
-
-  /* ── Buyer / Customer cards ──────────────────────────────── */
-  .card.buyer-card{
-    border-color:rgba(14,165,233,.2);
-    background:linear-gradient(160deg, rgba(14,165,233,.05) 0%, #ffffff 55%);
-  }
-  .card.buyer-card::before{
-    background:linear-gradient(90deg, transparent 0%, rgba(14,165,233,.6) 30%, rgba(56,189,248,.45) 60%, transparent 100%);
-  }
-  .card.buyer-card:hover{
-    box-shadow:var(--shadow-card-hover), 0 0 0 1px rgba(14,165,233,.22);
-    border-color:rgba(14,165,233,.3);
-  }
-  .card.buyer-card h3 a:hover{ color:#0369a1; }
-  .card.buyer-card .card-favicon{ background:rgba(14,165,233,.08); border-color:rgba(14,165,233,.14); }
-
-  .badge.importer    { background:rgba(14,165,233,.1);  color:#0369a1; border:1px solid rgba(14,165,233,.25); }
-  .badge.retailer    { background:rgba(99,102,241,.1);  color:#4338ca; border:1px solid rgba(99,102,241,.25); }
-  .badge.wholesaler  { background:rgba(8,145,178,.1);   color:#0e7490; border:1px solid rgba(8,145,178,.25); }
-  .badge.procurement { background:rgba(139,92,246,.1);  color:#6d28d9; border:1px solid rgba(139,92,246,.25); }
-  .badge.buyer       { background:rgba(14,165,233,.08); color:#0369a1; border:1px solid rgba(14,165,233,.2); }
-
-  .buyer-type-icon{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; }
-
-  /* Stagger entrance delays */
-  .card:nth-child(1){ animation-delay:.04s; }
-  .card:nth-child(2){ animation-delay:.09s; }
-  .card:nth-child(3){ animation-delay:.14s; }
-  .card:nth-child(4){ animation-delay:.19s; }
-  .card:nth-child(5){ animation-delay:.24s; }
-  .card:nth-child(6){ animation-delay:.29s; }
-
-  /* Card header with favicon */
-  .card-header{ display:flex; align-items:flex-start; gap:14px; margin-bottom:14px; }
-  .card-favicon{
-    width:44px; height:44px; border-radius:13px; flex-shrink:0;
-    background:linear-gradient(135deg, rgba(99,102,241,.15), rgba(168,85,247,.1));
-    border:1px solid rgba(15,23,42,.11);
-    display:flex; align-items:center; justify-content:center; overflow:hidden;
-    box-shadow:0 2px 8px rgba(15,23,42,.1);
-    transition:transform .2s ease, box-shadow .2s ease;
-  }
-  .card:hover .card-favicon{ transform:scale(1.07); box-shadow:0 4px 12px rgba(15,23,42,.12); }
-  .card.manufacturer .card-favicon{ background:linear-gradient(135deg, rgba(5,150,105,.12), rgba(6,182,212,.07)); border-color:rgba(5,150,105,.18); }
-  .card.distributor  .card-favicon{ background:linear-gradient(135deg, rgba(217,119,6,.12), rgba(251,146,60,.07)); border-color:rgba(217,119,6,.18); }
-  .card-favicon img{ width:24px; height:24px; object-fit:contain; }
-  .card-favicon-fallback{ font-size:19px; line-height:1; }
-  .card-header-info{ flex:1; min-width:0; }
-
-  .card h3{ margin:0 0 4px 0; font-size:15.5px; font-weight:700; line-height:1.28; font-family:'Space Grotesk',sans-serif; }
-  .card h3 a{ color:var(--text); text-decoration:none; transition:color .15s; }
-  .card h3 a:hover{ color:#1d4ed8; }
-  .card-domain{ display:flex; align-items:center; gap:5px; margin-top:3px; }
-  .card-domain a{ color:#94a3b8; font-size:11px; text-decoration:none; transition:color .15s; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:220px; font-weight:500; }
-  .card-domain a:hover{ color:#2563eb; }
-  .card-domain-dot{ width:3px; height:3px; border-radius:50%; background:rgba(15,23,42,.12); flex-shrink:0; }
-  .card .desc{
-    color:var(--text-2); font-size:13px; line-height:1.7;
-    margin:0 0 14px 0; flex:1;
-    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
-  }
-  .card-divider{ height:1px; background:rgba(15,23,42,.07); margin:14px 0; }
-
-  /* ── Trade signals ───────────────────────────────────────── */
-  .signals-row{ display:flex; flex-wrap:wrap; gap:6px; margin:10px 0 4px; }
-  .signal-chip{
-    display:inline-flex; align-items:center; gap:4px;
-    padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600;
-    white-space:nowrap; max-width:200px; overflow:hidden; text-overflow:ellipsis;
-  }
-  .signal-chip.price    { background:rgba(5,150,105,.08);  color:#047857; border:1px solid rgba(5,150,105,.22); }
-  .signal-chip.moq      { background:rgba(37,99,235,.08);  color:#1d4ed8; border:1px solid rgba(37,99,235,.22); }
-  .signal-chip.cert     { background:rgba(217,119,6,.08);  color:#b45309; border:1px solid rgba(217,119,6,.22); }
-  .signal-chip.leadtime { background:rgba(109,40,217,.08); color:#6d28d9; border:1px solid rgba(109,40,217,.22); }
-  .signal-chip.since    { background:rgba(100,116,139,.07); color:#64748b; border:1px solid rgba(100,116,139,.18); }
-  .signal-chip.capacity { background:rgba(5,150,105,.07);  color:#047857; border:1px solid rgba(5,150,105,.18); }
-  .signal-chip.location { background:rgba(99,102,241,.07); color:#4338ca; border:1px solid rgba(99,102,241,.18); }
-  .signal-chip.export   { background:rgba(217,119,6,.07);  color:#b45309; border:1px solid rgba(217,119,6,.18); }
-
-  /* ── Direct vs marketplace grouping ─────────────────────── */
-  .marketplace-divider{
-    display:flex; align-items:center; gap:12px;
-    margin:36px 0 16px; color:#6366f1; font-size:10.5px;
-    font-weight:700; letter-spacing:1.2px; text-transform:uppercase;
-    font-family:'Space Grotesk',sans-serif;
-  }
-  .marketplace-divider::before, .marketplace-divider::after{
-    content:''; flex:1; height:1px; background:linear-gradient(90deg, rgba(99,102,241,.18), transparent);
-  }
-  .marketplace-divider::before{ background:linear-gradient(270deg, rgba(99,102,241,.18), transparent); }
-  .card.marketplace-card{ opacity:.92; }
-  .card.marketplace-card::before{ background:linear-gradient(90deg, transparent, rgba(99,102,241,.4) 40%, transparent); }
-
-  /* ── Snippet expand ──────────────────────────────────────── */
-  .snippet-full{ display:none; }
-  .snippet-short{ display:block; }
-  .snippet-toggle{
-    font-size:11px; color:#94a3b8; cursor:pointer; margin-top:4px;
-    background:none; border:none; padding:0; font-family:inherit;
-  }
-  .snippet-toggle:hover{ color:#2563eb; }
-
-  /* ── Quick contact bar ───────────────────────────────────── */
-  .quick-contact{
-    display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;
-  }
-  .qc-btn{
-    display:inline-flex; align-items:center; gap:5px;
-    padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600;
-    cursor:pointer; font-family:inherit; text-decoration:none;
-    transition:all .15s; border:1px solid;
-  }
-  .qc-btn.email   { color:#1d4ed8; background:rgba(37,99,235,.07);  border-color:rgba(37,99,235,.2); }
-  .qc-btn.phone   { color:#047857; background:rgba(5,150,105,.07);  border-color:rgba(5,150,105,.2); }
-  .qc-btn.whatsapp{ color:#15803d; background:rgba(22,163,74,.07);  border-color:rgba(22,163,74,.2); }
-  .qc-btn.website { color:#6d28d9; background:rgba(109,40,217,.07); border-color:rgba(109,40,217,.2); }
-  .qc-btn:hover.email    { background:rgba(37,99,235,.13);  border-color:rgba(37,99,235,.35); }
-  .qc-btn:hover.phone    { background:rgba(5,150,105,.13);  border-color:rgba(5,150,105,.35); }
-  .qc-btn:hover.whatsapp { background:rgba(22,163,74,.13);  border-color:rgba(22,163,74,.35); }
-  .qc-btn:hover.website  { background:rgba(109,40,217,.13); border-color:rgba(109,40,217,.35); }
-  .qc-loading{ font-size:11.5px; color:var(--muted); display:flex; align-items:center; gap:5px; margin-top:8px; }
-
-  .badge-row{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
-  .badge{
-    display:inline-flex; align-items:center; gap:4px; padding:4px 12px;
-    border-radius:20px; font-size:10px; font-weight:700; letter-spacing:.65px; text-transform:uppercase;
-  }
-  .badge.manufacturer{ background:rgba(5,150,105,.1); color:#047857; border:1px solid rgba(5,150,105,.25); }
-  .badge.distributor { background:rgba(217,119,6,.1);  color:#b45309; border:1px solid rgba(217,119,6,.25); }
-  .badge.unclassified{ background:rgba(100,116,139,.07); color:#64748b; border:1px solid rgba(100,116,139,.18); }
-  .badge.person-badge{ background:rgba(109,40,217,.09); color:#6d28d9; border:1px solid rgba(109,40,217,.22); }
-
-  /* Person card */
-  .person-card .person-header{ display:flex; align-items:flex-start; gap:14px; margin-bottom:10px; }
-  .person-photo-wrap{ flex-shrink:0; }
-  .person-photo{ width:68px; height:68px; border-radius:50%; object-fit:cover; border:2px solid rgba(139,92,246,.35); }
-  .person-avatar{
-    width:68px; height:68px; border-radius:50%;
-    background:linear-gradient(135deg, rgba(139,92,246,.2), rgba(59,130,246,.2));
-    color:#a78bfa; font-size:24px; font-weight:700;
-    display:flex; align-items:center; justify-content:center;
-    border:2px solid rgba(139,92,246,.3);
-  }
-  .person-card .person-info{ flex:1; min-width:0; }
-  .person-card .person-info h3{ margin:4px 0 2px; }
-  .confidence{ font-size:11px; color:var(--muted); font-weight:500; }
-
-  /* ── Card action buttons ─────────────────────────────────── */
-  .details-btn{
-    margin-top:10px; padding:7px 14px; border-radius:9px;
-    border:1px solid rgba(37,99,235,.18); background:rgba(37,99,235,.05);
-    color:#1d4ed8; font-size:12.5px; font-weight:600;
-    cursor:pointer; font-family:inherit; transition:all .15s;
-  }
-  .details-btn:hover{ border-color:rgba(37,99,235,.4); background:rgba(37,99,235,.1); }
-  .details-btn:disabled{ opacity:.6; cursor:wait; }
-
-  /* ── Details grid ────────────────────────────────────────── */
-  .details-grid{ margin-top:14px; padding-top:14px; border-top:1px solid rgba(15,23,42,.08); display:flex; flex-direction:column; gap:8px; }
-  .detail-row{ display:flex; gap:10px; font-size:13px; line-height:1.5; }
-  .detail-label{ color:var(--muted); min-width:88px; flex-shrink:0; font-weight:600; font-size:12px; }
-  .detail-value{ color:var(--text); word-break:break-word; }
-  .detail-value a{ color:#1d4ed8; text-decoration:none; }
-  .detail-value a:hover{ text-decoration:underline; }
-  .detail-note{ margin-top:12px; padding-top:12px; border-top:1px solid rgba(15,23,42,.08); color:var(--muted); font-size:12px; font-style:italic; }
-  .detail-error{ margin-top:12px; padding-top:12px; border-top:1px solid rgba(15,23,42,.08); color:#dc2626; font-size:12px; }
-
-  /* ── Hero glow orb ───────────────────────────────────────── */
-  .hero-text{ position:relative; }
-  .hero-orb{
-    position:absolute; width:700px; height:500px; border-radius:50%;
-    background:radial-gradient(ellipse at 30% 40%, rgba(99,102,241,.13) 0%, rgba(59,130,246,.07) 40%, transparent 70%);
-    top:-120px; left:-140px; pointer-events:none; z-index:0;
-    animation:hero-orb-drift 12s ease-in-out infinite alternate;
-  }
-  .hero-text > *{ position:relative; z-index:1; }
-  @keyframes hero-orb-drift{
-    0%{ transform:translate(0,0) scale(1); }
-    50%{ transform:translate(25px,-15px) scale(1.05); }
-    100%{ transform:translate(-10px,20px) scale(.97); }
-  }
-
-  /* ── Welcome / Empty State ───────────────────────────────── */
-  .state-empty{
-    text-align:center; padding:60px 20px 80px;
-    position:relative; overflow:hidden;
-  }
-  .welcome-orb{
-    position:absolute; width:500px; height:500px; border-radius:50%;
-    background:radial-gradient(circle at center, rgba(99,102,241,.1) 0%, rgba(59,130,246,.06) 40%, transparent 70%);
-    top:50%; left:50%; transform:translate(-50%,-50%);
-    pointer-events:none; animation:globe-pulse 6s ease-in-out infinite alternate;
-  }
-  .welcome-icon{
-    width:68px; height:68px; border-radius:20px; margin:0 auto 22px;
-    background:linear-gradient(135deg, rgba(37,99,235,.1), rgba(124,58,237,.08));
-    border:1px solid rgba(37,99,235,.18);
-    display:flex; align-items:center; justify-content:center;
-    color:#1d4ed8; position:relative;
-    box-shadow:0 4px 16px rgba(37,99,235,.1);
-  }
-  .welcome-title{
-    font-size:25px; font-weight:800; letter-spacing:-.7px; margin:0 0 12px;
-    font-family:'Space Grotesk',sans-serif; color:var(--text);
-    position:relative;
-  }
-  .welcome-sub{
-    font-size:14.5px; color:var(--text-2); margin:0 auto 36px; max-width:460px;
-    line-height:1.65; position:relative;
-  }
-  .welcome-modes{
-    display:flex; gap:10px; justify-content:center; flex-wrap:wrap;
-    position:relative;
-  }
-  .welcome-mode{
-    display:flex; align-items:center; gap:9px;
-    padding:12px 20px; border-radius:13px; cursor:pointer;
-    background:rgba(15,23,42,.04); border:1px solid rgba(15,23,42,.09);
-    box-shadow:0 1px 4px rgba(15,23,42,.06);
-    transition:all .2s ease; min-width:145px; justify-content:center;
-  }
-  .welcome-mode:hover{
-    background:rgba(99,102,241,.12); border-color:rgba(99,102,241,.3);
-    transform:translateY(-3px);
-    box-shadow:0 8px 24px rgba(99,102,241,.15);
-  }
-  .welcome-mode:nth-child(1):hover{ background:rgba(37,99,235,.06); border-color:rgba(37,99,235,.3); }
-  .welcome-mode:nth-child(2):hover{ background:rgba(5,150,105,.06); border-color:rgba(5,150,105,.3); }
-  .welcome-mode:nth-child(3):hover{ background:rgba(109,40,217,.06); border-color:rgba(109,40,217,.3); }
-  .welcome-mode:nth-child(4):hover{ background:rgba(217,119,6,.06); border-color:rgba(217,119,6,.3); }
-  .wm-icon{ font-size:22px; }
-  .wm-label{ font-size:13px; font-weight:700; color:var(--text-2); font-family:'Space Grotesk',sans-serif; letter-spacing:.1px; }
-
-  /* ── Misc ────────────────────────────────────────────────── */
-  .empty, .error{ text-align:center; color:var(--muted); margin-top:60px; font-size:14.5px; }
-  .error{ color:#dc2626; }
-  .stats{
-    color:var(--muted); margin-bottom:28px; font-size:13px;
-    padding:14px 22px;
-    background:#ffffff;
-    border-radius:16px;
-    border:1px solid rgba(15,23,42,.08);
-    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-    box-shadow:0 1px 4px rgba(15,23,42,.06), 0 4px 16px rgba(15,23,42,.06);
-    position:relative; overflow:hidden;
-  }
-  .stats::before{
-    content:''; position:absolute; top:0; left:0; right:0; height:2px;
-    background:linear-gradient(90deg, transparent 5%, rgba(37,99,235,.3) 35%, rgba(124,58,237,.25) 65%, transparent 95%);
-    pointer-events:none;
-  }
-  .stats strong{ color:var(--text); font-weight:700; }
-  .stats-counts{ display:flex; gap:10px; flex-wrap:wrap; }
-  .stats-pill{
-    display:flex; align-items:center; gap:6px; padding:5px 13px; border-radius:22px;
-    font-size:11.5px; font-weight:600;
-  }
-  .stats-pill.manu{ background:rgba(5,150,105,.08); color:#047857; border:1px solid rgba(5,150,105,.2); }
-  .stats-pill.dist{ background:rgba(217,119,6,.08); color:#b45309; border:1px solid rgba(217,119,6,.2); }
-  .stats-pill.unk{ background:rgba(100,116,139,.07); color:#64748b; border:1px solid rgba(100,116,139,.15); }
-  .stats-pill.person{ background:rgba(109,40,217,.08); color:#6d28d9; border:1px solid rgba(109,40,217,.18); }
-  footer{
-    text-align:center; color:var(--muted); margin-top:80px; font-size:12px; padding:28px 20px;
-    border-top:1px solid rgba(15,23,42,.07);
-    background:linear-gradient(0deg, rgba(99,102,241,.04), transparent);
-  }
-
-  /* ── Loading ─────────────────────────────────────────────── */
-  .auto-loading{ font-size:12px; color:var(--muted); margin:8px 0; display:flex; align-items:center; gap:6px; }
-  .loading-dot{ display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--accent); animation:pulse 1.4s infinite; }
-  @keyframes pulse{ 0%,100%{opacity:.25} 50%{opacity:1} }
-
-  /* ── Per-card export ─────────────────────────────────────── */
-  .card-export-row{ display:flex; gap:8px; margin-top:10px; }
-  .card-export-btn{
-    flex:1; padding:7px 10px; border-radius:9px; font-size:12px; font-weight:600;
-    cursor:pointer; font-family:inherit; transition:all .15s;
-    border:1px solid rgba(37,99,235,.18); background:rgba(37,99,235,.05); color:#1d4ed8;
-  }
-  .card-export-btn:hover{ border-color:rgba(37,99,235,.4); background:rgba(37,99,235,.1); }
-  .input-with-actions{ position:relative; display:flex; flex-direction:column; gap:6px; }
-  .input-with-actions input{ width:100%; }
-  .input-action-btns{ display:flex; gap:6px; }
-  .input-action-btn{
-    display:flex; align-items:center; gap:4px;
-    padding:6px 13px; border-radius:8px; font-size:11.5px; font-weight:600;
-    cursor:pointer; font-family:inherit; white-space:nowrap;
-    border:1px solid rgba(99,102,241,.2); background:rgba(99,102,241,.06); color:#4f46e5;
-    transition:all .15s;
-  }
-  .input-action-btn:hover{ border-color:rgba(99,102,241,.45); background:rgba(99,102,241,.13); }
-  .card-copy-btn{ border-color:rgba(5,150,105,.18)!important; background:rgba(5,150,105,.05)!important; color:#047857!important; }
-  .card-copy-btn:hover{ border-color:rgba(5,150,105,.4)!important; background:rgba(5,150,105,.12)!important; }
-  .card-cut-btn{ border-color:rgba(239,68,68,.18)!important; background:rgba(239,68,68,.05)!important; color:#dc2626!important; }
-  .card-cut-btn:hover{ border-color:rgba(239,68,68,.4)!important; background:rgba(239,68,68,.12)!important; }
-
-  /* ── Key People ──────────────────────────────────────────── */
-  .people-btn{
-    margin-top:10px; padding:8px 14px; border-radius:9px;
-    border:1px solid rgba(109,40,217,.18); background:rgba(109,40,217,.05);
-    color:#6d28d9; font-size:12px; font-weight:600;
-    cursor:pointer; font-family:inherit; transition:all .15s; display:block; width:100%;
-  }
-  .people-btn:hover{ border-color:rgba(109,40,217,.4); background:rgba(109,40,217,.1); }
-  .people-btn:disabled{ opacity:.6; cursor:wait; }
-  .people-panel{
-    margin-top:14px; padding:16px; border-radius:14px;
-    border:1px solid rgba(109,40,217,.18);
-    background:rgba(109,40,217,.04);
-    animation:card-in .35s ease both;
-  }
-  .people-panel-head{ display:flex; align-items:center; gap:11px; margin-bottom:14px; }
-  .people-panel-icon{
-    width:34px; height:34px; flex-shrink:0; border-radius:10px;
-    display:flex; align-items:center; justify-content:center; font-size:17px;
-    background:rgba(109,40,217,.1); border:1px solid rgba(109,40,217,.2);
-  }
-  .people-panel h4{ margin:0; font-size:13.5px; color:var(--text); font-weight:700; letter-spacing:.2px; font-family:'Space Grotesk',sans-serif; }
-  .people-panel-count{ font-size:11px; color:#6d28d9; font-weight:600; }
-  .people-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:10px; }
-  .person-chip{
-    padding:12px; border-radius:12px;
-    background:rgba(17,24,39,.9); border:1px solid rgba(168,85,247,.18);
-    box-shadow:0 1px 4px rgba(15,23,42,.06);
-    transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease;
-    display:flex; flex-direction:column;
-  }
-  .person-chip:hover{
-    border-color:rgba(109,40,217,.35); transform:translateY(-2px);
-    box-shadow:0 6px 18px rgba(15,23,42,.1);
-  }
-  .pc-top{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
-  .pc-avatar{
-    width:38px; height:38px; flex-shrink:0; border-radius:50%;
-    display:flex; align-items:center; justify-content:center;
-    font-size:13px; font-weight:700; color:#fff; font-family:'Space Grotesk',sans-serif;
-    background:linear-gradient(135deg, #7c3aed, #a78bfa);
-  }
-  .pc-id{ min-width:0; flex:1; }
-  .person-chip .pc-name{ font-weight:700; font-size:13.5px; color:var(--text); line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .person-chip .pc-title{ font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.3; }
-  .person-chip .pc-source{ margin-bottom:9px; }
-  .pc-source-link{ font-size:10.5px; color:var(--muted); text-decoration:none; font-weight:500; }
-  .pc-source-link:hover{ color:#6d28d9; }
-  .person-chip .pc-actions{ margin-top:auto; display:flex; gap:6px; flex-wrap:wrap; }
-  .pc-btn{
-    flex:1; min-width:0; text-align:center;
-    font-size:11px; padding:5px 8px; border-radius:7px; cursor:pointer; font-family:inherit; font-weight:600;
-    border:1px solid rgba(109,40,217,.22); background:rgba(109,40,217,.07); color:#6d28d9;
-    transition:all .14s;
-  }
-  .pc-btn:hover{ background:rgba(109,40,217,.15); border-color:rgba(109,40,217,.4); color:#5b21b6; }
-
-  /* ── Trust Check ─────────────────────────────────────────── */
-  .trust-btn{
-    margin-top:10px; padding:8px 14px; border-radius:9px;
-    border:1px solid rgba(5,150,105,.18); background:rgba(5,150,105,.05);
-    color:#047857; font-size:12px; font-weight:600;
-    cursor:pointer; font-family:inherit; transition:all .15s; display:block; width:100%;
-  }
-  .trust-btn:hover{ border-color:rgba(5,150,105,.4); background:rgba(5,150,105,.1); }
-  .trust-btn:disabled{ opacity:.6; cursor:wait; }
-  .trust-panel{ margin-top:12px; padding:14px; border-radius:12px; border:1px solid rgba(15,23,42,.08); background:#f8fafc; }
-  .trust-badge{
-    display:inline-flex; align-items:center; gap:6px; padding:5px 14px;
-    border-radius:20px; font-size:12px; font-weight:700; margin-bottom:10px;
-  }
-  .trust-good   { background:rgba(5,150,105,.08);  color:#047857; border:1px solid rgba(5,150,105,.22); }
-  .trust-warn   { background:rgba(217,119,6,.08);  color:#b45309; border:1px solid rgba(217,119,6,.22); }
-  .trust-danger { background:rgba(220,38,38,.08);  color:#b91c1c; border:1px solid rgba(220,38,38,.22); }
-  .trust-info   { background:rgba(100,116,139,.07); color:var(--muted); border:1px solid rgba(100,116,139,.15); }
-  .trust-score{ font-size:11.5px; color:var(--muted); margin-bottom:10px; }
-  .trust-findings{ display:flex; flex-direction:column; gap:5px; margin-bottom:10px; }
-  .trust-finding{ font-size:12.5px; line-height:1.5; padding:7px 11px; border-radius:8px; }
-  .trust-finding.good   { background:rgba(5,150,105,.06); color:#047857; }
-  .trust-finding.warning{ background:rgba(217,119,6,.06); color:#b45309; }
-  .trust-finding.danger { background:rgba(220,38,38,.06); color:#b91c1c; }
-  .trust-finding.info   { background:rgba(100,116,139,.06); color:var(--muted); }
-  .trust-section-title{ font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); font-weight:700; margin:10px 0 6px; }
-  .trust-link-item{ font-size:12px; padding:6px 0; border-bottom:1px solid rgba(15,23,42,.06); line-height:1.4; }
-  .trust-link-item:last-child{ border-bottom:none; }
-  .trust-link-item a{ color:#1d4ed8; text-decoration:none; font-weight:600; }
-  .trust-link-item a:hover{ text-decoration:underline; }
-  .trust-link-item .tl-snippet{ color:var(--muted); font-size:11px; margin-top:2px; }
-  .trust-disclaimer{ font-size:11px; color:#2a3a55; margin-top:10px; font-style:italic; }
-  .person-check-block{ margin-bottom:10px; padding:10px 12px; border-radius:10px; background:rgba(15,23,42,.03); border:1px solid rgba(15,23,42,.08); }
-  .person-check-block:last-child{ margin-bottom:0; }
-  .person-check-header{ margin-bottom:4px; }
-
-  /* ── Image / Card tab ────────────────────────────────────── */
-  .img-type-picker{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
-  .img-type-card{
-    flex:1; min-width:130px; padding:16px 14px; border-radius:14px;
-    border:1px solid rgba(15,23,42,.1); background:#ffffff;
-    box-shadow:0 1px 4px rgba(15,23,42,.06);
-    cursor:pointer; text-align:center; transition:all .15s; user-select:none;
-  }
-  .img-type-card:hover{ border-color:rgba(37,99,235,.3); background:rgba(37,99,235,.04); }
-  .img-type-card.selected{ border-color:rgba(37,99,235,.4); background:rgba(37,99,235,.07); box-shadow:0 2px 12px rgba(37,99,235,.1); }
-  .img-type-card .itc-icon{ font-size:28px; margin-bottom:8px; }
-  .img-type-card .itc-label{ font-size:13px; font-weight:700; color:var(--text); }
-  .img-type-card .itc-desc{ font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.4; }
-
-  .upload-zone{
-    border:2px dashed rgba(15,23,42,.15); border-radius:14px; padding:36px 20px;
-    text-align:center; cursor:pointer; transition:all .15s; color:var(--muted);
-    background:rgba(15,23,42,.02);
-  }
-  .upload-zone:hover, .upload-zone.dragover{
-    border-color:rgba(37,99,235,.4); background:rgba(37,99,235,.05); color:var(--text);
-  }
-  .upload-zone .uz-icon{ font-size:36px; margin-bottom:10px; }
-  .upload-zone .uz-label{ font-size:14px; font-weight:600; }
-  .upload-zone .uz-hint{ font-size:12px; margin-top:5px; }
-
-  .img-preview-wrap{ margin-top:14px; text-align:center; }
-  .img-preview-wrap img{ max-width:100%; max-height:220px; border-radius:12px; border:1px solid rgba(15,23,42,.1); }
-
-  .ocr-status{ margin-top:12px; font-size:13px; color:var(--muted); text-align:center; }
-  .ocr-bar-wrap{ height:4px; background:rgba(15,23,42,.08); border-radius:3px; overflow:hidden; margin-top:8px; }
-  .ocr-bar-fill{ height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:3px; transition:width .25s; width:0%; }
-
-  .ocr-result{ margin-top:14px; }
-  .ocr-actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
-  .lens-btn{
-    flex:1; padding:13px 16px; border:none; border-radius:12px; cursor:pointer;
-    font-size:14px; font-family:inherit; font-weight:700; color:#fff;
-    background:linear-gradient(135deg, var(--accent), var(--accent2));
-    box-shadow:0 6px 20px rgba(59,130,246,.3); transition:transform .12s,box-shadow .12s;
-  }
-  .lens-btn:hover{ transform:translateY(-1px); box-shadow:0 10px 28px rgba(59,130,246,.45); }
-  .lens-btn-secondary{
-    flex:1; padding:13px 16px; border:1px solid rgba(37,99,235,.18); border-radius:12px;
-    cursor:pointer; font-size:14px; font-family:inherit; font-weight:600; color:#1d4ed8;
-    background:rgba(37,99,235,.05); transition:all .12s;
-  }
-  .lens-btn-secondary:hover{ border-color:rgba(37,99,235,.35); background:rgba(37,99,235,.1); }
-
-  /* ── Physical Stock tab styles ───────────────────────────── */
-  .mode-tab[data-mode="stock"].active{
-    background:linear-gradient(135deg, rgba(16,185,129,.22), rgba(5,150,105,.15));
-    color:#6ee7b7; border:1px solid rgba(16,185,129,.28);
-    box-shadow:0 2px 14px rgba(16,185,129,.18), inset 0 1px 0 rgba(15,23,42,.07);
-  }
-  .badge.direct    { background:rgba(5,150,105,.08);   color:#047857; border:1px solid rgba(5,150,105,.22); }
-  .badge.warehouse { background:rgba(37,99,235,.08);   color:#1d4ed8; border:1px solid rgba(37,99,235,.2); }
-  .badge.surplus   { background:rgba(217,119,6,.08);   color:#b45309; border:1px solid rgba(217,119,6,.2); }
-  .badge.listing   { background:rgba(100,116,139,.07); color:#64748b; border:1px solid rgba(100,116,139,.18); }
-
-  /* ── Stock cards grid ───────────────────────────────────── */
-  .stock-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:16px; margin-top:10px; }
-  .stock-card{
-    background:#ffffff;
-    border-radius:16px; padding:18px 20px;
-    border:1px solid rgba(15,23,42,.08);
-    box-shadow:var(--shadow-card);
-    transition:transform .22s cubic-bezier(.34,1.56,.64,1), box-shadow .22s, border-color .22s;
-    display:flex; flex-direction:column; gap:10px; position:relative; overflow:hidden;
-  }
-  .stock-card::before{
-    content:''; position:absolute; top:0; left:0; right:0; height:2px;
-    border-radius:16px 16px 0 0;
-  }
-  .stock-card.direct::before{ background:linear-gradient(90deg,#059669,#34d399); }
-  .stock-card.warehouse::before{ background:linear-gradient(90deg,#2563eb,#60a5fa); }
-  .stock-card.surplus::before{ background:linear-gradient(90deg,#d97706,#fbbf24); }
-  .stock-card.listing::before{ background:linear-gradient(90deg,#6366f1,#818cf8); }
-  .stock-card:hover{ transform:translateY(-4px); box-shadow:var(--shadow-card-hover); border-color:rgba(37,99,235,.15); }
-  .stock-card-top{ display:flex; align-items:flex-start; gap:12px; }
-  .stock-card-favicon{
-    width:40px; height:40px; border-radius:10px; flex-shrink:0;
-    background:rgba(15,23,42,.04); border:1px solid rgba(15,23,42,.09);
-    display:flex; align-items:center; justify-content:center; overflow:hidden;
-  }
-  .stock-card-favicon img{ width:22px; height:22px; object-fit:contain; }
-  .stock-card-title-wrap{ flex:1; min-width:0; }
-  .stock-card-title{
-    font-size:14px; font-weight:700; line-height:1.35; font-family:'Space Grotesk',sans-serif;
-    color:var(--text); text-decoration:none; display:block;
-    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-  }
-  .stock-card-title:hover{ color:#1d4ed8; }
-  .stock-card-domain{ font-size:11px; color:#94a3b8; margin-top:3px; }
-  .stock-card-avail{
-    font-size:12px; font-weight:700; font-family:'Space Grotesk',sans-serif;
-    padding:4px 10px; border-radius:8px; align-self:flex-start;
-    background:rgba(5,150,105,.08); color:#047857; border:1px solid rgba(5,150,105,.2);
-    white-space:nowrap;
-  }
-  .stock-card-avail.warehouse{ background:rgba(37,99,235,.08); color:#1d4ed8; border-color:rgba(37,99,235,.2); }
-  .stock-card-avail.surplus{ background:rgba(217,119,6,.08); color:#b45309; border-color:rgba(217,119,6,.2); }
-  .stock-card-avail.listing{ background:rgba(99,102,241,.08); color:#4338ca; border-color:rgba(99,102,241,.2); }
-  .stock-card-snippet{ font-size:12.5px; color:var(--text-2); line-height:1.6; }
-  .stock-card-footer{ display:flex; align-items:center; justify-content:space-between; margin-top:4px; }
-  .stock-card-badge{ font-size:10px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; color:#94a3b8; }
-  .stock-card-link{
-    display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
-    color:#1d4ed8; text-decoration:none; padding:5px 12px; border-radius:8px;
-    background:rgba(37,99,235,.07); border:1px solid rgba(37,99,235,.15);
-    transition:all .15s;
-  }
-  .stock-card-link:hover{ background:rgba(37,99,235,.14); border-color:rgba(37,99,235,.3); }
-
-  .stock-stats{
-    display:flex; align-items:center; gap:12px; margin-bottom:24px;
-    padding:14px 20px; border-radius:16px;
-    background:#ffffff; border:1px solid rgba(15,23,42,.08);
-    box-shadow:var(--shadow-card);
-    font-size:13px; color:var(--muted); flex-wrap:wrap;
-  }
-  .stock-stats .ss-item{ display:flex; align-items:center; gap:6px; }
-  .stock-stats .ss-badge{
-    padding:5px 12px; border-radius:20px; font-size:11px; font-weight:700;
-    background:rgba(5,150,105,.08); color:#047857; border:1px solid rgba(5,150,105,.2);
-  }
-  .stock-stats .ss-badge.warehouse{ background:rgba(37,99,235,.08); color:#1d4ed8; border-color:rgba(37,99,235,.2); }
-  .stock-stats .ss-badge.surplus{ background:rgba(217,119,6,.08); color:#b45309; border-color:rgba(217,119,6,.2); }
-
-  /* keep table as fallback for very wide viewports — hidden by default */
-  .stock-table-wrap{ display:none; }
-
-  /* ── AI Insights Panel ───────────────────────────────────── */
-  .ai-panel{
-    max-width:960px; margin:0 auto 24px; padding:22px 28px;
-    border-radius:20px; position:relative; z-index:1;
-    background:#ffffff;
-    backdrop-filter:blur(12px);
-    border:1px solid rgba(168,85,247,.2);
-    box-shadow:0 2px 8px rgba(15,23,42,.06), 0 8px 32px rgba(168,85,247,.1);
-    animation:card-enter .35s cubic-bezier(0.0,0.0,0.2,1) both;
-  }
-  .ai-panel::before{ content:none; }
-  .ai-header{
-    display:flex; align-items:center; justify-content:space-between;
-    margin-bottom:18px; gap:12px; flex-wrap:wrap;
-  }
-  .ai-title{
-    display:flex; align-items:center; gap:10px;
-    font-family:'Space Grotesk',sans-serif; font-size:14px; font-weight:700; color:var(--text);
-  }
-  .ai-logo{
-    width:28px; height:28px; border-radius:8px; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center;
-    background:linear-gradient(135deg, #7c3aed, #4f46e5);
-    box-shadow:0 2px 10px rgba(124,58,237,.3);
-  }
-  .ai-logo svg{ width:15px; height:15px; }
-  .ai-provider-badge{
-    display:inline-flex; align-items:center; gap:5px;
-    padding:3px 10px; border-radius:20px; font-size:10.5px; font-weight:700;
-    letter-spacing:.4px; text-transform:uppercase;
-  }
-  .ai-provider-badge.openai{
-    background:rgba(5,150,105,.08); color:#047857; border:1px solid rgba(5,150,105,.22);
-  }
-  .ai-provider-badge.gemini{
-    background:rgba(37,99,235,.08); color:#1d4ed8; border:1px solid rgba(37,99,235,.22);
-  }
-  .ai-collapse-btn{
-    background:none; border:none; color:var(--muted); cursor:pointer;
-    font-size:13px; padding:4px 10px; border-radius:8px;
-    transition:background var(--dur-fast,150ms); touch-action:manipulation;
-    font-family:'DM Sans',sans-serif; font-weight:600;
-  }
-  .ai-collapse-btn:hover{ background:rgba(15,23,42,.05); color:var(--text); }
-
-  .ai-summary{
-    font-size:14px; line-height:1.7; color:var(--text-2); margin:0 0 20px;
-    padding:14px 18px; border-radius:12px;
-    background:rgba(109,40,217,.04); border-left:3px solid rgba(109,40,217,.35);
-  }
-
-  .ai-grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
-  @media(max-width:640px){ .ai-grid{ grid-template-columns:1fr; } }
-
-  .ai-section-title{
-    font-size:10px; font-weight:700; letter-spacing:1.4px; text-transform:uppercase;
-    color:var(--muted); margin:0 0 10px; display:flex; align-items:center; gap:7px;
-    font-family:'Space Grotesk',sans-serif;
-  }
-  .ai-section-title::after{ content:''; flex:1; height:1px; background:rgba(15,23,42,.08); }
-
-  .ai-insight{
-    display:flex; gap:10px; padding:9px 0;
-    border-bottom:1px solid rgba(15,23,42,.06); font-size:13px; color:var(--text-2);
-    line-height:1.5;
-  }
-  .ai-insight:last-child{ border-bottom:none; }
-  .ai-insight-dot{
-    width:6px; height:6px; border-radius:50%; background:linear-gradient(135deg,#7c3aed,#2563eb);
-    flex-shrink:0; margin-top:6px;
-  }
-
-  .ai-suggestion{
-    display:flex; align-items:center; gap:8px; padding:8px 12px; border-radius:10px;
-    background:rgba(37,99,235,.04); border:1px solid rgba(37,99,235,.14);
-    color:#1d4ed8; font-size:12.5px; cursor:pointer; transition:all var(--dur-fast,150ms);
-    touch-action:manipulation; text-align:left; width:100%;
-    font-family:'DM Sans',sans-serif;
-  }
-  .ai-suggestion:hover{ background:rgba(59,130,246,.1); border-color:rgba(59,130,246,.3); color:#fff; }
-  .ai-suggestion svg{ flex-shrink:0; opacity:.6; }
-
-  .ai-warning{
-    margin-top:16px; padding:10px 14px; border-radius:10px;
-    background:rgba(245,158,11,.07); border:1px solid rgba(245,158,11,.25);
-    color:#fcd34d; font-size:12.5px; display:flex; gap:8px; align-items:flex-start;
-    line-height:1.5;
-  }
-
-  .ai-top-pick-badge{
-    display:inline-flex; align-items:center; gap:3px;
-    padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700;
-    background:linear-gradient(135deg,rgba(139,92,246,.25),rgba(59,130,246,.2));
-    color:#c4b5fd; border:1px solid rgba(139,92,246,.3);
-    vertical-align:middle; margin-left:6px; letter-spacing:.3px;
-  }
-
-  .ai-loading{
-    display:flex; align-items:center; gap:12px; padding:18px 0; color:var(--muted); font-size:13.5px;
-  }
-  @keyframes ai-spin{ to{ transform:rotate(360deg); } }
-  .ai-spinner{
-    width:18px; height:18px; border:2px solid rgba(139,92,246,.25);
-    border-top-color:#a78bfa; border-radius:50%;
-    animation:ai-spin .8s linear infinite; flex-shrink:0;
-  }
-
-  /* ── Design Tokens (Skill: spacing-scale, z-index-management, duration-timing) ── */
-  :root{
-    --z-base:0; --z-card:10; --z-toolbar:20; --z-nav:100; --z-modal:400; --z-toast:999;
-    --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:24px;
-    --space-6:32px; --space-7:48px;
-    --dur-fast:150ms; --dur-base:220ms; --dur-slow:350ms;
-    --ease-out:cubic-bezier(0.0, 0.0, 0.2, 1);
-    --ease-in:cubic-bezier(0.4, 0.0, 1, 1);
-    --ease-spring:cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-
-  /* ── Reduced motion (Skill: reduced-motion) ─────────────── */
-  @media (prefers-reduced-motion: reduce){
-    *, *::before, *::after{
-      animation-duration:.01ms !important;
-      animation-iteration-count:1 !important;
-      transition-duration:.01ms !important;
-    }
-    body::before{ animation:none; }
-    .topbar-pill-dot, .hero-eyebrow-dot{ animation:none; }
-    #globeCanvas{ pointer-events:none; }
-  }
-
-  /* ── Skip link (Skill: skip-links) ──────────────────────── */
-  .skip-link{
-    position:fixed; top:-100px; left:16px; z-index:var(--z-toast);
-    padding:10px 20px; border-radius:8px;
-    background:var(--accent); color:#fff; font-weight:700; font-size:14px;
-    text-decoration:none; transition:top var(--dur-fast);
-  }
-  .skip-link:focus{ top:16px; outline:3px solid #fff; outline-offset:2px; }
-
-  /* ── Focus rings (Skill: focus-states, keyboard-nav) ────── */
-  :focus-visible{
-    outline:2px solid rgba(99,102,241,.8);
-    outline-offset:3px;
-    border-radius:4px;
-  }
-  .mode-tab:focus-visible{ outline-offset:2px; border-radius:11px; }
-  .search-box button:focus-visible{ outline-offset:2px; }
-  .chip:focus-visible{ outline-offset:2px; }
-
-  /* ── Touch targets (Skill: touch-target-size, tap-delay) ── */
-  .search-box button, .mode-tab, .chip, .filters button, .export-btn,
-  select#sortBy, .search-box input, .search-box select{
-    min-height:44px;
-    touch-action:manipulation;
-  }
-  button, a, [role="button"]{ touch-action:manipulation; }
-
-  /* ── Button press feedback (Skill: scale-feedback, press-feedback) ── */
-  .search-box button:active:not(:disabled){ transform:scale(0.97) translateY(0) !important; }
-  .mode-tab:active{ transform:scale(0.97) !important; }
-  .chip:active{ transform:scale(0.97) !important; }
-
-  /* ── Stagger card entrance (Skill: stagger-sequence, easing) ── */
-  @keyframes card-enter{
-    from{ opacity:0; transform:translateY(16px) scale(.98); }
-    to  { opacity:1; transform:translateY(0) scale(1); }
-  }
-  .card-animate{
-    animation:card-enter var(--dur-slow) var(--ease-out) both;
-  }
-
-  /* ── Skeleton loading (Skill: loading-states, progressive-loading) ── */
-  .skeleton-wrap{ display:grid; grid-template-columns:repeat(auto-fill, minmax(290px,1fr)); gap:16px; }
-  .skeleton-card{
-    border-radius:var(--radius-card); padding:20px 22px;
-    background:#ffffff; border:1px solid rgba(15,23,42,.08);
-    height:170px; overflow:hidden; position:relative;
-  }
-  .skeleton-card::after{
-    content:''; position:absolute; inset:0;
-    background:linear-gradient(90deg, transparent 25%, rgba(15,23,42,.04) 50%, transparent 75%);
-    animation:shimmer 1.6s var(--ease-out) infinite;
-    background-size:200% 100%;
-  }
-  @keyframes shimmer{
-    0%{ background-position:200% 0; }
-    100%{ background-position:-200% 0; }
-  }
-  .skeleton-line{
-    border-radius:6px; background:rgba(15,23,42,.08); margin-bottom:10px;
-  }
-
-  /* ── Button loading spinner (Skill: loading-buttons, submit-feedback) ── */
-  @keyframes btn-spin{
-    to{ transform:rotate(360deg); }
-  }
-  .btn-loading{
-    color:transparent !important; pointer-events:none;
-    position:relative;
-  }
-  .btn-loading::after{
-    content:''; position:absolute;
-    width:16px; height:16px;
-    top:50%; left:50%; margin:-8px 0 0 -8px;
-    border:2px solid rgba(255,255,255,.3);
-    border-top-color:#fff;
-    border-radius:50%;
-    animation:btn-spin 0.7s linear infinite;
-  }
-
-  /* ── Empty & error states ────────────────────────────────── */
-  .state-error{
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:60px 20px; gap:16px; text-align:center;
-  }
-  .state-error svg{ opacity:.35; }
-  .state-error p{ color:#fca5a5; font-size:14px; line-height:1.6; margin:0; max-width:340px; }
-  .state-error p{ color:#fca5a5; }
-  .state-retry{
-    padding:9px 22px; border-radius:20px; border:none; cursor:pointer; font-size:13px;
-    font-weight:700; background:rgba(59,130,246,.15); color:var(--accent);
-    border:1px solid rgba(59,130,246,.25); transition:background var(--dur-fast);
-    touch-action:manipulation; min-height:44px;
-  }
-  .state-retry:hover{ background:rgba(59,130,246,.25); }
-
-  /* ── Input labels (Skill: input-labels, form-labels) ──────── */
-  .search-field{ display:flex; flex-direction:column; gap:5px; flex:2; min-width:200px; }
-  .search-field label{
-    font-size:11px; font-weight:700; letter-spacing:.7px; text-transform:uppercase;
-    color:var(--muted); padding-left:4px;
-  }
-  .search-field input{ flex:none; width:100%; }
-  .search-select-field{ display:flex; flex-direction:column; gap:5px; flex:1; min-width:150px; }
-  .search-select-field label{
-    font-size:11px; font-weight:700; letter-spacing:.7px; text-transform:uppercase;
-    color:var(--muted); padding-left:4px;
-  }
-  .search-select-field select{ flex:none; width:100%; }
-
-  /* ── SVG tab icons ───────────────────────────────────────── */
-  .tab-icon{ width:16px; height:16px; flex-shrink:0; }
-
-  /* ── Topbar SVG logo ─────────────────────────────────────── */
-  .topbar-logo svg{ width:20px; height:20px; }
-
-  /* ── Result count badge (Skill: number-tabular) ──────────── */
-  .result-count{
-    font-variant-numeric:tabular-nums;
-    background:rgba(59,130,246,.1); color:#93c5fd;
-    padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700;
-    border:1px solid rgba(59,130,246,.2);
-  }
-  .td-avail, .td-price, .stat-num{
-    font-variant-numeric:tabular-nums;
-  }
-
-  /* ── Smooth scroll ───────────────────────────────────────── */
-  html{ scroll-behavior:smooth; }
-
-  /* ── Tablet ──────────────────────────────────────────────── */
-  @media (max-width:720px){
-    .topbar{ padding:0 16px; }
-    .topbar-tag{ display:none; }
-    .hero{ padding:40px 16px 24px; }
-    h1{ font-size:32px; }
-    .panel{ margin:0 12px 14px; padding:16px; border-radius:18px; }
-    .card-grid{ grid-template-columns:1fr; }
-    .stock-grid{ grid-template-columns:1fr; }
-    .toolbar{ flex-direction:column; align-items:stretch; gap:8px; }
-    .filters{ justify-content:center; }
-    select#sortBy, .export-btn{ width:100%; text-align:center; }
-    .results-wrap{ padding:0 12px; }
-    .mode-tab{ font-size:12.5px; padding:9px 6px; }
-  }
-
-  /* ── Phone ───────────────────────────────────────────────── */
-  @media (max-width:480px){
-    .topbar{ height:50px; padding:0 14px; }
-    .topbar-name{ font-size:13.5px; }
-    .hero{ padding:28px 14px 18px; }
-    .hero-eyebrow{ font-size:11px; }
-    h1{ font-size:26px; letter-spacing:-1px; }
-    p.subtitle{ font-size:14px; margin-bottom:24px; }
-
-    .panel{ margin:0 10px 12px; padding:14px; border-radius:16px; }
-    .mode-tab{ font-size:12px; padding:9px 4px; }
-
-    .search-box{ flex-direction:column; gap:8px; }
-    .search-box input, .search-box select, .search-box button{
-      width:100%; min-width:unset; box-sizing:border-box;
-    }
-    .search-box button{ padding:14px; font-size:15px; }
-    .search-box input, .search-box select{ font-size:16px; }
-
-    .chips{ gap:6px; margin:14px auto 20px; }
-    .chip{ font-size:12px; padding:6px 11px; }
-
-    .toolbar{ flex-direction:column; align-items:stretch; gap:8px; }
-    .filters{ flex-wrap:nowrap; overflow-x:auto; }
-    .filters button{ flex:1; min-width:64px; font-size:12px; padding:7px 6px; }
-    select#sortBy, .export-btn{ width:100%; box-sizing:border-box; }
-
-    .group-title{ font-size:11px; }
-    .card-grid{ grid-template-columns:1fr; gap:12px; }
-    .stock-grid{ grid-template-columns:1fr; gap:10px; }
-    .card{ padding:16px 18px; border-radius:16px; }
-    .card h3{ font-size:14.5px; }
-    .card .desc{ font-size:12.5px; }
-    .stats{ flex-direction:column; align-items:flex-start; gap:10px; }
-    .stats-counts{ gap:8px; }
-
-    .detail-row{ flex-direction:column; gap:2px; }
-    .detail-label{ min-width:unset; }
-
-    .banner{ font-size:12px; padding:10px 14px; }
-    .results-wrap{ padding:0 10px; }
-  }
-
-
-
-
-  /* ══════════════ SOURCEIQ — PURE WHITE BRIGHT DESIGN ══════════════ */
-
-  :root{
-    --ind:#4f46e5; --grn:#059669; --amb:#d97706;
-    --cyn:#0891b2; --vio:#7c3aed;
-    --text:#1e293b; --text2:#475569; --mut:#94a3b8;
-  }
-
-  html,body{ margin:0; min-height:100vh; color:#1e293b; }
-  body{
-    background:#ffffff !important;
-    background-image:none !important;
-    animation:none !important;
-  }
-  body::before{ content:none !important; }
-  body::after{ content:none !important; }
-
-  /* TOPBAR */
-  .topbar{
-    background:#fff !important; backdrop-filter:none !important;
-    border-bottom:1px solid #f1f5f9 !important;
-    box-shadow:0 1px 12px rgba(0,0,0,.06) !important;
-  }
-  .topbar::after{
-    background:linear-gradient(90deg,#4f46e5,#7c3aed,#db2777,#0891b2) !important;
-    height:3px !important; opacity:1 !important;
-  }
-  .topbar-name{
-    background:linear-gradient(120deg,#4f46e5,#7c3aed) !important;
-    -webkit-background-clip:text !important; background-clip:text !important;
-    color:transparent !important;
-  }
-  .topbar-tag{ color:#94a3b8 !important; }
-  .topbar-pill{ background:#f8fafc !important; border:1px solid #e2e8f0 !important; color:#64748b !important; }
-  .topbar-pill:hover{ background:#ede9fe !important; border-color:#c4b5fd !important; color:#4f46e5 !important; }
-
-  /* HERO */
-  h1{ color:#0f172a !important; }
-  .h1-accent{
-    background:linear-gradient(120deg,#4f46e5,#7c3aed,#db2777) !important;
-    background-size:200% 100% !important;
-    animation:text-slide 3s linear infinite !important;
-    -webkit-background-clip:text !important; background-clip:text !important;
-    color:transparent !important;
-  }
-  @keyframes text-slide{ 0%{background-position:0%} 100%{background-position:200%} }
-  p.subtitle{ color:#64748b !important; }
-  .hero-eyebrow{ background:#ede9fe !important; border:1px solid #c4b5fd !important; color:#4f46e5 !important; }
-  .hero-stats{ background:#fff !important; border:1px solid #e2e8f0 !important; box-shadow:0 2px 12px rgba(0,0,0,.06) !important; backdrop-filter:none !important; }
-  .hero-stat:nth-child(1) .hero-stat-num{ color:#4f46e5 !important; }
-  .hero-stat:nth-child(3) .hero-stat-num{ color:#059669 !important; }
-  .hero-stat:nth-child(5) .hero-stat-num{ color:#7c3aed !important; }
-  .hero-stat:nth-child(7) .hero-stat-num{ color:#0891b2 !important; }
-  .hero-stat-label{ color:#94a3b8 !important; }
-  .hero-stat-sep{ background:#e2e8f0 !important; }
-  .hero-trust-pill{ background:#f8fafc !important; border:1px solid #e2e8f0 !important; color:#64748b !important; backdrop-filter:none !important; }
-  .hero-trust-pill:hover{ background:#ede9fe !important; border-color:#c4b5fd !important; color:#4f46e5 !important; }
-
-  /* PANEL */
-  .panel{
-    background:#fff !important; backdrop-filter:none !important;
-    border:1px solid #e2e8f0 !important; border-radius:20px !important;
-    box-shadow:0 4px 20px rgba(0,0,0,.07) !important;
-  }
-  .panel::after{
-    background:linear-gradient(90deg,transparent,#4f46e5 30%,#7c3aed 55%,#db2777 75%,transparent) !important;
-    opacity:.4 !important;
-  }
-
-  /* TABS */
-  .mode-tabs{ background:#f8fafc !important; border:1px solid #e2e8f0 !important; backdrop-filter:none !important; }
-  .mode-tab{ color:#94a3b8 !important; }
-  .mode-tab:not(.active):hover{ background:#fff !important; color:#64748b !important; }
-  .mode-tab.active{ background:#fff !important; box-shadow:0 1px 6px rgba(0,0,0,.1) !important; }
-  .mode-tab[data-mode="product"].active{ color:#4f46e5 !important; }
-  .mode-tab[data-mode="company"].active{ color:#059669 !important; }
-  .mode-tab[data-mode="person"].active { color:#7c3aed !important; }
-  .mode-tab[data-mode="buyers"].active { color:#0891b2 !important; }
-  .mode-tab[data-mode="trade"].active  { color:#0891b2 !important; }
-  .mode-tab[data-mode="market"].active { color:#7c3aed !important; }
-  .mode-tab[data-mode="stock"].active  { color:#059669 !important; }
-  .mode-tab[data-mode="image"].active  { color:#d97706 !important; }
-
-  /* INPUTS */
-  .search-box input,.search-box select{
-    background:#f8fafc !important; border:1.5px solid #e2e8f0 !important;
-    color:#0f172a !important; backdrop-filter:none !important;
-    box-shadow:none !important;
-  }
-  .search-box input::placeholder{ color:#cbd5e1 !important; }
-  .search-box input:focus,.search-box select:focus{
-    background:#fff !important; border-color:#a5b4fc !important;
-    box-shadow:0 0 0 4px rgba(79,70,229,.1) !important;
-  }
-  .search-box select option{ background:#fff !important; color:#0f172a !important; }
-  .search-field label,.search-select-field label{ color:#94a3b8 !important; }
-
-  /* BUTTON */
-  .search-box button{
-    background:linear-gradient(135deg,#4f46e5,#7c3aed) !important;
-    box-shadow:0 4px 16px rgba(79,70,229,.4) !important;
-    border-radius:12px !important; font-weight:700 !important;
-  }
-  .search-box button:hover{
-    transform:translateY(-3px) scale(1.03) !important;
-    box-shadow:0 10px 32px rgba(79,70,229,.5) !important;
-  }
-
-  /* CHIPS */
-  .chip{ background:#f8fafc !important; border:1.5px solid #e2e8f0 !important; color:#64748b !important; backdrop-filter:none !important; }
-  .chip:hover{ background:#ede9fe !important; border-color:#c4b5fd !important; color:#4f46e5 !important; transform:translateY(-2px) !important; box-shadow:0 4px 12px rgba(79,70,229,.12) !important; }
-
-  /* CARDS — pure white, no tints */
-  .card{
-    background:#fff !important; backdrop-filter:none !important;
-    border:1.5px solid #e2e8f0 !important; border-radius:16px !important;
-    box-shadow:0 1px 4px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.05) !important;
-    transition:transform .22s cubic-bezier(.34,1.56,.64,1),box-shadow .22s ease,border-color .22s ease !important;
-  }
-  .card:hover{
-    transform:translateY(-6px) scale(1.01) !important;
-    box-shadow:0 12px 40px rgba(79,70,229,.14),0 4px 12px rgba(0,0,0,.06) !important;
-    border-color:#c7d2fe !important;
-  }
-  .card::before{ height:3px !important; border-radius:16px 16px 0 0 !important; opacity:1 !important; background:linear-gradient(90deg,#4f46e5,#7c3aed,#db2777) !important; }
-  .card.manufacturer{ background:#fff !important; border-color:#d1fae5 !important; }
-  .card.manufacturer::before{ background:linear-gradient(90deg,#059669,#10b981) !important; }
-  .card.manufacturer:hover{ border-color:#6ee7b7 !important; box-shadow:0 12px 40px rgba(5,150,105,.14),0 4px 12px rgba(0,0,0,.05) !important; }
-  .card.distributor{ background:#fff !important; border-color:#fde68a !important; }
-  .card.distributor::before{ background:linear-gradient(90deg,#d97706,#f59e0b) !important; }
-  .card.distributor:hover{ border-color:#fcd34d !important; box-shadow:0 12px 40px rgba(217,119,6,.14),0 4px 12px rgba(0,0,0,.05) !important; }
-  .card.trade-card{ background:#fff !important; border-color:#a5f3fc !important; }
-  .card.trade-card::before{ background:linear-gradient(90deg,#0891b2,#06b6d4) !important; }
-  .card.trade-card:hover{ border-color:#67e8f9 !important; box-shadow:0 12px 40px rgba(8,145,178,.14),0 4px 12px rgba(0,0,0,.05) !important; }
-  .card.market-card{ background:#fff !important; border-color:#ddd6fe !important; }
-  .card.market-card::before{ background:linear-gradient(90deg,#7c3aed,#8b5cf6) !important; }
-  .card.market-card:hover{ border-color:#c4b5fd !important; box-shadow:0 12px 40px rgba(124,58,237,.14),0 4px 12px rgba(0,0,0,.05) !important; }
-  .card.buyer-card{ background:#fff !important; border-color:#bae6fd !important; }
-  .card.buyer-card::before{ background:linear-gradient(90deg,#0ea5e9,#38bdf8) !important; }
-  .card.buyer-card:hover{ border-color:#7dd3fc !important; box-shadow:0 12px 40px rgba(14,165,233,.14),0 4px 12px rgba(0,0,0,.05) !important; }
-
-  .card h3 a{ color:#0f172a !important; }
-  .card h3 a:hover{ color:#4f46e5 !important; }
-  .card .desc{ color:#64748b !important; }
-  .card-domain a{ color:#cbd5e1 !important; }
-  .card-domain a:hover{ color:#4f46e5 !important; }
-  .card-divider{ background:#f1f5f9 !important; }
-  .card-favicon{ background:#f8fafc !important; border:1px solid #f1f5f9 !important; box-shadow:none !important; }
-  .card-inner{ padding:22px 24px !important; }
-
-  /* STATS / FILTERS / SORT */
-  .stats{ background:#fff !important; border:1.5px solid #e2e8f0 !important; box-shadow:0 1px 6px rgba(0,0,0,.05) !important; color:#64748b !important; backdrop-filter:none !important; }
-  .stats strong{ color:#0f172a !important; }
-  .stats::before{ background:linear-gradient(90deg,transparent,rgba(79,70,229,.25) 35%,rgba(124,58,237,.2) 65%,transparent) !important; }
-  .stats-pill.manu{ background:#d1fae5 !important; color:#065f46 !important; border-color:#a7f3d0 !important; }
-  .stats-pill.dist{ background:#fef3c7 !important; color:#92400e !important; border-color:#fde68a !important; }
-  .filters{ background:#fff !important; border:1.5px solid #e2e8f0 !important; backdrop-filter:none !important; }
-  .filters button{ color:#94a3b8 !important; }
-  .filters button.active{ background:#ede9fe !important; color:#4f46e5 !important; border:1px solid #c4b5fd !important; }
-  .filters button:not(.active):hover{ background:#f8fafc !important; color:#475569 !important; }
-  select#sortBy,.export-btn{ background:#fff !important; border:1.5px solid #e2e8f0 !important; color:#64748b !important; backdrop-filter:none !important; }
-  select#sortBy:hover,.export-btn:hover{ border-color:#c4b5fd !important; color:#4f46e5 !important; }
-
-  /* WELCOME */
-  .welcome-title{ color:#0f172a !important; } .welcome-sub{ color:#64748b !important; }
-  .welcome-mode{ background:#fff !important; border:1.5px solid #e2e8f0 !important; backdrop-filter:none !important; }
-  .welcome-mode:hover{ background:#ede9fe !important; border-color:#c4b5fd !important; transform:translateY(-4px) !important; box-shadow:0 8px 24px rgba(79,70,229,.12) !important; }
-  .wm-label{ color:#475569 !important; }
-  .welcome-icon{ background:#ede9fe !important; border-color:#c4b5fd !important; color:#4f46e5 !important; }
-
-  /* AI / PERSON / TRUST / STOCK */
-  .ai-panel{ background:#fff !important; backdrop-filter:none !important; border:1.5px solid #e2e8f0 !important; box-shadow:0 2px 12px rgba(0,0,0,.06) !important; }
-  .ai-summary{ background:#f5f3ff !important; border-left-color:#7c3aed !important; color:#475569 !important; }
-  .person-chip{ background:#fff !important; border:1.5px solid #e2e8f0 !important; backdrop-filter:none !important; }
-  .person-chip:hover{ border-color:#c4b5fd !important; box-shadow:0 4px 16px rgba(124,58,237,.1) !important; }
-  .trust-panel{ background:#f8fafc !important; border:1px solid #e2e8f0 !important; backdrop-filter:none !important; }
-  .stock-card{ background:#fff !important; backdrop-filter:none !important; border:1.5px solid #e2e8f0 !important; }
-  .stock-card:hover{ transform:translateY(-5px) !important; box-shadow:0 10px 32px rgba(79,70,229,.12) !important; border-color:#c7d2fe !important; }
-  .stock-stats{ background:#fff !important; border:1.5px solid #e2e8f0 !important; backdrop-filter:none !important; }
-
-  /* MISC */
-  footer{ background:#fff !important; border-top:1px solid #f1f5f9 !important; color:#94a3b8 !important; }
-  .skeleton-card{ background:#f8fafc !important; border:1px solid #e2e8f0 !important; }
-  .skeleton-line{ background:#e2e8f0 !important; }
-  .skeleton-card::after{ background:linear-gradient(90deg,transparent 25%,rgba(255,255,255,.8) 50%,transparent 75%) !important; }
-  .badge.manufacturer{ background:#d1fae5 !important; color:#065f46 !important; border-color:#a7f3d0 !important; }
-  .badge.distributor{ background:#fef3c7 !important; color:#92400e !important; border-color:#fde68a !important; }
-  .badge.person-badge{ background:#ede9fe !important; color:#6d28d9 !important; border-color:#c4b5fd !important; }
-  .result-count{ background:#ede9fe !important; color:#4f46e5 !important; border-color:#c4b5fd !important; }
-  .details-btn{ background:#ede9fe !important; border-color:#c4b5fd !important; color:#4f46e5 !important; }
-  .details-btn:hover{ background:#ddd6fe !important; }
-  .people-btn{ background:#f5f3ff !important; border-color:#ddd6fe !important; color:#7c3aed !important; }
-  .trust-btn{ background:#d1fae5 !important; border-color:#a7f3d0 !important; color:#065f46 !important; }
-  .card-copy-btn{ background:#d1fae5 !important; border-color:#a7f3d0 !important; color:#065f46 !important; }
-  .card-cut-btn{ background:#fee2e2 !important; border-color:#fca5a5 !important; color:#dc2626 !important; }
-  .qc-btn.email   { background:#ede9fe !important; color:#4f46e5 !important; border-color:#c4b5fd !important; }
-  .qc-btn.phone   { background:#d1fae5 !important; color:#065f46 !important; border-color:#a7f3d0 !important; }
-  .qc-btn.whatsapp{ background:#d1fae5 !important; color:#065f46 !important; border-color:#a7f3d0 !important; }
-  .qc-btn.website { background:#f5f3ff !important; color:#6d28d9 !important; border-color:#ddd6fe !important; }
-  .detail-label{ color:#94a3b8 !important; }
-  .detail-value{ color:#334155 !important; }
-  .detail-value a{ color:#4f46e5 !important; }
-  .banner{ background:#fef3c7 !important; border-color:#fde68a !important; color:#92400e !important; }
-  .country-note{ background:#ede9fe !important; border-color:#c4b5fd !important; color:#4f46e5 !important; }
-  .group-title{ color:#cbd5e1 !important; }
-  #globeCanvas{ box-shadow:0 0 0 1px rgba(79,70,229,.2),0 0 50px rgba(79,70,229,.12),0 28px 80px rgba(0,0,0,.4) !important; }
-</style>
-</head><body>
-<h1 style="color:#1a2040;">${r.title||'Company Details'}</h1>
-<p style="color:#666;font-size:10pt;">Generated: ${date}</p>
-<hr style="border:none;border-top:1px solid #ddd;margin:12px 0;">
-${body}
-<p style="font-size:9pt;color:#999;margin-top:30px;border-top:1px solid #eee;padding-top:8px;">Generated by Product Source Search Engine.</p>
-</body></html>`;
-  const blob = new Blob(['﻿'+html], {type:'application/msword'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${(r.title||'company').replace(/[^a-z0-9]+/gi,'_').slice(0,40)}.doc`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function exportCardEmail(id) {
-  const r = cardRegistry[id];
-  if (!r) return;
-  const text = buildCardPlainText(r);
-  const subject = encodeURIComponent(`Company Info: ${r.title||''}`);
-  const maxLen = 6000;
-  const body = text.length > maxLen ? encodeURIComponent(text.slice(0,maxLen)+'\n\n[truncated]') : encodeURIComponent(text);
-  const link = document.createElement('a');
-  link.href = `mailto:?subject=${subject}&body=${body}`;
-  link.click();
-}
-
-function exportWord(){
-  if(!lastResults.length) return;
-  const html = buildResultsText(true);
-  const blob = new Blob(['﻿'+html], {type:'application/msword'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `${(lastSubject||'results').replace(/[^a-z0-9]+/gi,'_')}_results.doc`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-function exportEmail(){
-  if(!lastResults.length) return;
-  const text = buildResultsText(false);
-  const subject = encodeURIComponent(`Product Source Search: ${lastSubject}`);
-  // mailto body has a browser limit; truncate gracefully
-  const maxLen = 6000;
-  const body = text.length > maxLen
-    ? encodeURIComponent(text.slice(0, maxLen) + '\n\n[Full results truncated — export Word doc for complete list]')
-    : encodeURIComponent(text);
-  const link = document.createElement('a');
-  link.href = `mailto:?subject=${subject}&body=${body}`;
-  link.click();
-}
-
-document.getElementById('query').addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
-document.getElementById('companyQuery').addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
-document.getElementById('companyWebsite').addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
-document.getElementById('companyCountry').addEventListener('change', ()=>{ if(document.getElementById('companyQuery').value.trim()) runSearch(); });
-document.getElementById('personCountry').addEventListener('change', ()=>{ if(document.getElementById('personQuery').value.trim()) runSearch(); });
-document.getElementById('personQuery').addEventListener('keydown', e=>{ if(e.key==='Enter') runSearch(); });
-
-// ── Auto-enrich all cards after search ───────────────────
-async function autoEnrichCard(r) {
-  const id = r._id;
-  if (!id || !r.link) return;
-
-  const loadEl = document.getElementById(id + '-loading');
-  const qcEl   = document.getElementById(id + '-qc');
-
-  // Already has contact info — show it immediately, hide loader
-  if (r.phone || r.email || r.whatsapp) {
-    if (loadEl) loadEl.remove();
-    if (qcEl) qcEl.innerHTML = quickContactHtml(r);
-    const slot = document.getElementById(id + '-slot');
-    if (slot && !slot.innerHTML.trim()) slot.innerHTML = renderDetailsHtml(r, r.link);
-    return;
-  }
-
-  try {
-    const res  = await fetch('/api/enrich?url=' + encodeURIComponent(r.link));
-    const data = await res.json();
-    if (loadEl) loadEl.remove();
-    if (!data.success) return;
-
-    // Merge into registry
-    const entry = cardRegistry[id];
-    if (entry) Object.assign(entry, {
-      phone: data.phone, whatsapp: data.whatsapp, email: data.email,
-      address: data.address, keyPeople: data.keyPeople || [],
-      employeeCount: data.employeeCount, companySize: data.companySize, founded: data.founded
-    });
-
-    // Quick-contact buttons — most visible, shown first
-    if (qcEl && (data.email || data.phone || data.whatsapp)) {
-      qcEl.innerHTML = quickContactHtml(data);
-    }
-
-    // Full details grid below
-    const slot = document.getElementById(id + '-slot');
-    if (slot) {
-      const html = renderDetailsHtml(data, r.link);
-      if (html) slot.innerHTML = html;
-    }
-  } catch (_) {
-    if (loadEl) loadEl.remove();
-  }
-}
-
-async function autoEnrichAll() {
-  const toEnrich = lastResults.filter(r =>
-    r._id && r.link && r.type !== 'person' && r.category !== 'marketplace'
-  );
-  // Cards we don't auto-enrich (marketplace/directory listings) would otherwise
-  // show a "Loading contact info…" spinner forever — clear those loaders now.
-  lastResults
-    .filter(r => r._id && (r.category === 'marketplace' || !r.link))
-    .forEach(r => { const el = document.getElementById(r._id + '-loading'); if (el) el.remove(); });
-  // Process in concurrent batches so all cards enrich quickly (instead of a slow
-  // one-at-a-time trickle). 8 at a time keeps the browser/server responsive.
-  const BATCH = 14;
-  for (let i = 0; i < toEnrich.length; i += BATCH) {
-    const batch = toEnrich.slice(i, i + BATCH);
-    await Promise.allSettled(batch.map(r => autoEnrichCard(r)));
-  }
-}
-
-// ── Key People Lookup ────────────────────────────────────
-async function loadKeyPeople(id, btn) {
-  const r = cardRegistry[id];
-  if (!r) return;
-  const slot = document.getElementById(id + '-people');
-  if (!slot) return;
-
-  // Use the company name from the card title (strip common suffixes for cleaner query)
-  const companyName = (r.title || '').replace(/\s*[-–|].*$/, '').trim() || r.title;
-
-  btn.disabled = true;
-  btn.textContent = '⏳ Searching…';
-  slot.innerHTML = '';
-
-  try {
-    const resp = await fetch('/api/company-people?company=' + encodeURIComponent(companyName));
-    const data = await resp.json();
-
-    if (!data.people || data.people.length === 0) {
-      slot.innerHTML = `<div class="people-panel" style="text-align:center">
-        <div style="font-size:22px;margin-bottom:6px">🔍</div>
-        <div style="font-size:12.5px;color:var(--text);font-weight:600;margin-bottom:3px">No key people found</div>
-        <div style="font-size:11.5px;color:var(--muted);line-height:1.5">We couldn't identify named executives for this company from public sources. Try the company's LinkedIn or About page directly.</div>
-      </div>`;
-      btn.textContent = '👥 Find Key People';
-      btn.disabled = false;
-      return;
-    }
-
-    const chips = data.people.map(p => {
-      const initials = (p.name || '?').split(/\s+/).slice(0,2).map(w=>w[0]).join('').toUpperCase();
-      const isLinkedIn = /linkedin/i.test(p.source || '');
-      const searchPersonBtn = `<button class="pc-btn" onclick="setMode('person');document.getElementById('personQuery').value=${JSON.stringify(p.name)};runSearch()">🔍 Search</button>`;
-      const trustBtn = `<button class="pc-btn" onclick="runPersonTrustCheck(${JSON.stringify(p.name)}, ${JSON.stringify(companyName)}, this)">🛡 Check</button>`;
-      const sourceLink = p.sourceUrl
-        ? `<a class="pc-source-link" href="${escapeHtml(p.sourceUrl)}" target="_blank" rel="noopener">${isLinkedIn ? '🔗 LinkedIn' : '🌐 ' + escapeHtml(p.source)} ↗</a>`
-        : `<span class="pc-source-link">${escapeHtml(p.source)}</span>`;
-      return `<div class="person-chip">
-        <div class="pc-top">
-          <div class="pc-avatar">${escapeHtml(initials)}</div>
-          <div class="pc-id">
-            <div class="pc-name">${escapeHtml(p.name)}</div>
-            <div class="pc-title">${escapeHtml(p.title)}</div>
-          </div>
-        </div>
-        <div class="pc-source">${sourceLink}</div>
-        <div class="pc-actions">${searchPersonBtn}${trustBtn}</div>
-      </div>`;
-    }).join('');
-
-    slot.innerHTML = `<div class="people-panel">
-      <div class="people-panel-head">
-        <span class="people-panel-icon">👥</span>
-        <div>
-          <h4>Key People at ${escapeHtml(companyName)}</h4>
-          <span class="people-panel-count">${data.people.length} ${data.people.length===1?'person':'people'} found</span>
-        </div>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">Skip to main content</a>
+
+<nav class="topbar" role="navigation" aria-label="Main navigation">
+  <div class="topbar-brand">
+    <div class="topbar-logo" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    </div>
+    <div>
+      <div class="topbar-name">SourceIQ</div>
+      <div class="topbar-tag">Global Supplier Intelligence</div>
+    </div>
+  </div>
+  <div class="topbar-right" aria-label="Status indicators">
+    <button class="topbar-pill topbar-saved-btn" onclick="showSavedPanel()" title="View shared shortlist">⭐ Saved <span id="savedCount" class="saved-count"></span></button>
+    <div class="topbar-pill"><span class="topbar-pill-dot" aria-hidden="true"></span>Live Results</div>
+    <div class="topbar-pill">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+      195+ Countries
+    </div>
+    <a href="/logout" class="topbar-logout" title="Sign out">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Log Out
+    </a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-text">
+    <div class="hero-orb"></div>
+    <div class="hero-eyebrow"><span class="hero-eyebrow-dot"></span> Live Global B2B Search</div>
+    <h1>Find Suppliers &amp;<br><span class="h1-accent">Global Partners</span></h1>
+    <p class="subtitle">Search manufacturers, distributors, companies, and key decision-makers across 195+ countries — powered by live web data.</p>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <span class="hero-stat-num">195+</span>
+        <span class="hero-stat-label">Countries</span>
       </div>
-      <div class="people-grid">${chips}</div>
-    </div>`;
-
-    btn.textContent = '👥 Key People ✓';
-  } catch(err) {
-    slot.innerHTML = `<p style="font-size:12.5px;color:#f87171;margin:8px 0 0">Error: ${escapeHtml(err.message)}</p>`;
-    btn.textContent = '👥 Find Key People';
-    btn.disabled = false;
-  }
-}
-
-async function runPersonTrustCheck(personName, companyName, btn) {
-  btn.disabled = true;
-  btn.textContent = '⏳';
-  try {
-    const url = '/api/trust-check?url=' + encodeURIComponent('https://www.google.com/search?q=' + encodeURIComponent(personName)) +
-                '&name=' + encodeURIComponent(companyName);
-    const resp = await fetch(url);
-    const data = await resp.json();
-    const panel = btn.closest('.person-chip');
-    if (!panel) return;
-    let existing = panel.querySelector('.mini-trust');
-    if (!existing) { existing = document.createElement('div'); existing.className = 'mini-trust'; panel.appendChild(existing); }
-    const color = data.score >= 70 ? '#34d399' : data.score >= 40 ? '#fbbf24' : '#f87171';
-    const flagged = (data.findings || []).filter(f => f.type === 'danger' || f.type === 'warn');
-    existing.innerHTML = `<div style="margin-top:6px;font-size:11px;color:${color};font-weight:600">Trust score: ${data.score}/100</div>` +
-      (flagged.length ? flagged.map(f=>`<div style="font-size:10.5px;color:#f87171;margin-top:2px">${escapeHtml(f.text)}</div>`).join('') : `<div style="font-size:10.5px;color:#34d399;margin-top:2px">✅ No issues found</div>`);
-    btn.textContent = '🛡 Check';
-    btn.disabled = false;
-  } catch(e) {
-    btn.textContent = '🛡 Check'; btn.disabled = false;
-  }
-}
-
-// ── Trust Check ──────────────────────────────────────────
-async function runTrustCheck(id, btn){
-  const r = cardRegistry[id];
-  if(!r) return;
-  const slot = document.getElementById(id + '-trust');
-
-  btn.disabled = true;
-  btn.textContent = '🔍 Checking…';
-  slot.innerHTML = '';
-
-  try{
-    const params = new URLSearchParams();
-    if(r.link)  params.set('url', r.link);
-    if(r.title) params.set('name', r.title);
-    if(r.keyPeople && r.keyPeople.length) params.set('people', JSON.stringify(r.keyPeople.map(p=>p.name)));
-    const res = await fetch('/api/trust-check?' + params.toString());
-    const data = await res.json();
-
-    if(!res.ok || data.error){
-      slot.innerHTML = `<div class="trust-panel"><div class="trust-finding danger">${escapeHtml(data.error||'Trust check failed.')}</div></div>`;
-      btn.remove(); return;
-    }
-
-    const badgeHtml = `<span class="trust-badge ${escapeHtml(data.ratingClass)}">${escapeHtml(data.rating)}</span>`;
-    const scoreHtml = data.score !== null ? `<div class="trust-score">Trust score: ${data.score}/100</div>` : '';
-
-    const findingsHtml = (data.findings||[]).length
-      ? `<div class="trust-findings">${data.findings.map(f=>`<div class="trust-finding ${escapeHtml(f.type)}">${escapeHtml(f.text)}</div>`).join('')}</div>`
-      : '';
-
-    let scamHtml = '';
-    if(data.searchLinks && data.searchLinks.length){
-      scamHtml = `<div class="trust-section-title">⚠️ Complaint / Scam Results</div>`
-        + data.searchLinks.map(l=>`<div class="trust-link-item"><a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.title)}</a>${l.snippet?`<div class="tl-snippet">${escapeHtml(l.snippet.slice(0,120))}…</div>`:''}</div>`).join('');
-    }
-
-    let reviewHtml = '';
-    if(data.reviewLinks && data.reviewLinks.length){
-      reviewHtml = `<div class="trust-section-title">⭐ Reviews &amp; Ratings</div>`
-        + data.reviewLinks.map(l=>`<div class="trust-link-item"><a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.title)}</a></div>`).join('');
-    }
-
-    // Per-person background check results
-    let peopleHtml = '';
-    if(data.peopleResults && data.peopleResults.length){
-      peopleHtml = `<div class="trust-section-title">👤 Key People Background Check</div>`;
-      peopleHtml += data.peopleResults.map(person => {
-        const riskIcon = person.risk === 'flagged' ? '⚠️' : person.risk === 'clean' ? '✅' : 'ℹ️';
-        const riskClass = person.risk === 'flagged' ? 'trust-warn' : person.risk === 'clean' ? 'trust-good' : 'trust-info';
-        const personFindings = (person.findings || []).map(f => {
-          const linksHtml = (f.links||[]).length
-            ? `<div class="trust-links">${f.links.map(l=>`<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener">${escapeHtml(l.title)}</a>`).join('')}</div>`
-            : '';
-          return `<div class="trust-finding ${escapeHtml(f.type)}">${escapeHtml(f.text)}${linksHtml}</div>`;
-        }).join('');
-        return `<div class="person-check-block">
-          <div class="person-check-header">
-            <span class="trust-badge ${riskClass}" style="font-size:11px;padding:3px 10px;">${riskIcon} ${escapeHtml(person.name)}</span>
-          </div>
-          <div style="margin-top:6px;">${personFindings}</div>
-        </div>`;
-      }).join('');
-    }
-
-    const disclaimer = `<div class="trust-disclaimer">⚠️ This is an automated check — not a legal or financial assessment. Always verify independently before doing business.</div>`;
-
-    slot.innerHTML = `<div class="trust-panel">${badgeHtml}${scoreHtml}${findingsHtml}${scamHtml}${reviewHtml}${peopleHtml}${disclaimer}</div>`;
-    btn.remove();
-  }catch(err){
-    slot.innerHTML = `<div class="trust-panel"><div class="trust-finding danger">Trust check failed: ${escapeHtml(err.message)}</div></div>`;
-    btn.remove();
-  }
-}
-
-// ── Image / Card tab ─────────────────────────────────────
-let currentImageType = 'card';
-let currentImageFile = null;
-
-function setImageType(type){
-  currentImageType = type;
-  ['card','person','company'].forEach(t => {
-    document.getElementById('itc-'+t).classList.toggle('selected', t === type);
-  });
-  const zone = document.getElementById('uploadZone');
-  if(type === 'card'){
-    zone.querySelector('.uz-label').textContent = 'Click to upload a business card image';
-    zone.querySelector('.uz-hint').textContent = 'We\'ll extract name, phone, email, company & address automatically';
-  } else if(type === 'person'){
-    zone.querySelector('.uz-label').textContent = 'Click to upload a photo of the person';
-    zone.querySelector('.uz-hint').textContent = 'Opens Google Lens reverse image search';
-  } else {
-    zone.querySelector('.uz-label').textContent = 'Click to upload a company photo or logo';
-    zone.querySelector('.uz-hint').textContent = 'Opens Google Lens reverse image search';
-  }
-  if(currentImageFile) handleImageFile(currentImageFile);
-}
-
-function handleImageDrop(e){
-  e.preventDefault();
-  document.getElementById('uploadZone').classList.remove('dragover');
-  const file = e.dataTransfer.files[0];
-  if(file && file.type.startsWith('image/')) handleImageFile(file);
-}
-
-function handleImageFile(file){
-  if(!file) return;
-  currentImageFile = file;
-  const area = document.getElementById('imgResultArea');
-
-  const objectUrl = URL.createObjectURL(file);
-  const previewHtml = `<div class="img-preview-wrap"><img src="${objectUrl}" alt="preview"></div>`;
-
-  if(currentImageType === 'card'){
-    area.innerHTML = previewHtml + `
-      <div class="ocr-status" id="ocrStatus">Preparing OCR engine…</div>
-      <div class="ocr-bar-wrap"><div class="ocr-bar-fill" id="ocrBar"></div></div>
-      <div class="ocr-result" id="ocrResult"></div>`;
-    runBusinessCardOCR(file);
-  } else {
-    const label = currentImageType === 'person' ? 'person' : 'company / logo';
-    area.innerHTML = previewHtml + `
-      <div class="ocr-actions">
-        <button class="lens-btn" onclick="openGoogleLens()">🔍 Search this ${label} on Google Lens</button>
+      <div class="hero-stat-sep"></div>
+      <div class="hero-stat">
+        <span class="hero-stat-num">Live</span>
+        <span class="hero-stat-label">Web Data</span>
       </div>
-      <div class="ocr-status" style="margin-top:8px;">Google Lens will open in a new tab — it can identify people, logos, and companies from photos.</div>`;
-  }
-}
-
-function loadTesseract(){
-  return new Promise((resolve, reject) => {
-    if(window.Tesseract){ resolve(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://unpkg.com/tesseract.js@v4.1.1/dist/tesseract.min.js';
-    s.onload = resolve;
-    s.onerror = () => reject(new Error('Could not load OCR engine. Check your internet connection.'));
-    document.head.appendChild(s);
-  });
-}
-
-async function runBusinessCardOCR(file){
-  const statusEl = document.getElementById('ocrStatus');
-  const barEl    = document.getElementById('ocrBar');
-  const resultEl = document.getElementById('ocrResult');
-  try{
-    await loadTesseract();
-    statusEl.textContent = 'Loading language data…';
-    const worker = await Tesseract.createWorker('eng', 1, {
-      logger: m => {
-        if(m.status === 'recognizing text'){
-          const pct = Math.round((m.progress || 0) * 100);
-          barEl.style.width = pct + '%';
-          statusEl.textContent = `Reading text… ${pct}%`;
-        } else if(m.status){
-          statusEl.textContent = m.status.charAt(0).toUpperCase() + m.status.slice(1) + '…';
-        }
-      }
-    });
-    const { data: { text } } = await worker.recognize(file);
-    await worker.terminate();
-    barEl.style.width = '100%';
-    statusEl.textContent = 'Done ✓';
-    const parsed = parseBusinessCard(text);
-    resultEl.innerHTML = renderBusinessCardResult(parsed);
-  } catch(err){
-    statusEl.textContent = '⚠ ' + err.message;
-    barEl.style.width = '0%';
-  }
-}
-
-function parseBusinessCard(text){
-  const lines = text.split(/\n/).map(l => l.trim()).filter(l => l.length > 1);
-
-  const emailMatch = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/);
-  const email = emailMatch ? emailMatch[0] : null;
-
-  const webMatch = text.match(/(?:https?:\/\/|www\.)[^\s,<>]+/i);
-  const website = webMatch ? webMatch[0] : null;
-
-  const phoneMatches = [...text.matchAll(/(\+?[\d][\d\s().\-]{5,17}\d)/g)].map(m => m[1].trim());
-  const phone = phoneMatches.find(p => { const d = p.replace(/\D/g,''); return d.length >= 7 && d.length <= 15; }) || null;
-
-  const companyRe = /\b(Ltd\.?|Limited|Inc\.?|Corp\.?|LLC|L\.L\.C|Co\.|Group|GmbH|S\.A\.?|B\.V\.|PLC|Industries|Solutions|Technologies|Tech|Services|Trading|International|Global|Holdings|Consulting)\b/i;
-  const company = lines.find(l => companyRe.test(l)) || null;
-
-  const nameRe = /^([A-Z][a-zÀ-ÿ'\-]{1,20}(\s[A-Z][a-zÀ-ÿ'\-]{1,20}){1,3})$/;
-  const name = lines.find(l => nameRe.test(l)) || null;
-
-  const titleRe = /\b(CEO|CTO|COO|CFO|CMO|Founder|Co[\-\s]Founder|President|Vice President|VP|Director|Manager|Executive|Officer|Engineer|Sales|Marketing|Account|Business Development|Partner|Principal|Head of|Lead)\b/i;
-  const title = lines.find(l => titleRe.test(l) && l !== name) || null;
-
-  const addrRe = /\d{1,5}[^,\n]{3,40}(Street|St\.?|Road|Rd\.?|Avenue|Ave\.?|Blvd|Boulevard|Lane|Drive|Suite|Floor|Building)[^,\n]{0,40},[^\n]{3,80}/i;
-  const addrMatch = text.match(addrRe);
-  const address = addrMatch ? addrMatch[0].trim() : null;
-
-  return { name, title, company, phone, email, website, address, rawText: text };
-}
-
-function renderBusinessCardResult(p){
-  const fields = [];
-  if(p.name)    fields.push(['👤 Name',    escapeHtml(p.name)]);
-  if(p.title)   fields.push(['🏷 Title',   escapeHtml(p.title)]);
-  if(p.company) fields.push(['🏢 Company', escapeHtml(p.company)]);
-  if(p.phone)   fields.push(['📞 Phone',   escapeHtml(p.phone)]);
-  if(p.email)   fields.push(['✉️ Email',   `<a href="mailto:${escapeHtml(p.email)}">${escapeHtml(p.email)}</a>`]);
-  if(p.website) fields.push(['🌐 Website', `<a href="${escapeHtml(p.website.startsWith('http') ? p.website : 'https://'+p.website)}" target="_blank" rel="noopener">${escapeHtml(p.website)}</a>`]);
-  if(p.address) fields.push(['📍 Address', escapeHtml(p.address)]);
-
-  const noResults = !fields.length;
-  const grid = noResults
-    ? `<div class="detail-note">No contact details could be extracted — try a clearer or higher-resolution photo.</div>`
-    : `<div class="details-grid">${fields.map(([l,v]) => `<div class="detail-row"><span class="detail-label">${l}</span><span class="detail-value">${v}</span></div>`).join('')}</div>`;
-
-  const searchBtnHtml = p.company
-    ? `<button class="lens-btn-secondary" onclick="setMode('company');document.getElementById('companyQuery').value=${JSON.stringify(p.company)};runSearch()">🔎 Search this company</button>`
-    : p.name
-    ? `<button class="lens-btn-secondary" onclick="setMode('person');document.getElementById('personQuery').value=${JSON.stringify(p.name)};runSearch()">🔎 Search this person</button>`
-    : '';
-
-  const rawToggle = `<details style="margin-top:10px;"><summary style="cursor:pointer;font-size:12px;color:var(--muted);">Show raw OCR text</summary><pre style="font-size:11px;color:var(--muted);white-space:pre-wrap;margin-top:6px;">${escapeHtml(p.rawText)}</pre></details>`;
-
-  return `<div class="ocr-result">${grid}${searchBtnHtml ? `<div class="ocr-actions" style="margin-top:10px;">${searchBtnHtml}</div>` : ''}${rawToggle}</div>`;
-}
-
-async function openGoogleLens(){
-  if(!currentImageFile){ alert('No image selected.'); return; }
-
-  // Method 1: Upload via FormData POST to Google Lens (works on most desktop browsers)
-  try {
-    const form = new FormData();
-    form.append('encoded_image', currentImageFile, currentImageFile.name);
-    const area = document.getElementById('imgResultArea');
-    const statusDiv = area.querySelector('.ocr-status') || area.appendChild(Object.assign(document.createElement('div'), {className:'ocr-status', textContent:'Opening Google Lens…'}));
-    statusDiv.textContent = 'Uploading to Google Lens…';
-
-    const resp = await fetch('https://lens.google.com/upload?ep=gsbubb&hl=en&re=df', {
-      method: 'POST', body: form, mode: 'no-cors'
-    });
-    // no-cors means we can't read the response but the POST goes through;
-    // Google Lens will have received the image — open the results page
-    window.open('https://lens.google.com/', '_blank');
-    statusDiv.textContent = '✅ Opened Google Lens in a new tab. If it shows an empty search, use the upload button there to re-upload your image.';
-    return;
-  } catch(_) {}
-
-  // Method 2: Hidden form submit fallback
-  try {
-    const dt = new DataTransfer();
-    dt.items.add(currentImageFile);
-    document.getElementById('gLensFile').files = dt.files;
-    document.getElementById('gLensForm').submit();
-    return;
-  } catch(_) {}
-
-  // Method 3: Last resort — open Google Lens and tell user to upload manually
-  window.open('https://lens.google.com/', '_blank');
-  const area = document.getElementById('imgResultArea');
-  area.insertAdjacentHTML('beforeend', `<div class="ocr-status" style="color:var(--accent);margin-top:8px;">📷 Google Lens opened in a new tab. Click the camera icon there and upload your image manually.</div>`);
-}
-
-renderChips();
-
-// ── AI Analysis ──────────────────────────────────────────────────────────────
-
-let aiPanelCollapsed = false;
-
-function showAILoading() {
-  const wrap = document.getElementById('aiPanelWrap');
-  wrap.style.display = 'block';
-  wrap.innerHTML = `
-    <div class="ai-panel" style="max-width:960px;margin:0 auto 24px;padding:18px 28px;">
-      <div class="ai-loading">
-        <div class="ai-spinner"></div>
-        <span>AI is analyzing your results…</span>
+      <div class="hero-stat-sep"></div>
+      <div class="hero-stat">
+        <span class="hero-stat-num">4</span>
+        <span class="hero-stat-label">Search Modes</span>
       </div>
-    </div>`;
-}
-
-function hideAIPanel() {
-  const wrap = document.getElementById('aiPanelWrap');
-  wrap.style.display = 'none';
-  wrap.innerHTML = '';
-}
-
-async function runAIAnalysis(query, results, mode) {
-  showAILoading();
-  try {
-    const res = await fetch('/api/ai-analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, results, mode })
-    });
-    const data = await res.json();
-    if (data.error) { hideAIPanel(); return; }
-    renderAIPanel(data.analysis, data.provider, query, mode);
-    highlightTopPicks(data.analysis.topPicks || []);
-  } catch(e) {
-    hideAIPanel();
-  }
-}
-
-function renderAIPanel(a, provider, query, mode) {
-  const wrap = document.getElementById('aiPanelWrap');
-  if (!a) { wrap.style.display = 'none'; return; }
-
-  const providerLabel = provider === 'openai' ? 'GPT-4o' : 'Gemini';
-  const providerIcon  = provider === 'openai'
-    ? `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.28 9.28a5.67 5.67 0 0 0-.49-4.65 5.74 5.74 0 0 0-6.17-2.75A5.67 5.67 0 0 0 11.35 0a5.74 5.74 0 0 0-5.48 3.98 5.67 5.67 0 0 0-3.79 2.75 5.74 5.74 0 0 0 .71 6.73 5.67 5.67 0 0 0 .49 4.65 5.74 5.74 0 0 0 6.17 2.75A5.67 5.67 0 0 0 12.65 24a5.74 5.74 0 0 0 5.48-3.98 5.67 5.67 0 0 0 3.79-2.75 5.74 5.74 0 0 0-.71-6.73l.07-.26z"/></svg>`
-    : `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>`;
-
-  const insights = (a.keyInsights || []).map(i =>
-    `<div class="ai-insight"><div class="ai-insight-dot"></div><span>${escapeHtml(i)}</span></div>`
-  ).join('');
-
-  const suggestions = (a.suggestions || []).map(s =>
-    `<button class="ai-suggestion" onclick="aiSuggest('${escapeHtml(s)}', '${mode}')">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-      ${escapeHtml(s)}
-    </button>`
-  ).join('');
-
-  const warning = a.warning
-    ? `<div class="ai-warning">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" flex-shrink="0" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-        <span>${escapeHtml(a.warning)}</span>
-       </div>`
-    : '';
-
-  const bodyHtml = `
-    <p class="ai-summary">${escapeHtml(a.summary || '')}</p>
-    <div class="ai-grid">
-      <div>
-        <div class="ai-section-title">Key Insights</div>
-        ${insights || '<p style="color:var(--muted);font-size:13px">No insights available.</p>'}
-      </div>
-      <div>
-        <div class="ai-section-title">Smarter Follow-up Searches</div>
-        <div style="display:flex;flex-direction:column;gap:7px;">
-          ${suggestions || '<p style="color:var(--muted);font-size:13px">No suggestions.</p>'}
-        </div>
+      <div class="hero-stat-sep"></div>
+      <div class="hero-stat">
+        <span class="hero-stat-num">AI</span>
+        <span class="hero-stat-label">Enriched</span>
       </div>
     </div>
-    ${warning}`;
+    <div class="hero-trust">
+      <div class="hero-trust-pill"><span>🏭</span> Manufacturers</div>
+      <div class="hero-trust-pill"><span>📦</span> Distributors</div>
+      <div class="hero-trust-pill"><span>👤</span> Key People</div>
+      <div class="hero-trust-pill"><span>✅</span> Trust Check</div>
+    </div>
+    <div id="globeHint" style="font-size:11px;color:rgba(71,85,105,.65);font-weight:500;display:flex;align-items:center;gap:6px;margin-top:14px;">
+      <span style="color:rgba(59,130,246,.6)">🌐</span> Click any country on the globe to set your search location
+    </div>
+  </div>
+  <div class="globe-wrap">
+    <div class="orbit-ring orbit-1"></div>
+    <div class="orbit-ring orbit-2"></div>
+    <div class="orbit-ring orbit-3"></div>
+    <canvas id="globeCanvas" width="420" height="420"></canvas>
+    <div class="globe-country-tooltip" id="globeTooltip"></div>
+  </div>
+</div>
 
-  wrap.style.display = 'block';
-  wrap.innerHTML = `
-    <div class="ai-panel">
-      <div class="ai-header">
-        <div class="ai-title">
-          <div class="ai-logo" aria-hidden="true">${providerIcon}</div>
-          AI Intelligence · <em style="font-style:normal;color:#a78bfa">${escapeHtml(query)}</em>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="ai-provider-badge ${provider}">${providerLabel}</span>
-          <button class="ai-collapse-btn" onclick="toggleAIPanel(this)" aria-label="Toggle AI panel">
-            ${aiPanelCollapsed ? 'Show ▾' : 'Hide ▴'}
-          </button>
-        </div>
+<div class="hero-separator">
+  <div class="hero-separator-line"></div>
+</div>
+
+<div id="demoBanner" class="banner" style="display:none;">
+  ⚠️ Demo Mode — showing bundled sample data. Add your Google API key + CX to <code>.env</code> and restart the server for live web results.
+</div>
+
+<div class="panel" id="main-content">
+  <div class="mode-tabs" id="modeTabs" role="tablist" aria-label="Search mode">
+    <button class="mode-tab active" data-mode="product" onclick="setMode('product')" role="tab" aria-selected="true" aria-controls="productSearchBox">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Product
+    </button>
+    <button class="mode-tab" data-mode="company" onclick="setMode('company')" role="tab" aria-selected="false" aria-controls="companySearchBox">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+      Company
+    </button>
+    <button class="mode-tab" data-mode="buyers" onclick="setMode('buyers')" role="tab" aria-selected="false" aria-controls="buyersSearchBox">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      Buyers
+    </button>
+    <button class="mode-tab" data-mode="person" onclick="setMode('person')" role="tab" aria-selected="false" aria-controls="personSearchBox">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Person
+    </button>
+    <button class="mode-tab" data-mode="stock" onclick="setMode('stock')" role="tab" aria-selected="false" aria-controls="stockSearchBox">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      Stock
+    </button>
+    <button class="mode-tab" data-mode="image" onclick="setMode('image')" role="tab" aria-selected="false" aria-controls="imageSearchBox">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+      Image
+    </button>
+    <button class="mode-tab" data-mode="trade" onclick="setMode('trade')" role="tab" aria-selected="false" aria-controls="tradeSearchBox">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Trade
+    </button>
+    <button class="mode-tab" data-mode="market" onclick="setMode('market')" role="tab" aria-selected="false" aria-controls="marketSearchBox">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Market
+    </button>
+  </div>
+
+  <div class="search-box" id="productSearchBox" role="tabpanel" aria-labelledby="tab-product">
+    <div class="search-field">
+      <label for="query">Product / Keyword</label>
+      <input id="query" type="text" placeholder="Product" autocomplete="off" />
+    </div>
+    <div class="search-select-field">
+      <label for="country">Country</label>
+      <select id="country">
+      <option value="">Any country</option>
+      <optgroup label="── Asia ──">
+      <option value="Afghanistan">Afghanistan</option>
+      <option value="Bangladesh">Bangladesh</option>
+      <option value="Bhutan">Bhutan</option>
+      <option value="Brunei">Brunei</option>
+      <option value="Cambodia">Cambodia</option>
+      <option value="China">China</option>
+      <option value="India">India</option>
+      <option value="Indonesia">Indonesia</option>
+      <option value="Japan">Japan</option>
+      <option value="Kazakhstan">Kazakhstan</option>
+      <option value="Kyrgyzstan">Kyrgyzstan</option>
+      <option value="Laos">Laos</option>
+      <option value="Malaysia">Malaysia</option>
+      <option value="Maldives">Maldives</option>
+      <option value="Mongolia">Mongolia</option>
+      <option value="Myanmar">Myanmar</option>
+      <option value="Nepal">Nepal</option>
+      <option value="North Korea">North Korea</option>
+      <option value="Pakistan">Pakistan</option>
+      <option value="Philippines">Philippines</option>
+      <option value="Singapore">Singapore</option>
+      <option value="South Korea">South Korea</option>
+      <option value="Sri Lanka">Sri Lanka</option>
+      <option value="Taiwan">Taiwan</option>
+      <option value="Tajikistan">Tajikistan</option>
+      <option value="Thailand">Thailand</option>
+      <option value="Timor-Leste">Timor-Leste</option>
+      <option value="Turkmenistan">Turkmenistan</option>
+      <option value="Uzbekistan">Uzbekistan</option>
+      <option value="Vietnam">Vietnam</option>
+      </optgroup>
+      <optgroup label="── Middle East ──">
+      <option value="Bahrain">Bahrain</option>
+      <option value="Cyprus">Cyprus</option>
+      <option value="Iran">Iran</option>
+      <option value="Iraq">Iraq</option>
+      <option value="Israel">Israel</option>
+      <option value="Jordan">Jordan</option>
+      <option value="Kuwait">Kuwait</option>
+      <option value="Lebanon">Lebanon</option>
+      <option value="Oman">Oman</option>
+      <option value="Palestine">Palestine</option>
+      <option value="Qatar">Qatar</option>
+      <option value="Saudi Arabia">Saudi Arabia</option>
+      <option value="Syria">Syria</option>
+      <option value="Turkey">Turkey</option>
+      <option value="UAE">UAE</option>
+      <option value="Yemen">Yemen</option>
+      </optgroup>
+      <optgroup label="── Europe ──">
+      <option value="Albania">Albania</option>
+      <option value="Andorra">Andorra</option>
+      <option value="Armenia">Armenia</option>
+      <option value="Austria">Austria</option>
+      <option value="Azerbaijan">Azerbaijan</option>
+      <option value="Belarus">Belarus</option>
+      <option value="Belgium">Belgium</option>
+      <option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
+      <option value="Bulgaria">Bulgaria</option>
+      <option value="Croatia">Croatia</option>
+      <option value="Czech Republic">Czech Republic</option>
+      <option value="Denmark">Denmark</option>
+      <option value="Estonia">Estonia</option>
+      <option value="Finland">Finland</option>
+      <option value="France">France</option>
+      <option value="Georgia">Georgia</option>
+      <option value="Germany">Germany</option>
+      <option value="Greece">Greece</option>
+      <option value="Hungary">Hungary</option>
+      <option value="Iceland">Iceland</option>
+      <option value="Ireland">Ireland</option>
+      <option value="Italy">Italy</option>
+      <option value="Kosovo">Kosovo</option>
+      <option value="Latvia">Latvia</option>
+      <option value="Liechtenstein">Liechtenstein</option>
+      <option value="Lithuania">Lithuania</option>
+      <option value="Luxembourg">Luxembourg</option>
+      <option value="Malta">Malta</option>
+      <option value="Moldova">Moldova</option>
+      <option value="Monaco">Monaco</option>
+      <option value="Montenegro">Montenegro</option>
+      <option value="Netherlands">Netherlands</option>
+      <option value="North Macedonia">North Macedonia</option>
+      <option value="Norway">Norway</option>
+      <option value="Poland">Poland</option>
+      <option value="Portugal">Portugal</option>
+      <option value="Romania">Romania</option>
+      <option value="Russia">Russia</option>
+      <option value="San Marino">San Marino</option>
+      <option value="Serbia">Serbia</option>
+      <option value="Slovakia">Slovakia</option>
+      <option value="Slovenia">Slovenia</option>
+      <option value="Spain">Spain</option>
+      <option value="Sweden">Sweden</option>
+      <option value="Switzerland">Switzerland</option>
+      <option value="Ukraine">Ukraine</option>
+      <option value="United Kingdom">United Kingdom</option>
+      </optgroup>
+      <optgroup label="── North America ──">
+      <option value="Antigua and Barbuda">Antigua and Barbuda</option>
+      <option value="Bahamas">Bahamas</option>
+      <option value="Barbados">Barbados</option>
+      <option value="Belize">Belize</option>
+      <option value="Canada">Canada</option>
+      <option value="Costa Rica">Costa Rica</option>
+      <option value="Cuba">Cuba</option>
+      <option value="Dominican Republic">Dominican Republic</option>
+      <option value="El Salvador">El Salvador</option>
+      <option value="Grenada">Grenada</option>
+      <option value="Guatemala">Guatemala</option>
+      <option value="Haiti">Haiti</option>
+      <option value="Honduras">Honduras</option>
+      <option value="Jamaica">Jamaica</option>
+      <option value="Mexico">Mexico</option>
+      <option value="Nicaragua">Nicaragua</option>
+      <option value="Panama">Panama</option>
+      <option value="Puerto Rico">Puerto Rico</option>
+      <option value="Trinidad and Tobago">Trinidad and Tobago</option>
+      <option value="USA">USA</option>
+      </optgroup>
+      <optgroup label="── South America ──">
+      <option value="Argentina">Argentina</option>
+      <option value="Bolivia">Bolivia</option>
+      <option value="Brazil">Brazil</option>
+      <option value="Chile">Chile</option>
+      <option value="Colombia">Colombia</option>
+      <option value="Ecuador">Ecuador</option>
+      <option value="Guyana">Guyana</option>
+      <option value="Paraguay">Paraguay</option>
+      <option value="Peru">Peru</option>
+      <option value="Suriname">Suriname</option>
+      <option value="Uruguay">Uruguay</option>
+      <option value="Venezuela">Venezuela</option>
+      </optgroup>
+      <optgroup label="── Oceania ──">
+      <option value="Australia">Australia</option>
+      <option value="Fiji">Fiji</option>
+      <option value="Kiribati">Kiribati</option>
+      <option value="Marshall Islands">Marshall Islands</option>
+      <option value="Micronesia">Micronesia</option>
+      <option value="Nauru">Nauru</option>
+      <option value="New Zealand">New Zealand</option>
+      <option value="Palau">Palau</option>
+      <option value="Papua New Guinea">Papua New Guinea</option>
+      <option value="Samoa">Samoa</option>
+      <option value="Solomon Islands">Solomon Islands</option>
+      <option value="Tonga">Tonga</option>
+      <option value="Tuvalu">Tuvalu</option>
+      <option value="Vanuatu">Vanuatu</option>
+      </optgroup>
+      <optgroup label="── Africa ──">
+      <option value="Algeria">Algeria</option>
+      <option value="Angola">Angola</option>
+      <option value="Benin">Benin</option>
+      <option value="Botswana">Botswana</option>
+      <option value="Burkina Faso">Burkina Faso</option>
+      <option value="Burundi">Burundi</option>
+      <option value="Cabo Verde">Cabo Verde</option>
+      <option value="Cameroon">Cameroon</option>
+      <option value="Central African Republic">Central African Republic</option>
+      <option value="Chad">Chad</option>
+      <option value="Comoros">Comoros</option>
+      <option value="Congo">Congo</option>
+      <option value="DRC">DRC (Dem. Rep. Congo)</option>
+      <option value="Djibouti">Djibouti</option>
+      <option value="Egypt">Egypt</option>
+      <option value="Equatorial Guinea">Equatorial Guinea</option>
+      <option value="Eritrea">Eritrea</option>
+      <option value="Eswatini">Eswatini</option>
+      <option value="Ethiopia">Ethiopia</option>
+      <option value="Gabon">Gabon</option>
+      <option value="Gambia">Gambia</option>
+      <option value="Ghana">Ghana</option>
+      <option value="Guinea">Guinea</option>
+      <option value="Guinea-Bissau">Guinea-Bissau</option>
+      <option value="Ivory Coast">Ivory Coast</option>
+      <option value="Kenya">Kenya</option>
+      <option value="Lesotho">Lesotho</option>
+      <option value="Liberia">Liberia</option>
+      <option value="Libya">Libya</option>
+      <option value="Madagascar">Madagascar</option>
+      <option value="Malawi">Malawi</option>
+      <option value="Mali">Mali</option>
+      <option value="Mauritania">Mauritania</option>
+      <option value="Mauritius">Mauritius</option>
+      <option value="Morocco">Morocco</option>
+      <option value="Mozambique">Mozambique</option>
+      <option value="Namibia">Namibia</option>
+      <option value="Niger">Niger</option>
+      <option value="Nigeria">Nigeria</option>
+      <option value="Rwanda">Rwanda</option>
+      <option value="Sao Tome and Principe">Sao Tome and Principe</option>
+      <option value="Senegal">Senegal</option>
+      <option value="Seychelles">Seychelles</option>
+      <option value="Sierra Leone">Sierra Leone</option>
+      <option value="Somalia">Somalia</option>
+      <option value="South Africa">South Africa</option>
+      <option value="South Sudan">South Sudan</option>
+      <option value="Sudan">Sudan</option>
+      <option value="Tanzania">Tanzania</option>
+      <option value="Togo">Togo</option>
+      <option value="Tunisia">Tunisia</option>
+      <option value="Uganda">Uganda</option>
+      <option value="Zambia">Zambia</option>
+      <option value="Zimbabwe">Zimbabwe</option>
+      </optgroup>
+    </select>
+    </div>
+    <button id="searchBtn" onclick="runSearch()" aria-label="Search for products">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-2px;margin-right:7px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Search Now
+    </button>
+  </div>
+
+  <div class="search-box" id="companySearchBox" style="display:none;" role="tabpanel">
+    <div class="search-field">
+      <label for="companyQuery">Company Name</label>
+      <input id="companyQuery" type="text" placeholder="Company" autocomplete="organization" />
+    </div>
+    <div class="search-select-field">
+      <label for="companyCountry">Country</label>
+      <select id="companyCountry">
+        <option value="">Any country</option>
+        <optgroup label="── Asia ──">
+        <option value="Afghanistan">Afghanistan</option><option value="Bangladesh">Bangladesh</option>
+        <option value="Bhutan">Bhutan</option><option value="Brunei">Brunei</option>
+        <option value="Cambodia">Cambodia</option><option value="China">China</option>
+        <option value="India">India</option><option value="Indonesia">Indonesia</option>
+        <option value="Japan">Japan</option><option value="Kazakhstan">Kazakhstan</option>
+        <option value="Kyrgyzstan">Kyrgyzstan</option><option value="Laos">Laos</option>
+        <option value="Malaysia">Malaysia</option><option value="Maldives">Maldives</option>
+        <option value="Mongolia">Mongolia</option><option value="Myanmar">Myanmar</option>
+        <option value="Nepal">Nepal</option><option value="North Korea">North Korea</option>
+        <option value="Pakistan">Pakistan</option><option value="Philippines">Philippines</option>
+        <option value="Singapore">Singapore</option><option value="South Korea">South Korea</option>
+        <option value="Sri Lanka">Sri Lanka</option><option value="Taiwan">Taiwan</option>
+        <option value="Tajikistan">Tajikistan</option><option value="Thailand">Thailand</option>
+        <option value="Timor-Leste">Timor-Leste</option><option value="Turkmenistan">Turkmenistan</option>
+        <option value="Uzbekistan">Uzbekistan</option><option value="Vietnam">Vietnam</option>
+        </optgroup>
+        <optgroup label="── Middle East ──">
+        <option value="Bahrain">Bahrain</option><option value="Cyprus">Cyprus</option>
+        <option value="Iran">Iran</option><option value="Iraq">Iraq</option>
+        <option value="Israel">Israel</option><option value="Jordan">Jordan</option>
+        <option value="Kuwait">Kuwait</option><option value="Lebanon">Lebanon</option>
+        <option value="Oman">Oman</option><option value="Palestine">Palestine</option>
+        <option value="Qatar">Qatar</option><option value="Saudi Arabia">Saudi Arabia</option>
+        <option value="Syria">Syria</option><option value="Turkey">Turkey</option>
+        <option value="UAE">UAE</option><option value="Yemen">Yemen</option>
+        </optgroup>
+        <optgroup label="── Europe ──">
+        <option value="Albania">Albania</option><option value="Andorra">Andorra</option>
+        <option value="Armenia">Armenia</option><option value="Austria">Austria</option>
+        <option value="Azerbaijan">Azerbaijan</option><option value="Belarus">Belarus</option>
+        <option value="Belgium">Belgium</option><option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
+        <option value="Bulgaria">Bulgaria</option><option value="Croatia">Croatia</option>
+        <option value="Czech Republic">Czech Republic</option><option value="Denmark">Denmark</option>
+        <option value="Estonia">Estonia</option><option value="Finland">Finland</option>
+        <option value="France">France</option><option value="Georgia">Georgia</option>
+        <option value="Germany">Germany</option><option value="Greece">Greece</option>
+        <option value="Hungary">Hungary</option><option value="Iceland">Iceland</option>
+        <option value="Ireland">Ireland</option><option value="Italy">Italy</option>
+        <option value="Kosovo">Kosovo</option><option value="Latvia">Latvia</option>
+        <option value="Liechtenstein">Liechtenstein</option><option value="Lithuania">Lithuania</option>
+        <option value="Luxembourg">Luxembourg</option><option value="Malta">Malta</option>
+        <option value="Moldova">Moldova</option><option value="Monaco">Monaco</option>
+        <option value="Montenegro">Montenegro</option><option value="Netherlands">Netherlands</option>
+        <option value="North Macedonia">North Macedonia</option><option value="Norway">Norway</option>
+        <option value="Poland">Poland</option><option value="Portugal">Portugal</option>
+        <option value="Romania">Romania</option><option value="Russia">Russia</option>
+        <option value="Serbia">Serbia</option><option value="Slovakia">Slovakia</option>
+        <option value="Slovenia">Slovenia</option><option value="Spain">Spain</option>
+        <option value="Sweden">Sweden</option><option value="Switzerland">Switzerland</option>
+        <option value="Ukraine">Ukraine</option><option value="United Kingdom">United Kingdom</option>
+        </optgroup>
+        <optgroup label="── North America ──">
+        <option value="Belize">Belize</option><option value="Canada">Canada</option>
+        <option value="Costa Rica">Costa Rica</option><option value="Cuba">Cuba</option>
+        <option value="Dominican Republic">Dominican Republic</option><option value="El Salvador">El Salvador</option>
+        <option value="Guatemala">Guatemala</option><option value="Haiti">Haiti</option>
+        <option value="Honduras">Honduras</option><option value="Jamaica">Jamaica</option>
+        <option value="Mexico">Mexico</option><option value="Nicaragua">Nicaragua</option>
+        <option value="Panama">Panama</option><option value="Trinidad and Tobago">Trinidad and Tobago</option>
+        <option value="USA">USA</option>
+        </optgroup>
+        <optgroup label="── South America ──">
+        <option value="Argentina">Argentina</option><option value="Bolivia">Bolivia</option>
+        <option value="Brazil">Brazil</option><option value="Chile">Chile</option>
+        <option value="Colombia">Colombia</option><option value="Ecuador">Ecuador</option>
+        <option value="Guyana">Guyana</option><option value="Paraguay">Paraguay</option>
+        <option value="Peru">Peru</option><option value="Suriname">Suriname</option>
+        <option value="Uruguay">Uruguay</option><option value="Venezuela">Venezuela</option>
+        </optgroup>
+        <optgroup label="── Oceania ──">
+        <option value="Australia">Australia</option><option value="Fiji">Fiji</option>
+        <option value="New Zealand">New Zealand</option><option value="Papua New Guinea">Papua New Guinea</option>
+        <option value="Solomon Islands">Solomon Islands</option><option value="Vanuatu">Vanuatu</option>
+        </optgroup>
+        <optgroup label="── Africa ──">
+        <option value="Algeria">Algeria</option><option value="Angola">Angola</option>
+        <option value="Benin">Benin</option><option value="Botswana">Botswana</option>
+        <option value="Burkina Faso">Burkina Faso</option><option value="Burundi">Burundi</option>
+        <option value="Cabo Verde">Cabo Verde</option><option value="Cameroon">Cameroon</option>
+        <option value="Central African Republic">Central African Republic</option><option value="Chad">Chad</option>
+        <option value="Comoros">Comoros</option><option value="Congo">Congo</option>
+        <option value="DRC">DRC (Dem. Rep. Congo)</option><option value="Djibouti">Djibouti</option>
+        <option value="Egypt">Egypt</option><option value="Eritrea">Eritrea</option>
+        <option value="Eswatini">Eswatini</option><option value="Ethiopia">Ethiopia</option>
+        <option value="Gabon">Gabon</option><option value="Gambia">Gambia</option>
+        <option value="Ghana">Ghana</option><option value="Guinea">Guinea</option>
+        <option value="Guinea-Bissau">Guinea-Bissau</option><option value="Ivory Coast">Ivory Coast</option>
+        <option value="Kenya">Kenya</option><option value="Lesotho">Lesotho</option>
+        <option value="Liberia">Liberia</option><option value="Libya">Libya</option>
+        <option value="Madagascar">Madagascar</option><option value="Malawi">Malawi</option>
+        <option value="Mali">Mali</option><option value="Mauritania">Mauritania</option>
+        <option value="Mauritius">Mauritius</option><option value="Morocco">Morocco</option>
+        <option value="Mozambique">Mozambique</option><option value="Namibia">Namibia</option>
+        <option value="Niger">Niger</option><option value="Nigeria">Nigeria</option>
+        <option value="Rwanda">Rwanda</option><option value="Senegal">Senegal</option>
+        <option value="Seychelles">Seychelles</option><option value="Sierra Leone">Sierra Leone</option>
+        <option value="Somalia">Somalia</option><option value="South Africa">South Africa</option>
+        <option value="South Sudan">South Sudan</option><option value="Sudan">Sudan</option>
+        <option value="Tanzania">Tanzania</option><option value="Togo">Togo</option>
+        <option value="Tunisia">Tunisia</option><option value="Uganda">Uganda</option>
+        <option value="Zambia">Zambia</option><option value="Zimbabwe">Zimbabwe</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="search-field">
+      <label for="companyWebsite">Website <span style="opacity:.6;font-weight:500">(optional — for exact match)</span></label>
+      <input id="companyWebsite" type="text" placeholder="e.g. www.erez-group.com" autocomplete="url" />
+    </div>
+    <button id="companySearchBtn" onclick="runSearch()" aria-label="Search for company">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Search
+    </button>
+  </div>
+
+  <div class="search-box" id="personSearchBox" style="display:none;" role="tabpanel">
+    <div class="search-field">
+      <label for="personQuery">Person Name</label>
+      <input id="personQuery" type="text" placeholder="Name" autocomplete="name" />
+    </div>
+    <div class="search-select-field">
+      <label for="personCountry">Country</label>
+      <select id="personCountry">
+        <option value="">Any country</option>
+        <optgroup label="── Asia ──">
+        <option value="Afghanistan">Afghanistan</option><option value="Bangladesh">Bangladesh</option>
+        <option value="Bhutan">Bhutan</option><option value="Brunei">Brunei</option>
+        <option value="Cambodia">Cambodia</option><option value="China">China</option>
+        <option value="India">India</option><option value="Indonesia">Indonesia</option>
+        <option value="Japan">Japan</option><option value="Kazakhstan">Kazakhstan</option>
+        <option value="Kyrgyzstan">Kyrgyzstan</option><option value="Laos">Laos</option>
+        <option value="Malaysia">Malaysia</option><option value="Maldives">Maldives</option>
+        <option value="Mongolia">Mongolia</option><option value="Myanmar">Myanmar</option>
+        <option value="Nepal">Nepal</option><option value="North Korea">North Korea</option>
+        <option value="Pakistan">Pakistan</option><option value="Philippines">Philippines</option>
+        <option value="Singapore">Singapore</option><option value="South Korea">South Korea</option>
+        <option value="Sri Lanka">Sri Lanka</option><option value="Taiwan">Taiwan</option>
+        <option value="Tajikistan">Tajikistan</option><option value="Thailand">Thailand</option>
+        <option value="Timor-Leste">Timor-Leste</option><option value="Turkmenistan">Turkmenistan</option>
+        <option value="Uzbekistan">Uzbekistan</option><option value="Vietnam">Vietnam</option>
+        </optgroup>
+        <optgroup label="── Middle East ──">
+        <option value="Bahrain">Bahrain</option><option value="Cyprus">Cyprus</option>
+        <option value="Iran">Iran</option><option value="Iraq">Iraq</option>
+        <option value="Israel">Israel</option><option value="Jordan">Jordan</option>
+        <option value="Kuwait">Kuwait</option><option value="Lebanon">Lebanon</option>
+        <option value="Oman">Oman</option><option value="Palestine">Palestine</option>
+        <option value="Qatar">Qatar</option><option value="Saudi Arabia">Saudi Arabia</option>
+        <option value="Syria">Syria</option><option value="Turkey">Turkey</option>
+        <option value="UAE">UAE</option><option value="Yemen">Yemen</option>
+        </optgroup>
+        <optgroup label="── Europe ──">
+        <option value="Albania">Albania</option><option value="Andorra">Andorra</option>
+        <option value="Armenia">Armenia</option><option value="Austria">Austria</option>
+        <option value="Azerbaijan">Azerbaijan</option><option value="Belarus">Belarus</option>
+        <option value="Belgium">Belgium</option><option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option>
+        <option value="Bulgaria">Bulgaria</option><option value="Croatia">Croatia</option>
+        <option value="Czech Republic">Czech Republic</option><option value="Denmark">Denmark</option>
+        <option value="Estonia">Estonia</option><option value="Finland">Finland</option>
+        <option value="France">France</option><option value="Georgia">Georgia</option>
+        <option value="Germany">Germany</option><option value="Greece">Greece</option>
+        <option value="Hungary">Hungary</option><option value="Iceland">Iceland</option>
+        <option value="Ireland">Ireland</option><option value="Italy">Italy</option>
+        <option value="Kosovo">Kosovo</option><option value="Latvia">Latvia</option>
+        <option value="Liechtenstein">Liechtenstein</option><option value="Lithuania">Lithuania</option>
+        <option value="Luxembourg">Luxembourg</option><option value="Malta">Malta</option>
+        <option value="Moldova">Moldova</option><option value="Monaco">Monaco</option>
+        <option value="Montenegro">Montenegro</option><option value="Netherlands">Netherlands</option>
+        <option value="North Macedonia">North Macedonia</option><option value="Norway">Norway</option>
+        <option value="Poland">Poland</option><option value="Portugal">Portugal</option>
+        <option value="Romania">Romania</option><option value="Russia">Russia</option>
+        <option value="Serbia">Serbia</option><option value="Slovakia">Slovakia</option>
+        <option value="Slovenia">Slovenia</option><option value="Spain">Spain</option>
+        <option value="Sweden">Sweden</option><option value="Switzerland">Switzerland</option>
+        <option value="Ukraine">Ukraine</option><option value="United Kingdom">United Kingdom</option>
+        </optgroup>
+        <optgroup label="── North America ──">
+        <option value="Belize">Belize</option><option value="Canada">Canada</option>
+        <option value="Costa Rica">Costa Rica</option><option value="Cuba">Cuba</option>
+        <option value="Dominican Republic">Dominican Republic</option><option value="El Salvador">El Salvador</option>
+        <option value="Guatemala">Guatemala</option><option value="Haiti">Haiti</option>
+        <option value="Honduras">Honduras</option><option value="Jamaica">Jamaica</option>
+        <option value="Mexico">Mexico</option><option value="Nicaragua">Nicaragua</option>
+        <option value="Panama">Panama</option><option value="Trinidad and Tobago">Trinidad and Tobago</option>
+        <option value="USA">USA</option>
+        </optgroup>
+        <optgroup label="── South America ──">
+        <option value="Argentina">Argentina</option><option value="Bolivia">Bolivia</option>
+        <option value="Brazil">Brazil</option><option value="Chile">Chile</option>
+        <option value="Colombia">Colombia</option><option value="Ecuador">Ecuador</option>
+        <option value="Guyana">Guyana</option><option value="Paraguay">Paraguay</option>
+        <option value="Peru">Peru</option><option value="Suriname">Suriname</option>
+        <option value="Uruguay">Uruguay</option><option value="Venezuela">Venezuela</option>
+        </optgroup>
+        <optgroup label="── Oceania ──">
+        <option value="Australia">Australia</option><option value="Fiji">Fiji</option>
+        <option value="New Zealand">New Zealand</option><option value="Papua New Guinea">Papua New Guinea</option>
+        <option value="Solomon Islands">Solomon Islands</option><option value="Vanuatu">Vanuatu</option>
+        </optgroup>
+        <optgroup label="── Africa ──">
+        <option value="Algeria">Algeria</option><option value="Angola">Angola</option>
+        <option value="Benin">Benin</option><option value="Botswana">Botswana</option>
+        <option value="Burkina Faso">Burkina Faso</option><option value="Burundi">Burundi</option>
+        <option value="Cabo Verde">Cabo Verde</option><option value="Cameroon">Cameroon</option>
+        <option value="Central African Republic">Central African Republic</option><option value="Chad">Chad</option>
+        <option value="Comoros">Comoros</option><option value="Congo">Congo</option>
+        <option value="DRC">DRC (Dem. Rep. Congo)</option><option value="Djibouti">Djibouti</option>
+        <option value="Egypt">Egypt</option><option value="Eritrea">Eritrea</option>
+        <option value="Eswatini">Eswatini</option><option value="Ethiopia">Ethiopia</option>
+        <option value="Gabon">Gabon</option><option value="Gambia">Gambia</option>
+        <option value="Ghana">Ghana</option><option value="Guinea">Guinea</option>
+        <option value="Guinea-Bissau">Guinea-Bissau</option><option value="Ivory Coast">Ivory Coast</option>
+        <option value="Kenya">Kenya</option><option value="Lesotho">Lesotho</option>
+        <option value="Liberia">Liberia</option><option value="Libya">Libya</option>
+        <option value="Madagascar">Madagascar</option><option value="Malawi">Malawi</option>
+        <option value="Mali">Mali</option><option value="Mauritania">Mauritania</option>
+        <option value="Mauritius">Mauritius</option><option value="Morocco">Morocco</option>
+        <option value="Mozambique">Mozambique</option><option value="Namibia">Namibia</option>
+        <option value="Niger">Niger</option><option value="Nigeria">Nigeria</option>
+        <option value="Rwanda">Rwanda</option><option value="Senegal">Senegal</option>
+        <option value="Seychelles">Seychelles</option><option value="Sierra Leone">Sierra Leone</option>
+        <option value="Somalia">Somalia</option><option value="South Africa">South Africa</option>
+        <option value="South Sudan">South Sudan</option><option value="Sudan">Sudan</option>
+        <option value="Tanzania">Tanzania</option><option value="Togo">Togo</option>
+        <option value="Tunisia">Tunisia</option><option value="Uganda">Uganda</option>
+        <option value="Zambia">Zambia</option><option value="Zimbabwe">Zimbabwe</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="search-select-field" style="min-width:120px;">
+      <label for="personGender">Gender</label>
+      <select id="personGender">
+        <option value="">Any</option>
+        <option value="male">Male</option>
+        <option value="female">Female</option>
+      </select>
+    </div>
+    <button id="personSearchBtn" onclick="runSearch()" aria-label="Search for person">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Search
+    </button>
+  </div>
+
+  <div class="search-box" id="stockSearchBox" style="display:none;" role="tabpanel">
+    <div class="search-field">
+      <label for="stockQuery">Product Name</label>
+      <input id="stockQuery" type="text" placeholder="Stock" />
+    </div>
+    <div class="search-select-field" style="min-width:110px;">
+      <label for="stockMinQty">Min Quantity</label>
+      <input id="stockMinQty" type="number" min="1" placeholder="e.g. 1000" style="width:100%;" />
+    </div>
+    <div class="search-select-field" style="min-width:90px;">
+      <label for="stockUnit">Unit</label>
+      <select id="stockUnit">
+        <option value="pcs">pcs</option>
+        <option value="kg">kg</option>
+        <option value="mt">MT</option>
+        <option value="yards">yards</option>
+        <option value="sets">sets</option>
+      </select>
+    </div>
+    <div class="search-select-field">
+      <label for="stockCountry">Country</label>
+      <select id="stockCountry">
+        <option value="">Any Country</option>
+        <optgroup label="── Asia ──">
+        <option value="Afghanistan">Afghanistan</option><option value="Bangladesh">Bangladesh</option>
+        <option value="Bhutan">Bhutan</option><option value="Brunei">Brunei</option>
+        <option value="Cambodia">Cambodia</option><option value="China">China</option>
+        <option value="India">India</option><option value="Indonesia">Indonesia</option>
+        <option value="Japan">Japan</option><option value="Kazakhstan">Kazakhstan</option>
+        <option value="Kyrgyzstan">Kyrgyzstan</option><option value="Laos">Laos</option>
+        <option value="Malaysia">Malaysia</option><option value="Maldives">Maldives</option>
+        <option value="Mongolia">Mongolia</option><option value="Myanmar">Myanmar</option>
+        <option value="Nepal">Nepal</option><option value="Pakistan">Pakistan</option>
+        <option value="Philippines">Philippines</option><option value="Singapore">Singapore</option>
+        <option value="South Korea">South Korea</option><option value="Sri Lanka">Sri Lanka</option>
+        <option value="Taiwan">Taiwan</option><option value="Tajikistan">Tajikistan</option>
+        <option value="Thailand">Thailand</option><option value="Timor-Leste">Timor-Leste</option>
+        <option value="Turkmenistan">Turkmenistan</option><option value="Uzbekistan">Uzbekistan</option>
+        <option value="Vietnam">Vietnam</option>
+        </optgroup>
+        <optgroup label="── Middle East ──">
+        <option value="Bahrain">Bahrain</option><option value="Cyprus">Cyprus</option>
+        <option value="Iran">Iran</option><option value="Iraq">Iraq</option>
+        <option value="Israel">Israel</option><option value="Jordan">Jordan</option>
+        <option value="Kuwait">Kuwait</option><option value="Lebanon">Lebanon</option>
+        <option value="Oman">Oman</option><option value="Qatar">Qatar</option>
+        <option value="Saudi Arabia">Saudi Arabia</option><option value="Turkey">Turkey</option>
+        <option value="UAE">UAE</option><option value="Yemen">Yemen</option>
+        </optgroup>
+        <optgroup label="── Europe ──">
+        <option value="Albania">Albania</option><option value="Armenia">Armenia</option>
+        <option value="Austria">Austria</option><option value="Azerbaijan">Azerbaijan</option>
+        <option value="Belarus">Belarus</option><option value="Belgium">Belgium</option>
+        <option value="Bosnia and Herzegovina">Bosnia and Herzegovina</option><option value="Bulgaria">Bulgaria</option>
+        <option value="Croatia">Croatia</option><option value="Czech Republic">Czech Republic</option>
+        <option value="Denmark">Denmark</option><option value="Estonia">Estonia</option>
+        <option value="Finland">Finland</option><option value="France">France</option>
+        <option value="Georgia">Georgia</option><option value="Germany">Germany</option>
+        <option value="Greece">Greece</option><option value="Hungary">Hungary</option>
+        <option value="Ireland">Ireland</option><option value="Italy">Italy</option>
+        <option value="Latvia">Latvia</option><option value="Lithuania">Lithuania</option>
+        <option value="Luxembourg">Luxembourg</option><option value="Moldova">Moldova</option>
+        <option value="Netherlands">Netherlands</option><option value="Norway">Norway</option>
+        <option value="Poland">Poland</option><option value="Portugal">Portugal</option>
+        <option value="Romania">Romania</option><option value="Russia">Russia</option>
+        <option value="Serbia">Serbia</option><option value="Slovakia">Slovakia</option>
+        <option value="Slovenia">Slovenia</option><option value="Spain">Spain</option>
+        <option value="Sweden">Sweden</option><option value="Switzerland">Switzerland</option>
+        <option value="Ukraine">Ukraine</option><option value="United Kingdom">United Kingdom</option>
+        </optgroup>
+        <optgroup label="── North America ──">
+        <option value="Canada">Canada</option><option value="Costa Rica">Costa Rica</option>
+        <option value="Cuba">Cuba</option><option value="Dominican Republic">Dominican Republic</option>
+        <option value="El Salvador">El Salvador</option><option value="Guatemala">Guatemala</option>
+        <option value="Honduras">Honduras</option><option value="Jamaica">Jamaica</option>
+        <option value="Mexico">Mexico</option><option value="Nicaragua">Nicaragua</option>
+        <option value="Panama">Panama</option><option value="USA">USA</option>
+        </optgroup>
+        <optgroup label="── South America ──">
+        <option value="Argentina">Argentina</option><option value="Bolivia">Bolivia</option>
+        <option value="Brazil">Brazil</option><option value="Chile">Chile</option>
+        <option value="Colombia">Colombia</option><option value="Ecuador">Ecuador</option>
+        <option value="Paraguay">Paraguay</option><option value="Peru">Peru</option>
+        <option value="Uruguay">Uruguay</option><option value="Venezuela">Venezuela</option>
+        </optgroup>
+        <optgroup label="── Oceania ──">
+        <option value="Australia">Australia</option><option value="Fiji">Fiji</option>
+        <option value="New Zealand">New Zealand</option><option value="Papua New Guinea">Papua New Guinea</option>
+        </optgroup>
+        <optgroup label="── Africa ──">
+        <option value="Algeria">Algeria</option><option value="Angola">Angola</option>
+        <option value="Benin">Benin</option><option value="Botswana">Botswana</option>
+        <option value="Burkina Faso">Burkina Faso</option><option value="Burundi">Burundi</option>
+        <option value="Cameroon">Cameroon</option><option value="Central African Republic">Central African Republic</option>
+        <option value="Chad">Chad</option><option value="Congo">Congo</option>
+        <option value="DRC">DRC (Dem. Rep. Congo)</option><option value="Egypt">Egypt</option>
+        <option value="Eritrea">Eritrea</option><option value="Ethiopia">Ethiopia</option>
+        <option value="Gabon">Gabon</option><option value="Gambia">Gambia</option>
+        <option value="Ghana">Ghana</option><option value="Guinea">Guinea</option>
+        <option value="Ivory Coast">Ivory Coast</option><option value="Kenya">Kenya</option>
+        <option value="Liberia">Liberia</option><option value="Libya">Libya</option>
+        <option value="Madagascar">Madagascar</option><option value="Malawi">Malawi</option>
+        <option value="Mali">Mali</option><option value="Mauritania">Mauritania</option>
+        <option value="Mauritius">Mauritius</option><option value="Morocco">Morocco</option>
+        <option value="Mozambique">Mozambique</option><option value="Namibia">Namibia</option>
+        <option value="Niger">Niger</option><option value="Nigeria">Nigeria</option>
+        <option value="Rwanda">Rwanda</option><option value="Senegal">Senegal</option>
+        <option value="Sierra Leone">Sierra Leone</option><option value="Somalia">Somalia</option>
+        <option value="South Africa">South Africa</option><option value="South Sudan">South Sudan</option>
+        <option value="Sudan">Sudan</option><option value="Tanzania">Tanzania</option>
+        <option value="Togo">Togo</option><option value="Tunisia">Tunisia</option>
+        <option value="Uganda">Uganda</option><option value="Zambia">Zambia</option>
+        <option value="Zimbabwe">Zimbabwe</option>
+        </optgroup>
+      </select>
+    </div>
+    <button id="stockSearchBtn" onclick="runStockSearch()" aria-label="Search for product stock">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Search Stock
+    </button>
+  </div>
+
+  <div id="imageSearchBox" style="display:none; flex-direction:column; gap:12px; width:100%;">
+    <div class="img-type-picker">
+      <div class="img-type-card selected" id="itc-card" onclick="setImageType('card')">
+        <div class="itc-icon">💼</div>
+        <div class="itc-label">Business Card</div>
+        <div class="itc-desc">Extract contact details automatically</div>
       </div>
-      <div id="aiPanelBody">${aiPanelCollapsed ? '' : bodyHtml}</div>
-    </div>`;
+      <div class="img-type-card" id="itc-person" onclick="setImageType('person')">
+        <div class="itc-icon">👤</div>
+        <div class="itc-label">Person Photo</div>
+        <div class="itc-desc">Reverse-search to identify the person</div>
+      </div>
+      <div class="img-type-card" id="itc-company" onclick="setImageType('company')">
+        <div class="itc-icon">🏢</div>
+        <div class="itc-label">Company / Logo</div>
+        <div class="itc-desc">Reverse-search by company image or logo</div>
+      </div>
+    </div>
 
-  if (aiPanelCollapsed) document.getElementById('aiPanelBody').style.display = 'none';
-  wrap._bodyHtml = bodyHtml;
-}
+    <div class="upload-zone" id="uploadZone"
+         onclick="document.getElementById('imgFileInput').click()"
+         ondragover="event.preventDefault();this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handleImageDrop(event)">
+      <div class="uz-icon">📁</div>
+      <div class="uz-label">Click to upload or drag &amp; drop an image</div>
+      <div class="uz-hint">JPG, PNG, WEBP — also supports camera on mobile</div>
+    </div>
+    <input type="file" id="imgFileInput" accept="image/*" capture="environment" style="display:none" onchange="handleImageFile(this.files[0])">
 
-function toggleAIPanel(btn) {
-  aiPanelCollapsed = !aiPanelCollapsed;
-  const body = document.getElementById('aiPanelBody');
-  const wrap = document.getElementById('aiPanelWrap');
-  if (aiPanelCollapsed) {
-    body.style.display = 'none';
-    btn.textContent = 'Show ▾';
-  } else {
-    body.innerHTML = wrap._bodyHtml || '';
-    body.style.display = '';
-    btn.textContent = 'Hide ▴';
-  }
-}
+    <div id="imgResultArea"></div>
+  </div>
 
-function highlightTopPicks(indices) {
-  const cards = document.querySelectorAll('.card');
-  indices.forEach(i => {
-    const card = cards[i - 1];
-    if (!card) return;
-    const h3 = card.querySelector('h3');
-    if (h3 && !h3.querySelector('.ai-top-pick-badge')) {
-      h3.insertAdjacentHTML('beforeend', '<span class="ai-top-pick-badge">✦ AI Pick</span>');
-    }
-    card.style.borderColor = 'rgba(139,92,246,.35)';
-  });
-}
+  <div class="search-box" id="tradeSearchBox" style="display:none;" role="tabpanel">
+    <div class="search-field">
+      <label for="tradeProduct">Product / Commodity</label>
+      <input id="tradeProduct" type="text" placeholder="Trade" autocomplete="off" />
+    </div>
+    <div class="search-field" style="max-width:160px;">
+      <label for="tradeHS">HS Code (optional)</label>
+      <input id="tradeHS" type="text" placeholder="e.g. 7208, 8542" autocomplete="off" />
+    </div>
+    <div class="search-select-field">
+      <label for="tradeCountry">Country</label>
+      <select id="tradeCountry">
+        <option value="">Any country</option>
+        <optgroup label="── Asia ──"><option value="China">China</option><option value="India">India</option><option value="Japan">Japan</option><option value="South Korea">South Korea</option><option value="Taiwan">Taiwan</option><option value="Vietnam">Vietnam</option><option value="Indonesia">Indonesia</option><option value="Bangladesh">Bangladesh</option><option value="Pakistan">Pakistan</option><option value="Thailand">Thailand</option><option value="Malaysia">Malaysia</option><option value="Philippines">Philippines</option><option value="Singapore">Singapore</option></optgroup>
+        <optgroup label="── Middle East ──"><option value="UAE">UAE</option><option value="Saudi Arabia">Saudi Arabia</option><option value="Turkey">Turkey</option><option value="Israel">Israel</option></optgroup>
+        <optgroup label="── Europe ──"><option value="Germany">Germany</option><option value="France">France</option><option value="Italy">Italy</option><option value="Netherlands">Netherlands</option><option value="Spain">Spain</option><option value="Poland">Poland</option><option value="United Kingdom">United Kingdom</option><option value="Belgium">Belgium</option></optgroup>
+        <optgroup label="── Americas ──"><option value="USA">USA</option><option value="Canada">Canada</option><option value="Mexico">Mexico</option><option value="Brazil">Brazil</option><option value="Argentina">Argentina</option></optgroup>
+        <optgroup label="── Africa ──"><option value="South Africa">South Africa</option><option value="Egypt">Egypt</option><option value="Nigeria">Nigeria</option><option value="Kenya">Kenya</option></optgroup>
+        <optgroup label="── Oceania ──"><option value="Australia">Australia</option><option value="New Zealand">New Zealand</option></optgroup>
+      </select>
+    </div>
+    <div class="search-select-field" style="min-width:130px;">
+      <label for="tradeDir">Trade Direction</label>
+      <select id="tradeDir">
+        <option value="">Import &amp; Export</option>
+        <option value="import">Importers</option>
+        <option value="export">Exporters</option>
+      </select>
+    </div>
+    <button id="tradeSearchBtn" onclick="runTradeSearch()" aria-label="Search trade data">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Search Trade
+    </button>
+  </div>
 
-function aiSuggest(query, mode) {
-  if (mode === 'product' || mode === 'company' || mode === 'person') {
-    const inputId = mode === 'product' ? 'query' : mode === 'company' ? 'companyQuery' : 'personQuery';
-    const input = document.getElementById(inputId);
-    if (input) {
-      input.value = query;
-      input.focus();
-    }
-    setMode(mode);
-    setTimeout(() => runSearch(), 100);
-  } else if (mode === 'stock') {
-    const input = document.getElementById('stockQuery');
-    if (input) input.value = query;
-    setMode('stock');
-    setTimeout(() => runStockSearch(), 100);
-  }
-}
+  <div class="search-box" id="buyersSearchBox" style="display:none;" role="tabpanel" aria-labelledby="tab-buyers">
+    <div class="search-field">
+      <label for="buyersProduct">Product / Keyword</label>
+      <input id="buyersProduct" type="text" placeholder="Buyers" autocomplete="off" />
+    </div>
+    <div class="search-select-field">
+      <label for="buyersCountry">Country</label>
+      <select id="buyersCountry">
+        <option value="">Any country</option>
+        <optgroup label="── Asia ──">
+        <option value="China">China</option><option value="India">India</option>
+        <option value="Japan">Japan</option><option value="South Korea">South Korea</option>
+        <option value="Taiwan">Taiwan</option><option value="Vietnam">Vietnam</option>
+        <option value="Indonesia">Indonesia</option><option value="Bangladesh">Bangladesh</option>
+        <option value="Pakistan">Pakistan</option><option value="Thailand">Thailand</option>
+        <option value="Malaysia">Malaysia</option><option value="Philippines">Philippines</option>
+        <option value="Singapore">Singapore</option>
+        </optgroup>
+        <optgroup label="── Middle East ──">
+        <option value="UAE">UAE</option><option value="Saudi Arabia">Saudi Arabia</option>
+        <option value="Turkey">Turkey</option><option value="Israel">Israel</option>
+        <option value="Qatar">Qatar</option><option value="Kuwait">Kuwait</option>
+        </optgroup>
+        <optgroup label="── Europe ──">
+        <option value="Germany">Germany</option><option value="France">France</option>
+        <option value="Italy">Italy</option><option value="Netherlands">Netherlands</option>
+        <option value="Spain">Spain</option><option value="Poland">Poland</option>
+        <option value="United Kingdom">United Kingdom</option><option value="Belgium">Belgium</option>
+        <option value="Sweden">Sweden</option><option value="Switzerland">Switzerland</option>
+        <option value="Austria">Austria</option><option value="Czech Republic">Czech Republic</option>
+        </optgroup>
+        <optgroup label="── Americas ──">
+        <option value="USA">USA</option><option value="Canada">Canada</option>
+        <option value="Mexico">Mexico</option><option value="Brazil">Brazil</option>
+        <option value="Argentina">Argentina</option><option value="Colombia">Colombia</option>
+        </optgroup>
+        <optgroup label="── Africa ──">
+        <option value="South Africa">South Africa</option><option value="Egypt">Egypt</option>
+        <option value="Nigeria">Nigeria</option><option value="Kenya">Kenya</option>
+        <option value="Morocco">Morocco</option>
+        </optgroup>
+        <optgroup label="── Oceania ──">
+        <option value="Australia">Australia</option><option value="New Zealand">New Zealand</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="search-select-field" style="min-width:140px;">
+      <label for="buyersType">Buyer Type</label>
+      <select id="buyersType">
+        <option value="">All Types</option>
+        <option value="importer">Importers</option>
+        <option value="retailer">Retailers</option>
+        <option value="wholesaler">Wholesalers</option>
+        <option value="procurement">Procurement</option>
+      </select>
+    </div>
+    <button id="buyersSearchBtn" onclick="runBuyersSearch()" aria-label="Search for buyers">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      Find Buyers
+    </button>
+  </div>
 
-// ── UI/UX Pro Max Helpers ─────────────────────────────────────────────────────
+  <div class="search-box" id="marketSearchBox" style="display:none;" role="tabpanel">
+    <div class="search-field">
+      <label for="marketIndustry">Industry / Sector</label>
+      <input id="marketIndustry" type="text" placeholder="Market" autocomplete="off" />
+    </div>
+    <div class="search-select-field">
+      <label for="marketCountry">Region / Country</label>
+      <select id="marketCountry">
+        <option value="">Global</option>
+        <optgroup label="── Regions ──"><option value="Asia Pacific">Asia Pacific</option><option value="Europe">Europe</option><option value="North America">North America</option><option value="Middle East">Middle East</option><option value="Latin America">Latin America</option><option value="Africa">Africa</option></optgroup>
+        <optgroup label="── Asia ──"><option value="China">China</option><option value="India">India</option><option value="Japan">Japan</option><option value="South Korea">South Korea</option><option value="Southeast Asia">Southeast Asia</option></optgroup>
+        <optgroup label="── Europe ──"><option value="Germany">Germany</option><option value="France">France</option><option value="United Kingdom">United Kingdom</option><option value="Italy">Italy</option></optgroup>
+        <optgroup label="── Americas ──"><option value="USA">USA</option><option value="Brazil">Brazil</option><option value="Canada">Canada</option></optgroup>
+      </select>
+    </div>
+    <div class="search-select-field" style="min-width:160px;">
+      <label for="marketFocus">Research Focus</label>
+      <select id="marketFocus">
+        <option value="">All Insights</option>
+        <option value="size">Market Size &amp; Value</option>
+        <option value="trends">Trends &amp; Forecast</option>
+        <option value="players">Key Players</option>
+      </select>
+    </div>
+    <button id="marketSearchBtn" onclick="runMarketSearch()" aria-label="Search market data">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Search Market
+    </button>
+  </div>
 
-function buildSkeleton(count){
-  const cards = Array.from({length:count}, () => `
-    <div class="skeleton-card">
-      <div class="skeleton-line" style="width:60%;height:14px;margin-bottom:14px"></div>
-      <div class="skeleton-line" style="width:90%;height:11px"></div>
-      <div class="skeleton-line" style="width:75%;height:11px"></div>
-      <div class="skeleton-line" style="width:50%;height:11px;margin-top:16px"></div>
-    </div>`).join('');
-  return `<div class="skeleton-wrap">${cards}</div>`;
-}
+</div>
+<p class="hint" id="searchHint">Search by product, by country, or both — leave either field blank to broaden the search.</p>
 
-function buildErrorState(msg, retryFn){
-  const id = 'err-retry-' + Date.now();
-  setTimeout(() => {
-    const btn = document.getElementById(id);
-    if(btn) btn.onclick = retryFn;
-  }, 0);
-  return `<div class="state-error">
-    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-    </svg>
-    <p>Search failed: ${escapeHtml(msg)}<br><span style="font-size:12px;color:var(--muted)">Check your connection or try a different query.</span></p>
-    <button id="${id}" class="state-retry">↺ Try Again</button>
-  </div>`;
-}
+<div class="chips" id="chips"></div>
 
-function staggerCards(container){
-  const cards = container.querySelectorAll('.card');
-  cards.forEach((card, i) => {
-    card.classList.add('card-animate');
-    card.style.animationDelay = `${i * 40}ms`;
-  });
-}
+<div class="toolbar" id="toolbar" style="display:none;">
+  <div class="filters" id="filters">
+    <button class="active" data-filter="all" onclick="setFilter('all')">All</button>
+    <button data-filter="manufacturer" onclick="setFilter('manufacturer')">Manufacturers</button>
+    <button data-filter="distributor" onclick="setFilter('distributor')">Distributors</button>
+    <button data-filter="unclassified" onclick="setFilter('unclassified')">Unclassified</button>
+  </div>
+  <select id="sortBy" onchange="render()">
+    <option value="relevance">Sort: Relevance</option>
+    <option value="confidence">Sort: Confidence</option>
+    <option value="name">Sort: Name (A-Z)</option>
+  </select>
+  <button class="export-btn" onclick="exportExcel()">📊 Excel</button>
+  <button class="export-btn" onclick="exportCsv()">⬇ CSV</button>
+  <button class="export-btn" onclick="exportWord()">📄 Word</button>
+  <button class="export-btn" onclick="exportEmail()">📧 Email</button>
+</div>
 
-// ── Interactive Globe ─────────────────────────────────────────────────────────
-(function(){
-  const canvas = document.getElementById('globeCanvas');
-  if(!canvas) return;
+<div id="aiPanelWrap" style="display:none;"></div>
 
-  // Resize canvas to parent
-  const wrap = canvas.parentElement;
-  const SIZE = wrap.offsetWidth || 400;
-  canvas.width = SIZE; canvas.height = SIZE;
-  const R = SIZE / 2 - 2;
+<div class="results-wrap" id="resultsWrap" aria-live="polite" aria-atomic="false">
+  <div class="state-empty">
+    <div class="welcome-orb"></div>
+    <div class="welcome-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    </div>
+    <h2 class="welcome-title">Start Your Global Search</h2>
+    <p class="welcome-sub">Find manufacturers, distributors, and decision-makers across 195+ countries instantly.</p>
+    <div class="welcome-modes">
+      <div class="welcome-mode" onclick="setMode('product');document.getElementById('query').focus()">
+        <span class="wm-icon">🏭</span><span class="wm-label">Product Search</span>
+      </div>
+      <div class="welcome-mode" onclick="setMode('company');document.getElementById('companyQuery').focus()">
+        <span class="wm-icon">🏢</span><span class="wm-label">Company Lookup</span>
+      </div>
+      <div class="welcome-mode" onclick="setMode('person');document.getElementById('personQuery').focus()">
+        <span class="wm-icon">👤</span><span class="wm-label">Person Search</span>
+      </div>
+      <div class="welcome-mode" onclick="setMode('stock');document.getElementById('stockQuery').focus()">
+        <span class="wm-icon">📦</span><span class="wm-label">Stock Finder</span>
+      </div>
+    </div>
+  </div>
+</div>
 
-  const ctx = canvas.getContext('2d');
-  const proj = d3.geoOrthographic()
-    .scale(R)
-    .translate([SIZE/2, SIZE/2])
-    .clipAngle(90);
-  const path = d3.geoPath(proj, ctx);
-  const sphere = { type:'Sphere' };
+<footer>Classification is heuristic and may be imperfect — always verify suppliers independently.</footer>
 
-  // ISO numeric → display name
-  const ISO = {
-    4:'Afghanistan',8:'Albania',12:'Algeria',24:'Angola',32:'Argentina',
-    36:'Australia',40:'Austria',50:'Bangladesh',56:'Belgium',64:'Bhutan',
-    68:'Bolivia',76:'Brazil',100:'Bulgaria',104:'Myanmar',116:'Cambodia',
-    120:'Cameroon',124:'Canada',144:'Sri Lanka',152:'Chile',156:'China',
-    170:'Colombia',178:'Congo',180:'DRC',188:'Costa Rica',191:'Croatia',
-    192:'Cuba',196:'Cyprus',203:'Czech Republic',208:'Denmark',
-    214:'Dominican Republic',218:'Ecuador',818:'Egypt',222:'El Salvador',
-    231:'Ethiopia',246:'Finland',250:'France',266:'Gabon',276:'Germany',
-    288:'Ghana',300:'Greece',320:'Guatemala',332:'Haiti',340:'Honduras',
-    348:'Hungary',356:'India',360:'Indonesia',364:'Iran',368:'Iraq',
-    372:'Ireland',376:'Israel',380:'Italy',384:'Ivory Coast',388:'Jamaica',
-    392:'Japan',398:'Kazakhstan',400:'Jordan',404:'Kenya',410:'South Korea',
-    408:'North Korea',414:'Kuwait',418:'Laos',422:'Lebanon',430:'Liberia',
-    434:'Libya',484:'Mexico',504:'Morocco',508:'Mozambique',516:'Namibia',
-    524:'Nepal',528:'Netherlands',554:'New Zealand',558:'Nicaragua',
-    566:'Nigeria',578:'Norway',512:'Oman',586:'Pakistan',591:'Panama',
-    604:'Peru',608:'Philippines',616:'Poland',634:'Qatar',642:'Romania',
-    643:'Russia',646:'Rwanda',682:'Saudi Arabia',686:'Senegal',
-    694:'Sierra Leone',703:'Slovakia',706:'Somalia',710:'South Africa',
-    728:'South Sudan',724:'Spain',729:'Sudan',752:'Sweden',756:'Switzerland',
-    760:'Syria',158:'Taiwan',762:'Tajikistan',834:'Tanzania',764:'Thailand',
-    768:'Togo',788:'Tunisia',792:'Turkey',800:'Uganda',804:'Ukraine',
-    784:'UAE',826:'UK',840:'USA',858:'Uruguay',860:'Uzbekistan',
-    862:'Venezuela',704:'Vietnam',887:'Yemen',894:'Zambia',716:'Zimbabwe',
-    702:'Singapore',458:'Malaysia',108:'Burundi',854:'Burkina Faso',
-    140:'Central African Republic',148:'Chad',174:'Comoros',214:'DR Congo',
-    232:'Eritrea',270:'Gambia',324:'Guinea',624:'Guinea-Bissau',
-    426:'Lesotho',454:'Malawi',466:'Mali',478:'Mauritania',516:'Namibia',
-    562:'Niger',706:'Somalia',736:'Sudan',748:'Eswatini'
-  };
+<!-- Hidden form for Google reverse image search -->
+<form id="gLensForm" method="POST" action="https://lens.google.com/upload" enctype="multipart/form-data" target="_blank" style="display:none">
+  <input type="file" id="gLensFile" name="encoded_image" accept="image/*">
+</form>
 
-  // Countries the dropdowns support (map display name → option value)
-  const SUPPORTED = {
-    'China':'China','India':'India','Israel':'Israel','Thailand':'Thailand',
-    'USA':'USA','Vietnam':'Vietnam','Bangladesh':'Bangladesh','Taiwan':'Taiwan',
-    'Turkey':'Turkey','Germany':'Germany','Netherlands':'Netherlands','UAE':'UAE',
-    'Poland':'Poland','Brazil':'Brazil','Australia':'Australia','Spain':'Spain',
-    'Singapore':'Singapore','South Africa':'South Africa','Nigeria':'Nigeria',
-    'Kenya':'Kenya','Egypt':'Egypt','Ethiopia':'Ethiopia','Ghana':'Ghana',
-    'Tanzania':'Tanzania','Morocco':'Morocco','Algeria':'Algeria','Angola':'Angola',
-    'Ivory Coast':'Ivory Coast','Cameroon':'Cameroon','Uganda':'Uganda',
-    'Mozambique':'Mozambique','Zimbabwe':'Zimbabwe','Zambia':'Zambia',
-    'Senegal':'Senegal','Tunisia':'Tunisia','DRC':'DRC',
-    'South Korea':'South Korea','Japan':'Japan','Indonesia':'Indonesia',
-    'Malaysia':'Malaysia','Philippines':'Philippines','Pakistan':'Pakistan',
-    'Saudi Arabia':'Saudi Arabia','France':'France','Italy':'Italy',
-    'UK':'UK','Russia':'Russia','Mexico':'Mexico','Canada':'Canada',
-    'Argentina':'Argentina','Colombia':'Colombia','Chile':'Chile','Peru':'Peru',
-    'Vietnam':'Vietnam','Iran':'Iran','Iraq':'Iraq','Kazakhstan':'Kazakhstan',
-    'Ukraine':'Ukraine','Romania':'Romania','Czech Republic':'Czech Republic',
-    'Hungary':'Hungary','Sweden':'Sweden','Norway':'Norway','Finland':'Finland',
-    'Belgium':'Belgium','Switzerland':'Switzerland','Austria':'Austria',
-    'Greece':'Greece','Portugal':'Portugal','Israel':'Israel',
-    'New Zealand':'New Zealand','South Africa':'South Africa'
-  };
-
-  let world = null;
-  let countries = [];
-  let hoveredId = null;
-  let selectedId = null;
-  let rotating = true;
-  let rotateTimer = null;
-  const rotation = [20, -25, 0];
-
-  // Drag state
-  let dragStart = null;
-  let rotStart = null;
-
-  function draw(){
-    ctx.clearRect(0,0,SIZE,SIZE);
-
-    // Atmosphere glow
-    const atm = ctx.createRadialGradient(SIZE/2,SIZE/2,R*.92,SIZE/2,SIZE/2,R*1.08);
-    atm.addColorStop(0,'rgba(37,99,235,.0)');
-    atm.addColorStop(1,'rgba(37,99,235,.12)');
-    ctx.beginPath(); ctx.arc(SIZE/2,SIZE/2,R*1.06,0,2*Math.PI);
-    ctx.fillStyle=atm; ctx.fill();
-
-    // Ocean
-    const ocean = ctx.createRadialGradient(SIZE*.35,SIZE*.3,0,SIZE/2,SIZE/2,R);
-    ocean.addColorStop(0,'#dbeafe');
-    ocean.addColorStop(.5,'#bfdbfe');
-    ocean.addColorStop(1,'#93c5fd');
-    ctx.beginPath(); path(sphere); ctx.fillStyle=ocean; ctx.fill();
-
-    // Graticule
-    const grat = d3.geoGraticule()();
-    ctx.beginPath(); path(grat);
-    ctx.strokeStyle='rgba(37,99,235,.12)'; ctx.lineWidth=.5; ctx.stroke();
-
-    // Countries
-    if(world){
-      for(const f of countries){
-        const id = +f.id;
-        const isHov = id === hoveredId;
-        const isSel = id === selectedId;
-        const inSupport = SUPPORTED[ISO[id]];
-
-        ctx.beginPath(); path(f);
-        if(isSel){
-          ctx.fillStyle='rgba(37,99,235,.85)';
-        } else if(isHov && inSupport){
-          ctx.fillStyle='rgba(37,99,235,.45)';
-        } else if(isHov){
-          ctx.fillStyle='rgba(100,116,139,.35)';
-        } else if(inSupport){
-          ctx.fillStyle='rgba(37,99,235,.28)';
-        } else {
-          ctx.fillStyle='rgba(203,213,225,.9)';
-        }
-        ctx.fill();
-
-        ctx.beginPath(); path(f);
-        ctx.strokeStyle = isSel ? 'rgba(37,99,235,.95)'
-                        : isHov ? 'rgba(37,99,235,.7)'
-                        : inSupport ? 'rgba(37,99,235,.3)'
-                        : 'rgba(71,85,105,.4)';
-        ctx.lineWidth = isSel ? 1.5 : isHov ? 1 : .4;
-        ctx.stroke();
-      }
-    }
-
-    // Sphere border
-    ctx.beginPath(); path(sphere);
-    ctx.strokeStyle='rgba(37,99,235,.25)'; ctx.lineWidth=1.5; ctx.stroke();
-
-    // Shine
-    const shine = ctx.createRadialGradient(SIZE*.35,SIZE*.28,0,SIZE*.4,SIZE*.35,R*.55);
-    shine.addColorStop(0,'rgba(255,255,255,.45)');
-    shine.addColorStop(1,'rgba(255,255,255,0)');
-    ctx.beginPath(); path(sphere); ctx.fillStyle=shine; ctx.fill();
-  }
-
-  function startAutoRotate(){
-    if(rotateTimer) return;
-    rotateTimer = d3.timer(elapsed => {
-      if(!rotating){ rotateTimer.stop(); rotateTimer=null; return; }
-      rotation[0] += .018;
-      proj.rotate(rotation);
-      draw();
-    });
-  }
-
-  function stopAutoRotate(){
-    rotating = false;
-    if(rotateTimer){ rotateTimer.stop(); rotateTimer=null; }
-  }
-
-  function getCountryAt(x, y){
-    if(!world) return null;
-    const pos = proj.invert([x, y]);
-    if(!pos) return null;
-    for(const f of countries){
-      if(d3.geoContains(f, pos)) return f;
-    }
-    return null;
-  }
-
-  // Mouse / touch events
-  canvas.addEventListener('mouseenter', () => { rotating = false; });
-  canvas.addEventListener('mouseleave', () => {
-    hoveredId = null;
-    document.getElementById('globeTooltip').style.opacity='0';
-    rotating = true; startAutoRotate(); draw();
-  });
-
-  canvas.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect();
-    const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
-    const x = sx * (SIZE / rect.width), y = sy * (SIZE / rect.height);
-
-    if(dragStart){
-      const dx = sx - dragStart[0], dy = sy - dragStart[1];
-      rotation[0] = rotStart[0] + dx * .35;
-      rotation[1] = Math.max(-60, Math.min(60, rotStart[1] - dy * .35));
-      proj.rotate(rotation);
-      draw(); return;
-    }
-
-    const f = getCountryAt(x, y);
-    const newId = f ? +f.id : null;
-    if(newId !== hoveredId){ hoveredId = newId; draw(); }
-
-    const tip = document.getElementById('globeTooltip');
-    if(f && ISO[+f.id]){
-      const name = ISO[+f.id];
-      const sup = SUPPORTED[name];
-      tip.textContent = sup ? `📍 ${name} — click to select` : `${name}`;
-      tip.style.opacity='1';
-      canvas.style.cursor = sup ? 'pointer' : 'default';
-    } else {
-      tip.style.opacity='0';
-      canvas.style.cursor = dragStart ? 'grabbing' : 'grab';
-    }
-  });
-
-  canvas.addEventListener('mousedown', e => {
-    const rect = canvas.getBoundingClientRect();
-    dragStart = [e.clientX - rect.left, e.clientY - rect.top];
-    rotStart = [...rotation];
-    stopAutoRotate();
-  });
-
-  window.addEventListener('mouseup', () => { dragStart = null; });
-
-  canvas.addEventListener('click', e => {
-    if(dragStart && (Math.abs(e.movementX)>3 || Math.abs(e.movementY)>3)) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX - rect.left) * (SIZE/rect.width);
-    const y = (e.clientY - rect.top)  * (SIZE/rect.height);
-    const f = getCountryAt(x, y);
-    if(!f) return;
-    const name = ISO[+f.id];
-    if(!name || !SUPPORTED[name]) return;
-    selectedId = +f.id;
-    draw();
-    selectCountryInDropdowns(name);
-    showGlobeToast('📍 ' + name + ' selected');
-  });
-
-  // Touch support
-  let lastTouch = null;
-  canvas.addEventListener('touchstart', e => {
-    e.preventDefault();
-    const t = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    lastTouch = [t.clientX - rect.left, t.clientY - rect.top];
-    rotStart = [...rotation];
-    stopAutoRotate();
-  }, {passive:false});
-
-  canvas.addEventListener('touchmove', e => {
-    e.preventDefault();
-    if(!lastTouch) return;
-    const t = e.touches[0];
-    const rect = canvas.getBoundingClientRect();
-    const cx = t.clientX - rect.left, cy = t.clientY - rect.top;
-    rotation[0] = rotStart[0] + (cx - lastTouch[0]) * .35;
-    rotation[1] = Math.max(-60, Math.min(60, rotStart[1] - (cy - lastTouch[1]) * .35));
-    proj.rotate(rotation);
-    draw();
-  }, {passive:false});
-
-  canvas.addEventListener('touchend', e => {
-    e.preventDefault();
-    if(e.changedTouches.length === 1){
-      const t = e.changedTouches[0];
-      const rect = canvas.getBoundingClientRect();
-      const x = (t.clientX - rect.left) * (SIZE/rect.width);
-      const y = (t.clientY - rect.top)  * (SIZE/rect.height);
-      const f = getCountryAt(x, y);
-      if(f && ISO[+f.id] && SUPPORTED[ISO[+f.id]]){
-        selectedId = +f.id;
-        draw();
-        selectCountryInDropdowns(ISO[+f.id]);
-        showGlobeToast('📍 ' + ISO[+f.id] + ' selected');
-      }
-    }
-    lastTouch = null;
-    rotating = true; startAutoRotate();
-  }, {passive:false});
-
-  function selectCountryInDropdowns(name){
-    ['country','companyCountry','personCountry','stockCountry'].forEach(id => {
-      const sel = document.getElementById(id);
-      if(!sel) return;
-      for(const opt of sel.options){
-        if(opt.value === name || opt.value.startsWith(name.split(' ')[0])){
-          sel.value = opt.value; break;
-        }
-      }
-    });
-  }
-
-  function showGlobeToast(msg){
-    const old = document.querySelector('.globe-country-toast');
-    if(old) old.remove();
-    const t = document.createElement('div');
-    t.className='globe-country-toast'; t.textContent=msg;
-    document.body.appendChild(t);
-    setTimeout(()=>{ t.style.transition='opacity .4s'; t.style.opacity='0';
-      setTimeout(()=>t.remove(), 400); }, 2200);
-  }
-
-  // Load world data
-  d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(data => {
-    world = data;
-    countries = topojson.feature(data, data.objects.countries).features;
-    proj.rotate(rotation);
-    draw();
-    rotating = true; startAutoRotate();
-  }).catch(()=>{
-    // Draw empty globe if fetch fails
-    proj.rotate(rotation); draw(); rotating=true; startAutoRotate();
-  });
-})();
-</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="app.js"></script>
+<script src="features.js"></script>
 </body>
 </html>
-
-
-
-
-
-

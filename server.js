@@ -5,8 +5,10 @@
 // so the app is usable immediately and upgrades to live results once a key is added.
 
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const cheerio = require('cheerio');
+const session = require('express-session');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const app = express();
@@ -20,7 +22,48 @@ const GEMINI_KEY    = process.env.GEMINI_API_KEY  || '';
 const LIVE_MODE     = Boolean((GOOGLE_API_KEY && GOOGLE_CX) || BRAVE_API_KEY);
 const AI_PROVIDER   = OPENAI_KEY ? 'openai' : GEMINI_KEY ? 'gemini' : null;
 
+const LOGIN_USER = process.env.LOGIN_USER || 'admin';
+const LOGIN_PASS = process.env.LOGIN_PASS || 'sourceiq2024';
+
+app.set('trust proxy', 1);
+app.use(compression()); // gzip responses — the dashboard HTML alone is ~260KB uncompressed
 app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'sourceiq-secret',
+  resave: false,
+  saveUninitialized: false,
+  proxy: true,
+  cookie: { maxAge: 8 * 60 * 60 * 1000, secure: false } // 8 hours
+}));
+
+// Auth middleware — protects everything except login page and its assets
+function requireAuth(req, res, next) {
+  if (req.session && req.session.loggedIn) return next();
+  if (req.path === '/login' || req.path === '/login.html') return next();
+  if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Unauthorized' });
+  return res.redirect('/login');
+}
+
+app.get('/login', (req, res) => {
+  if (req.session && req.session.loggedIn) return res.redirect('/');
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+  if (username === LOGIN_USER && password === LOGIN_PASS) {
+    req.session.loggedIn = true;
+    req.session.username = username;
+    return req.session.save(() => res.redirect('/'));
+  }
+  return res.redirect('/login?error=1');
+});
+
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => res.redirect('/login'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---- Classification heuristics ----
@@ -68,7 +111,8 @@ const DOMAIN_HINTS = {
     'tradekey.com', 'exportersindia.com', 'dhgate.com', 'global-sources.com',
     'goldsupplier.com', '1688.com', 'diytrade.com',
     // B2B directories (list both — treat as neutral/distributor-leaning)
-    'europages.com', 'europages.co.uk', 'kompass.com', 'directindustry.com'
+    'europages.com', 'europages.co.uk', 'kompass.com', 'directindustry.com',
+    'exporters.sg', 'go4worldbusiness.com', 'tradewheel.com'
   ]
 };
 
@@ -95,7 +139,8 @@ const AGGREGATOR_DOMAINS = [
   'sgpbusiness.com', 'opencorporates.com', 'importer.usaypage.com', 'addressadda.com',
   'clodura.ai', 'signalhire.com', 'lusha.com', 'kompass.com', 'europages.com',
   'tradeindia.com', 'indiamart.com', 'exportersindia.com', 'justdial.com',
-  'startupnationcentral.org', 'tofler.in', 'zaubacorp.com'
+  'startupnationcentral.org', 'tofler.in', 'zaubacorp.com',
+  'exporters.sg', 'go4worldbusiness.com', 'tradewheel.com'
 ];
 function isAggregatorHost(host = '') {
   const h = host.toLowerCase().replace(/^www\./, '');
@@ -163,7 +208,19 @@ function classify(title, snippet, displayLink = '', url = '') {
   if (/request.{0,10}quote|send.{0,10}inquiry|rfq|get.{0,8}price/i.test(snippetText)) manuScore += 3;
   if (/in.?stock|ready.?stock|same.?day.?dispatch|bulk.?discount/i.test(snippetText))  distScore += 4;
 
-  // If both scores are zero — genuinely cannot determine
+  // Weak fallback: generic "supplier/supply" wording was deliberately excluded above
+  // (too common on both manufacturer and distributor pages to be a strong signal), but
+  // a page that mentions it and triggers NOTHING else is still more likely a distributor/
+  // trading page than truly unclassifiable — nudge it rather than giving up entirely.
+  let weakFallback = false;
+  if (manuScore === 0 && distScore === 0) {
+    if (/\bsuppl(?:y|ier|iers)\b/.test(titleText) || /\bsuppl(?:y|ier|iers)\b/.test(snippetText)) {
+      distScore += 2;
+      weakFallback = true;
+    }
+  }
+
+  // If both scores are still zero — genuinely cannot determine
   if (manuScore === 0 && distScore === 0) {
     return { type: 'unclassified', confidence: 0 };
   }
@@ -174,7 +231,9 @@ function classify(title, snippet, displayLink = '', url = '') {
 
   // Confidence: starts at 50%, scaled by how decisive the margin is.
   // A margin of 0.5 (tie) → 50%. A margin of 1.0 (all on one side) → 97%.
-  const confidence = Math.min(97, Math.round(50 + margin * 47));
+  // The weak "supplier"-only fallback above is a guess, not a real signal — cap it
+  // low so the UI doesn't present it with false certainty.
+  const confidence = weakFallback ? 55 : Math.min(97, Math.round(50 + margin * 47));
 
   // If confidence is below 60%, still classify but mark it weaker
   return { type, confidence };
@@ -250,7 +309,21 @@ const DEMO_DATA = [
     employeeCount:"620", companySize:"Large (250+ employees)", founded:"1988"},
   {keywords:["rubber","tire","auto","parts"], country:"Israel", title:"AutoPart Distributors Israel", link:"https://example.com/autopartil", displayLink:"autopart-il.example.com", snippet:"Distributor of rubber components and auto parts to garages and retailers nationwide. Authorized dealer.", type:"distributor", confidence:91,
     phone:"+972 3 555 0456", whatsapp:"+972 50 555 0456", email:"info@autopart-il.example.com", address:"Holon Industrial Zone, Holon, Israel", keyPeople:[{name:"David Mizrahi", title:"Owner"}],
-    employeeCount:"18", companySize:"Small (under 50 employees)", founded:"2019"}
+    employeeCount:"18", companySize:"Small (under 50 employees)", founded:"2019"},
+
+  // ── Copper cathode producers — one verified real producer per continent ──────
+  // Unlike the entries above, these are REAL companies with REAL official sites,
+  // not example.com placeholders. We deliberately do NOT include phone/email/
+  // address here — we don't have verified current contact details for these, and
+  // fabricating them for real companies would be misleading. Clicking through
+  // triggers the app's normal live scraper (/api/enrich) to pull real contact
+  // info directly from each site instead.
+  {keywords:["copper","cathode"], continent:"South America", country:"Chile", title:"Codelco — Corporación Nacional del Cobre de Chile", link:"https://www.codelco.com", displayLink:"codelco.com", snippet:"State-owned Chilean mining company; the world's largest copper producer, producing copper cathodes for global export.", type:"manufacturer", confidence:97},
+  {keywords:["copper","cathode"], continent:"North America", country:"United States", title:"Freeport-McMoRan Inc.", link:"https://www.fcx.com", displayLink:"fcx.com", snippet:"Major U.S.-based copper producer with mining and smelting/refining operations producing copper cathodes.", type:"manufacturer", confidence:97},
+  {keywords:["copper","cathode"], continent:"Asia", country:"China", title:"Jiangxi Copper Corporation", link:"https://www.jxcc.com", displayLink:"jxcc.com", snippet:"China's largest integrated copper producer, with cathode production at its Guixi smelter/refinery complex.", type:"manufacturer", confidence:96},
+  {keywords:["copper","cathode"], continent:"Europe", country:"Germany", title:"Aurubis AG", link:"https://www.aurubis.com", displayLink:"aurubis.com", snippet:"Europe's largest copper producer and recycler, manufacturing copper cathodes from both mined concentrate and recycled material.", type:"manufacturer", confidence:96},
+  {keywords:["copper","cathode"], continent:"Africa", country:"Zambia", title:"First Quantum Minerals — Kansanshi Mining", link:"https://www.first-quantum.com", displayLink:"first-quantum.com", snippet:"Operates the Kansanshi mine in Zambia, one of Africa's largest copper cathode producers.", type:"manufacturer", confidence:95},
+  {keywords:["copper","cathode"], continent:"Oceania", country:"Australia", title:"BHP — Olympic Dam", link:"https://www.bhp.com", displayLink:"bhp.com", snippet:"Operates the Olympic Dam mine in South Australia, producing copper cathodes alongside uranium, gold and silver.", type:"manufacturer", confidence:95}
 ];
 
 function searchDemo(subject, country) {
@@ -262,6 +335,21 @@ function searchDemo(subject, country) {
     const matchesCountry = !countryLc || item.country.toLowerCase() === countryLc;
     return matchesSubject && matchesCountry;
   }).map(({ keywords, ...rest }) => rest);
+}
+
+// A handful of DEMO_DATA entries point to REAL companies (not example.com
+// placeholders) — e.g. the copper cathode producers. Unlike the rest of DEMO_DATA
+// (which only activates with no API keys at all), these should always be surfaced
+// in live search results too when the query matches, since they're a curated,
+// verified reference set worth showing regardless of live search quality.
+function curatedRealMatches(subjectTerms) {
+  if (!subjectTerms.length) return [];
+  return DEMO_DATA
+    .filter(item => !item.link.includes('example.com'))
+    .filter(item => subjectTerms.some(t => item.keywords.some(k => k.includes(t) || t.includes(k))))
+    .map(({ keywords, continent, ...rest }) => ({
+      ...rest, signals: [], category: 'direct', thumbnail: null, age: null, curated: true
+    }));
 }
 
 function searchDemoByCompanyName(company) {
@@ -282,7 +370,8 @@ function searchDemoByPersonName(person) {
 async function enrichFromExternalSources(companyName, websiteOrigin) {
   const out = {
     description: null, wikipedia: null, linkedin: null,
-    revenue: null, employeesExt: null, industry: null, news: []
+    revenue: null, employeesExt: null, industry: null, news: [],
+    fundingStage: null, founders: []
   };
   if (!companyName || companyName.length < 2) return out;
 
@@ -374,6 +463,33 @@ async function enrichFromExternalSources(companyName, websiteOrigin) {
       })
     );
 
+    // 3d. Funding stage & founders from Crunchbase / news
+    tasks.push(
+      braveFetch(`"${companyName}" funding round Series Seed investors founders`).then(items => {
+        const FUNDING_STAGES = ['Pre-Seed', 'Seed', 'Series A', 'Series B', 'Series C', 'Series D', 'Series E', 'Series F', 'IPO', 'Acquired', 'Grant'];
+        for (const item of items) {
+          const text = ((item.title || '') + ' ' + (item.description || '')).replace(/\s+/g, ' ');
+          if (!out.fundingStage) {
+            for (const stage of FUNDING_STAGES) {
+              if (new RegExp('\\b' + stage.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i').test(text)) {
+                out.fundingStage = stage;
+                break;
+              }
+            }
+          }
+          if (out.founders.length < 3) {
+            const founderMatch = text.match(/(?:founded by|co-founded by|founder[s]?[^a-z]{0,5})([A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2}(?:\s(?:and|&)\s[A-Z][a-z]+(?:\s[A-Z][a-z]+){0,2})?)/i);
+            if (founderMatch) {
+              const names = founderMatch[1].split(/\s+(?:and|&)\s+/i).map(n => n.trim()).filter(n => n.length > 2);
+              for (const name of names) {
+                if (!out.founders.includes(name)) out.founders.push(name);
+              }
+            }
+          }
+        }
+      })
+    );
+
     // 3c. Recent news (exclude the company's own site)
     tasks.push(
       braveFetch(`${companyName} company news 2025`, '&freshness=py').then(items => {
@@ -407,8 +523,63 @@ const TITLE_KEYWORDS = [
   'Owner', 'Sales Manager', 'Plant Manager'
 ];
 
+// Pull structured contact data out of JSON-LD (schema.org Organization/LocalBusiness).
+// Most company sites embed this for SEO — it's authoritative and far cleaner than
+// regex-scraping visible text, so we use it as the highest-priority source.
+function extractJsonLd($) {
+  const out = { phone: null, fax: null, email: null, address: null, whatsapp: null, founded: null, country: null };
+  const formatAddress = (a) => {
+    if (!a || typeof a !== 'object') return null;
+    const parts = [a.streetAddress, a.addressLocality, a.addressRegion, a.postalCode, a.addressCountry]
+      .filter(Boolean).map(String).map(s => s.trim());
+    return parts.length ? parts.join(', ') : null;
+  };
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (Array.isArray(node)) { node.forEach(visit); return; }
+    const type = (node['@type'] || '').toString();
+    if (/Organization|LocalBusiness|Corporation|Store/i.test(type)) {
+      if (!out.phone && node.telephone) out.phone = String(node.telephone).trim();
+      if (!out.fax && node.faxNumber) out.fax = String(node.faxNumber).trim();
+      if (!out.email && node.email) out.email = String(node.email).trim();
+      if (!out.address) out.address = formatAddress(node.address);
+      // Capture the country code/name directly, independent of whether the full
+      // street address assembled above — gives us a fallback even when other
+      // address fields (street, postal code) are missing from the markup.
+      if (!out.country && node.address && typeof node.address === 'object' && node.address.addressCountry) {
+        const ac = node.address.addressCountry;
+        out.country = typeof ac === 'object' ? (ac.name || null) : String(ac).trim();
+      }
+      if (!out.founded && node.foundingDate) {
+        const y = String(node.foundingDate).match(/\d{4}/);
+        if (y) out.founded = y[0];
+      }
+      if (Array.isArray(node.contactPoint)) {
+        for (const cp of node.contactPoint) {
+          if (!out.phone && cp.telephone) out.phone = String(cp.telephone).trim();
+          if (!out.email && cp.email) out.email = String(cp.email).trim();
+          if (!out.whatsapp && /whatsapp/i.test(cp.contactType || '') && cp.telephone) out.whatsapp = String(cp.telephone).trim();
+        }
+      }
+    }
+    for (const key of Object.keys(node)) {
+      if (key === '@type') continue;
+      const v = node[key];
+      if (v && typeof v === 'object') visit(v);
+    }
+  };
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const json = JSON.parse($(el).contents().text());
+      visit(json);
+    } catch (_) { /* malformed JSON-LD — ignore */ }
+  });
+  return out;
+}
+
 function extractContactInfo(html) {
   const $ = cheerio.load(html);
+  const jsonLd = extractJsonLd($);
   // Strip elements unlikely to contain real contact info and likely to produce
   // false-positive address/phone matches (nav menus, scripts, etc.)
   $('script, style, noscript, nav, header').remove();
@@ -427,6 +598,8 @@ function extractContactInfo(html) {
     const addr = ($(el).attr('href') || '').replace(/^mailto:/i, '').split('?')[0].trim();
     if (addr) mailtoEmails.push(addr);
   });
+  const itempropEmail = $('[itemprop="email"]').first().text().trim();
+  if (itempropEmail) mailtoEmails.push(itempropEmail);
   const textEmails = (text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g) || [])
     .filter(e => !/\.(png|jpg|jpeg|gif|svg|webp)$/i.test(e));
   // De-obfuscate common anti-scrape patterns, but ONLY the bracketed forms
@@ -481,6 +654,10 @@ function extractContactInfo(html) {
     const phoneMatches = text.match(/\+?\d[\d\s().-]{7,16}\d/g) || [];
     phone = phoneMatches.map(p => p.trim()).find(looksLikePhone) || null;
   }
+  if (!phone) {
+    const itemprop = $('[itemprop="telephone"]').first().text().trim();
+    if (looksLikePhone(itemprop)) phone = itemprop;
+  }
 
   // --- Address: <address> tag, schema.org markup, or a street-pattern heuristic
   //     scoped to footer/contact sections only, requiring a comma to cut down
@@ -492,6 +669,12 @@ function extractContactInfo(html) {
     let s = a.replace(/\s+/g, ' ').trim();
     // Cut at the first trailing contact-label keyword
     s = s.replace(/\s+(Website|WhatsApp|Whats App|Email|E-mail|Phone|Tel|Fax|Mobile|Call|Contact|Hours|Copyright|©|Follow|Subscribe|Newsletter|Menu|Home)\b.*$/i, '').trim();
+    // Cut right after a postal/zip code if it's followed by an unrelated sentence
+    // (e.g. "...Suite 110, Phoenix, AZ 85040 Communication will be forwarded to...").
+    // Addresses continue with commas; a capitalized word + 2+ lowercase words with
+    // no comma is prose, not an address continuation — but "Blvd. Suite 110" (an
+    // abbreviation immediately followed by digits) must NOT be caught by this.
+    s = s.replace(/(\d[\d-]{3,7})\s+[A-Z][a-z]+(?:\s+[a-z]+){2,}.*$/, '$1');
     // Drop a dangling trailing connector/punctuation
     s = s.replace(/[\s,;|·•\-]+$/, '').trim();
     return s.length >= 8 ? s : null;
@@ -506,6 +689,11 @@ function extractContactInfo(html) {
     if (addrMatch) { const c = cleanAddress(addrMatch[0]); if (c && c.length < 140) address = c; }
   }
 
+  // --- Fax: look for fax-labeled numbers ---
+  let fax = null;
+  const faxMatch = text.match(/(?:fax|facsimile|f:)[^\d]{0,4}(\+?\d[\d\s().-]{7,16}\d)/i);
+  if (faxMatch && looksLikePhone(faxMatch[1]) && faxMatch[1] !== phone) fax = faxMatch[1].trim();
+
   // --- WhatsApp: look for wa.me / api.whatsapp.com links, or a "WhatsApp: <number>"
   //     mention in the text. Note this is a company-level contact channel — sites
   //     essentially never publish a separate WhatsApp number per individual person. ---
@@ -519,6 +707,21 @@ function extractContactInfo(html) {
   if (!whatsapp) {
     const waTextMatch = text.match(/whatsapp[^a-zA-Z0-9]{0,5}(\+?\d[\d\s().-]{6,15}\d)/i);
     if (waTextMatch) whatsapp = waTextMatch[1].trim();
+  }
+
+  // --- Hiring status: detect careers/jobs sections or "we're hiring" signals ---
+  let hiringStatus = null;
+  const hiringLinks = [];
+  $('a[href*="career"], a[href*="jobs"], a[href*="hiring"], a[href*="work-with-us"], a[href*="join-us"]').each((_, el) => {
+    const href = $(el).attr('href') || '';
+    if (href && !href.startsWith('#')) hiringLinks.push(href);
+  });
+  if (hiringLinks.length > 0) {
+    hiringStatus = 'Actively hiring';
+  } else if (/(?:we're|we are|now)\s+hiring|join our team|career opportunities|open positions|current openings|job openings/i.test(text)) {
+    hiringStatus = 'Actively hiring';
+  } else if (/no open positions|no current openings|not hiring/i.test(text)) {
+    hiringStatus = 'Not currently hiring';
   }
 
   // --- Key people: name immediately followed by a recognized title ---
@@ -563,14 +766,59 @@ function extractContactInfo(html) {
   const foundedMatch = text.match(/(?:founded|established|incorporated|since)\D{0,12}((?:19|20)\d{2})\b/i);
   if (foundedMatch) founded = foundedMatch[1];
 
-  return { phone, email, address, whatsapp, keyPeople, employeeCount, companySize, founded };
+  // Country: even when we can't assemble a full street address, try to at least
+  // pin down which country the company is in. Priority: JSON-LD's explicit
+  // addressCountry > a country name/alias mentioned in the footer/contact section
+  // > the same scan over the whole page as a last resort before falling back to
+  // the domain's ccTLD (done one level up, in /api/enrich, where the host is known).
+  const country = jsonLd.country
+    || detectCountryFromText(addressCandidateText)
+    || detectCountryFromText(text);
+
+  // JSON-LD is authoritative — prefer it over the regex-scraped guesses above.
+  return {
+    phone: jsonLd.phone || phone,
+    fax: jsonLd.fax || fax,
+    email: jsonLd.email || email,
+    address: jsonLd.address || address,
+    whatsapp: jsonLd.whatsapp || whatsapp,
+    keyPeople, employeeCount, companySize,
+    founded: jsonLd.founded || founded,
+    hiringStatus,
+    country
+  };
 }
+
+// In-memory cache for scraped enrichment data, keyed by domain (not full URL —
+// contact info lives at the company level, so re-scraping the same domain across
+// different search-result pages or repeat searches is wasted work). 12h TTL: long
+// enough to avoid re-hitting the same sites within a workday, short enough that
+// stale contact info doesn't linger indefinitely.
+const ENRICH_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
+const enrichCache = new Map();
 
 app.get('/api/enrich', async (req, res) => {
   const url = (req.query.url || '').trim();
   const nameHint = (req.query.name || '').trim();
+  // Optional: the country the search result was already tagged with (e.g. from
+  // a country-filtered search, or one of the curated reference entries) — used
+  // as a fallback if scraping can't determine a country on its own.
+  const countryHint = (req.query.country || '').trim();
   if (!url) {
     return res.status(400).json({ error: 'Missing url parameter' });
+  }
+
+  let cacheHost = '';
+  try { cacheHost = new URL(url).host.replace(/^www\./, '').toLowerCase(); } catch (_) {}
+  if (cacheHost) {
+    const cached = enrichCache.get(cacheHost);
+    if (cached && (Date.now() - cached.time) < ENRICH_CACHE_TTL_MS) {
+      // A cached scrape may predate a countryHint the caller now supplies (or be
+      // from before the country-detection fallback existed) — still apply the
+      // hint/TLD fallback on a cache hit rather than serving a stale empty country.
+      const country = cached.data.country || countryHint || countryFromHost(cacheHost);
+      return res.json({ ...cached.data, website: url, country, cached: true });
+    }
   }
 
   // Directory/aggregator pages (ZoomInfo, Bloomberg, Crunchbase, D&B, importer dirs…)
@@ -582,6 +830,7 @@ app.get('/api/enrich', async (req, res) => {
     return res.json({
       success: true, website: url, phone: null, email: null, address: null,
       whatsapp: null, keyPeople: [], employeeCount: null, companySize: null, founded: null,
+      country: countryHint || countryFromHost(enrichHost),
       isAggregator: true,
       note: `This is a third-party directory listing (${enrichHost}); its details may not match the exact company. Open it to verify.`
     });
@@ -589,19 +838,28 @@ app.get('/api/enrich', async (req, res) => {
 
   // If this is one of our bundled demo links, return the canned demo contact info
   // instead of trying to fetch a non-existent example.com page.
-  const demoMatch = DEMO_DATA.find(d => d.link === url);
+  // Only example.com placeholder entries should short-circuit to canned data —
+  // curated real-company entries (e.g. copper cathode producers) must always go
+  // through live scraping below, since they have real websites worth actually fetching.
+  const demoMatch = DEMO_DATA.find(d => d.link === url && d.link.includes('example.com'));
   if (demoMatch) {
+    const demoFounders = (demoMatch.keyPeople || []).filter(p => /founder/i.test(p.title)).map(p => p.name);
     return res.json({
       success: true,
       website: url,
       phone: demoMatch.phone || null,
+      fax: demoMatch.fax || null,
       email: demoMatch.email || null,
       address: demoMatch.address || null,
       whatsapp: demoMatch.whatsapp || null,
       keyPeople: demoMatch.keyPeople || [],
       employeeCount: demoMatch.employeeCount || null,
       companySize: demoMatch.companySize || null,
-      founded: demoMatch.founded || null
+      founded: demoMatch.founded || null,
+      hiringStatus: demoMatch.hiringStatus || null,
+      fundingStage: demoMatch.fundingStage || null,
+      country: demoMatch.country || countryHint || null,
+      founders: demoFounders
     });
   }
 
@@ -638,13 +896,13 @@ app.get('/api/enrich', async (req, res) => {
     let origin, deep = url.replace(/[#?].*$/, '').replace(/\/$/, '');
     try { origin = new URL(url).origin; } catch (_) { origin = deep; }
 
-    let combinedInfo = { phone:null, email:null, address:null, whatsapp:null, keyPeople:[], employeeCount:null, companySize:null, founded:null };
+    let combinedInfo = { phone:null, fax:null, email:null, address:null, whatsapp:null, keyPeople:[], employeeCount:null, companySize:null, founded:null, hiringStatus:null, country:null };
     let blocked = false, fetchedAny = false;
 
     const mergeFrom = (html) => {
       fetchedAny = true;
       const info = extractContactInfo(html);
-      for (const key of ['phone','email','address','whatsapp','employeeCount','companySize','founded']) {
+      for (const key of ['phone','fax','email','address','whatsapp','employeeCount','companySize','founded','hiringStatus','country']) {
         if (!combinedInfo[key] && info[key]) combinedInfo[key] = info[key];
       }
       if (!combinedInfo.keyPeople.length && info.keyPeople.length) combinedInfo.keyPeople = info.keyPeople;
@@ -654,11 +912,38 @@ app.get('/api/enrich', async (req, res) => {
     // Phase 1: fetch the result page + homepage in parallel (fast).
     const phase1Urls = [...new Set([deep, origin])];
     const phase1 = await Promise.all(phase1Urls.map(tryFetch));
-    phase1.forEach(r => {
+    let homepageHtml = null;
+    phase1.forEach((r, i) => {
       if (!r) return;
       if (!r.html) { if (BLOCK_CODES.has(r.status)) blocked = true; return; }
       mergeFrom(r.html);
+      if (phase1Urls[i] === origin) homepageHtml = r.html;
     });
+
+    // Discover the site's actual contact-page link from the homepage nav/footer
+    // instead of only guessing fixed paths — far more reliable for sites whose
+    // contact page lives somewhere a static path list would never predict
+    // (localized slugs, non-standard URL structures, etc.).
+    let discoveredContactUrls = [];
+    if (homepageHtml) {
+      try {
+        const $h = cheerio.load(homepageHtml);
+        const found = new Set();
+        $h('a[href]').each((_, el) => {
+          const href = ($h(el).attr('href') || '').trim();
+          const linkText = $h(el).text().trim();
+          if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+          const isContactish = /contact|contacto|contato|kontakt|contatti|nous-contacter|get-in-touch/i.test(href) ||
+            /^(contact|contact us|get in touch|contáctenos|contato|kontakt)$/i.test(linkText);
+          if (!isContactish) return;
+          try {
+            const abs = new URL(href, origin).href;
+            if (new URL(abs).origin === origin) found.add(abs);
+          } catch (_) {}
+        });
+        discoveredContactUrls = [...found].slice(0, 3);
+      } catch (_) { /* malformed homepage HTML — ignore */ }
+    }
 
     // Derive a company name for external lookups:
     // prefer the passed name hint, fall back to domain (strip TLD + hyphens → spaces).
@@ -669,8 +954,24 @@ app.get('/api/enrich', async (req, res) => {
     const [, extData] = await Promise.all([
       (async () => {
         if (!enough() && !(blocked && !fetchedAny)) {
-          const contactPaths = ['/contact', '/contact-us', '/about-us', '/about', '/en/contact', '/company'];
-          const phase2 = await Promise.all(contactPaths.map(p => tryFetch(origin + p)));
+          // English plus common non-English contact-page conventions — many global
+          // suppliers (LatAm, Europe, China) publish contact details only on a
+          // localized path that an English-only path list would never try.
+          const contactPaths = [
+            '/contact', '/contact-us', '/contactus', '/contact.html', '/get-in-touch',
+            '/about-us', '/about', '/en/contact', '/en/contact-us', '/company', '/company/contact',
+            '/contacto', '/contactenos', '/contactanos',              // Spanish
+            '/contato', '/fale-conosco',                              // Portuguese
+            '/contactez-nous', '/nous-contacter',                     // French
+            '/kontakt', '/kontaktieren-sie-uns',                      // German
+            '/contatti',                                              // Italian
+            '/lianxiwomen', '/contact-cn'                              // CN fallback (most CN sites use English path anyway)
+          ];
+          // Try the actual discovered contact link(s) first — they're far more
+          // likely to be correct than a guessed path — then fall back to the
+          // static guess list for sites where nothing contact-like was found in nav.
+          const phase2Urls = [...new Set([...discoveredContactUrls, ...contactPaths.map(p => origin + p)])];
+          const phase2 = await Promise.all(phase2Urls.map(tryFetch));
           for (const r of phase2) {
             if (!r) continue;
             if (!r.html) { if (BLOCK_CODES.has(r.status)) blocked = true; continue; }
@@ -691,6 +992,13 @@ app.get('/api/enrich', async (req, res) => {
       }
     }
 
+    // Country fallback chain: scraped (JSON-LD / text scan, already in
+    // combinedInfo.country) > caller-supplied hint (the country the search result
+    // was already tagged with) > the domain's ccTLD. This guarantees we surface
+    // SOME country even on sites that publish no usable contact info at all.
+    if (!combinedInfo.country && countryHint) combinedInfo.country = countryHint;
+    if (!combinedInfo.country) combinedInfo.country = countryFromHost(enrichHost);
+
     const hasAny = combinedInfo.phone || combinedInfo.email || combinedInfo.address ||
                    combinedInfo.whatsapp || combinedInfo.keyPeople.length ||
                    combinedInfo.employeeCount || combinedInfo.founded ||
@@ -701,17 +1009,160 @@ app.get('/api/enrich', async (req, res) => {
     else if (!hasAny && !fetchedAny) note = 'This website could not be reached automatically. Open it directly to see contact details.';
     else if (!hasAny) note = 'No contact details were published on this website.';
 
-    res.json({
+    // Merge founders: prefer scraped keyPeople with Founder titles, fall back to external
+    const founderPeople = (combinedInfo.keyPeople || []).filter(p => /founder/i.test(p.title)).map(p => p.name);
+    const founders = founderPeople.length ? founderPeople : extData.founders;
+
+    const responseData = {
       success: true, website: url, ...combinedInfo, note, blocked: blocked && !hasAny,
       description: extData.description,
       wikipedia: extData.wikipedia,
       linkedin: extData.linkedin,
       revenue: extData.revenue,
       industry: extData.industry,
-      news: extData.news
-    });
+      news: extData.news,
+      fundingStage: extData.fundingStage,
+      founders
+    };
+    // Only cache real, usable results — a blocked/empty scrape shouldn't poison the
+    // cache for 12h in case a retry later would succeed.
+    if (cacheHost && hasAny) {
+      if (enrichCache.size >= 500) enrichCache.delete(enrichCache.keys().next().value); // evict oldest
+      enrichCache.set(cacheHost, { data: responseData, time: Date.now() });
+    }
+    res.json(responseData);
   } catch (err) {
     res.status(500).json({ error: 'Could not fetch the company website: ' + err.message });
+  }
+});
+
+// ── Buyer type classification ─────────────────────────────────────────────────
+function classifyBuyer(title, snippet, displayLink) {
+  const t = (title   || '').toLowerCase();
+  const s = (snippet || '').toLowerCase();
+  const h = (displayLink || '').toLowerCase().replace(/^www\./, '');
+  let score = { importer:0, retailer:0, wholesaler:0, procurement:0 };
+
+  const add = (key, n) => { score[key] += n; };
+
+  // Title signals (3×)
+  if (/\bimport(?:er|ing|s)?\b/.test(t))                  add('importer', 9);
+  if (/\bimport company\b|\bimport house\b/.test(t))       add('importer', 9);
+  if (/\bretail(?:er|s)?\b|supermarket|hypermarket|chain store/.test(t)) add('retailer', 9);
+  if (/\bwholesaler\b|\bwholesale buyer\b/.test(t))         add('wholesaler', 9);
+  if (/\bprocurement\b|\bpurchas(?:ing|er)\b|\brfq\b/.test(t)) add('procurement', 9);
+  if (/\bbuyer\b/.test(t))                                 { add('importer',2); add('wholesaler',2); }
+
+  // Snippet signals (1×)
+  if (/\bimport(?:er|ing)?\b/.test(s))                     add('importer', 3);
+  if (/\bretail(?:er)?\b|supermarket|chain store/.test(s)) add('retailer', 3);
+  if (/\bwholesale\b|\bwholesaler\b/.test(s))               add('wholesaler', 3);
+  if (/\bprocurement\b|\bpurchasing\b/.test(s))             add('procurement', 3);
+  if (/looking for supplier|seeking manufacturer|request for quotation|rfq/i.test(s)) add('procurement', 5);
+
+  // Domain signals
+  if (/import/.test(h)) add('importer', 6);
+  if (/retail|shop|store/.test(h)) add('retailer', 6);
+  if (/wholesale|trade/.test(h)) add('wholesaler', 6);
+
+  const best = Object.entries(score).sort((a,b) => b[1]-a[1])[0];
+  const total = Object.values(score).reduce((a,b)=>a+b,0);
+  if (total === 0) return { type:'buyer', confidence:55 };
+  const type = best[1] > 0 ? best[0] : 'buyer';
+  const confidence = Math.min(90, 50 + Math.round((best[1] / Math.max(total,1)) * 45));
+  return { type, confidence };
+}
+
+// ── Find customers / buyers for a product ────────────────────────────────────
+app.get('/api/search-customers', async (req, res) => {
+  const product = (req.query.product || '').trim();
+  const country = (req.query.country || '').trim();
+
+  if (!product) return res.status(400).json({ error: 'product parameter required' });
+
+  if (!LIVE_MODE) {
+    // Demo fallback: return a few canned buyer results
+    return res.json({
+      success: true, total: 3, note: 'Demo mode — add BRAVE_API_KEY to .env for live results.',
+      results: [
+        { title:'GlobalBuyers Import Co.', link:'https://example.com/globalbuyers', displayLink:'globalbuyers.example.com', snippet:`Leading importer and wholesale buyer of ${product} serving ${country||'global'} markets.`, type:'importer', confidence:86, category:'direct' },
+        { title:'RetailChain International', link:'https://example.com/retailchain', displayLink:'retailchain.example.com', snippet:`Major retail chain purchasing ${product} in bulk quantities for ${country||'international'} stores.`, type:'retailer', confidence:82, category:'direct' },
+        { title:'TradeBridge Procurement', link:'https://example.com/tradebridge', displayLink:'tradebridge.example.com', snippet:`B2B procurement company sourcing ${product} on behalf of manufacturers in ${country||'multiple countries'}.`, type:'procurement', confidence:78, category:'direct' }
+      ]
+    });
+  }
+
+  const cc = country || '';
+  const q1 = cc ? `${product} importer wholesale buyer ${cc}` : `${product} importer bulk buyer wholesale`;
+  const q2 = cc ? `${product} procurement purchasing retailer ${cc} -site:alibaba.com` : `${product} procurement purchasing retailer B2B -site:alibaba.com`;
+  const q3 = cc ? `${product} "looking for supplier" OR "request for quotation" OR "seeking manufacturer" ${cc}` : `${product} "request for quotation" OR "looking for supplier" B2B sourcing`;
+  const q4 = cc ? `${product} import company distributor purchaser ${cc}` : `${product} import company buyer purchaser`;
+  const q5 = cc ? `${product} retail chain supermarket buyer ${cc} -site:amazon.com` : `${product} retail chain wholesale buyer -site:amazon.com`;
+  const q6 = cc ? `site:importyeti.com ${product} ${cc}` : `site:importyeti.com ${product}`;
+  const q7 = cc ? `${product} "buying agent" OR "trading company" OR "sourcing company" ${cc}` : `${product} "buying agent" OR "sourcing company" OR "trading company"`;
+
+  try {
+    const [r1,r2,r3,r4,r5,r6,r7] = await braveMulti([
+      { q:q1, country:cc }, { q:q2, country:cc }, { q:q3, country:cc }, { q:q4, country:cc },
+      { q:q5, country:cc }, { q:q6 }, { q:q7, country:cc }
+    ]);
+
+    // Map raw results to buyer objects
+    const BUYER_NOISE = ['alibaba.com','aliexpress.com','amazon.com','ebay.com','indiamart.com',
+      'made-in-china.com','dhgate.com','tradeindia.com','thomasnet.com'];
+
+    const mapped = [r1,r2,r3,r4,r5,r6,r7].flat().map(item => {
+      const itemUrl    = item.url || item.link || '';
+      const displayLink = itemUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+      const title      = item.title || '';
+      const snippet    = item.description || item.snippet || '';
+      const { type, confidence } = classifyBuyer(title, snippet, displayLink);
+      const category   = categorise(displayLink, title, snippet);
+      const thumbnail  = item.thumbnail?.src || null;
+      return { title, link: itemUrl, snippet, displayLink, type, confidence, category, thumbnail };
+    }).filter(r => r.link);
+
+    // Deduplicate
+    const seen = new Set(), seenDomain = new Map();
+    const deduped = [];
+    for (const r of mapped) {
+      if (seen.has(r.link)) continue;
+      seen.add(r.link);
+      const dom = r.displayLink.toLowerCase();
+      if (BUYER_NOISE.some(n => dom.includes(n))) continue;
+      if (NOISE_DOMAINS.some(n => dom.includes(n))) continue;
+      const dc = seenDomain.get(dom) || 0;
+      if (dc >= 2) continue;
+      seenDomain.set(dom, dc+1);
+      deduped.push(r);
+      if (deduped.length >= 40) break;
+    }
+
+    // Score: boost country matches
+    const scored = deduped.map(r => {
+      let s = r.confidence;
+      const hay = (r.title + ' ' + r.snippet + ' ' + r.displayLink).toLowerCase();
+      if (cc) {
+        const matchers = countryMatchers(cc);
+        if (matchers.some(a => hay.includes(a))) s += 20;
+        const tld = COUNTRY_TLD[cc];
+        if (tld && r.displayLink.toLowerCase().endsWith('.' + tld)) s += 15;
+      }
+      // Boost specific buyer signals
+      if (/importer|wholesale buyer|procurement|purchasing/i.test(r.title)) s += 12;
+      if (/request for quotation|looking for supplier|seeking manufacturer/i.test(r.title + ' ' + r.snippet)) s += 10;
+      return { ...r, score: s };
+    });
+
+    scored.sort((a,b) => b.score - a.score);
+
+    const { results, note } = cc
+      ? applyCountryFilter(scored, cc)
+      : { results: scored, note: null };
+
+    res.json({ success:true, total: results.length, note, results: results.slice(0, 35) });
+  } catch (err) {
+    res.status(500).json({ error: 'Search failed: ' + err.message });
   }
 });
 
@@ -1046,6 +1497,42 @@ function countryMatchers(country) {
   if (!list.includes(lc)) list.push(lc);
   return list;
 }
+
+// Inverted ccTLD lookup (tld → country name) — last-resort fallback when a site
+// publishes no contact info at all: the domain's country-code TLD is still a
+// reasonably reliable signal of where the company is based.
+const TLD_TO_COUNTRY = Object.fromEntries(Object.entries(COUNTRY_TLD).map(([c, t]) => [t, c]));
+function countryFromHost(host = '') {
+  const h = host.toLowerCase().replace(/^www\./, '');
+  const labels = h.split('.');
+  if (labels.length < 2) return null;
+  const tld = labels[labels.length - 1];
+  // .com.cn, .co.in, .co.uk style — the real ccTLD is the LAST label, already
+  // captured above; this branch just avoids misreading "com"/"co" as the TLD.
+  return TLD_TO_COUNTRY[tld] || null;
+}
+
+// Scan free text for a country name or known alias/demonym/major-city mention —
+// used when structured address data isn't available so we can still surface
+// "this company appears to be based in X" rather than nothing at all.
+const ALL_COUNTRY_NAMES = Object.keys(COUNTRY_TLD);
+function detectCountryFromText(text = '') {
+  if (!text) return null;
+  const lc = text.toLowerCase();
+  // Prefer alias/demonym/city matches first (more specific, fewer false positives
+  // than a bare country name appearing incidentally in unrelated prose).
+  for (const [country, aliases] of Object.entries(COUNTRY_ALIASES)) {
+    if (aliases.some(a => new RegExp(`\\b${a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lc))) {
+      return country;
+    }
+  }
+  for (const country of ALL_COUNTRY_NAMES) {
+    if (new RegExp(`\\b${country.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(lc)) {
+      return country;
+    }
+  }
+  return null;
+}
 // Known ccTLDs that are clearly NOT a target country — used to detect SEO-keyword stuffing
 // e.g. rajveerstainless.com (Indian) targeting "Germany" is not a German manufacturer
 const INDIAN_SEO_DOMAINS = /\.(in|co\.in)$|rajveer|philips.?metal|prosaic.?steel|neelcon|metline|rexton|sachiya|kinnari|guru|shree|panchal|bhavya/i;
@@ -1075,14 +1562,10 @@ function resultInCountry(r, country) {
   }
   return true;
 }
-// Apply country filter to a scored list. Keeps in-country results; if that removes
-// everything, returns the original list with a note so the user isn't left empty.
+// Apply country filter to a scored list. Strictly returns only in-country results.
 function applyCountryFilter(results, country, { keep = () => false } = {}) {
   if (!country) return { results, note: null };
   const inC = results.filter(r => keep(r) || resultInCountry(r, country));
-  if (inC.length === 0) {
-    return { results, note: `Couldn't confirm any results specifically in ${country}; showing closest matches. Try adding a city or the company website for a tighter match.` };
-  }
   return { results: inC, note: null };
 }
 
@@ -1151,7 +1634,8 @@ function categorise(displayLink, title, snippet) {
     'exportersindia.com', 'b2bmart.com', 'esources.co.uk',
     'goldsupplier.com',   // Alibaba Gold Supplier subdomain pages
     'europages.com', 'europages.co.uk', 'kompass.com', 'directindustry.com',
-    'thomasnet.com', 'wer-liefert-was.de', 'yellowpages.com', 'mfgpages.com'
+    'thomasnet.com', 'wer-liefert-was.de', 'yellowpages.com', 'mfgpages.com',
+    'exporters.sg', 'go4worldbusiness.com', 'tradewheel.com'
   ];
   if (MARKETPLACES.some(m => dom.includes(m))) return 'marketplace';
   if (/linkedin\.com/i.test(dom)) return 'linkedin';
@@ -1204,15 +1688,111 @@ async function searchBrave(query, country, count = 20, offset = 0) {
   });
 }
 
+// Google Custom Search fallback — used when BRAVE_API_KEY is absent
+async function searchDDG(query, count = 10) {
+  try {
+    const r = await fetch(
+      `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SourceIQ/1.0)', 'Accept-Language': 'en-US,en;q=0.9' }, signal: AbortSignal.timeout(10000) }
+    );
+    if (!r.ok) { console.warn(`[searchDDG] HTTP ${r.status}`); return []; }
+    const html = await r.text();
+    const $ = cheerio.load(html);
+    const out = [];
+    $('.result').each((_, el) => {
+      if (out.length >= count) return false;
+      const titleEl = $(el).find('.result__title a');
+      const snippetEl = $(el).find('.result__snippet');
+      const title = titleEl.text().trim();
+      const snippet = snippetEl.text().trim();
+      let link = titleEl.attr('href') || '';
+      if (link.startsWith('//duckduckgo.com/l/?')) {
+        try { link = new URL('https:' + link).searchParams.get('uddg') || link; } catch {}
+      }
+      if (!link || !title) return;
+      const displayLink = link.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+      const { type, confidence } = classify(title, snippet, displayLink, link);
+      const signals = extractSignals(title, snippet);
+      const category = categorise(displayLink, title, snippet);
+      out.push({ title, link, snippet, displayLink, type, confidence, signals, category, thumbnail: null, age: null });
+    });
+    console.log(`[searchDDG] "${query.slice(0,50)}" → ${out.length} results`);
+    return out;
+  } catch (err) { console.warn(`[searchDDG] error: ${err.message}`); return []; }
+}
+
+async function searchGoogle(query, count = 10) {
+  if (!GOOGLE_API_KEY || !GOOGLE_CX) return [];
+  try {
+    const r = await fetch(
+      `https://www.googleapis.com/customsearch/v1?key=${encodeURIComponent(GOOGLE_API_KEY)}&cx=${encodeURIComponent(GOOGLE_CX)}&q=${encodeURIComponent(query)}&num=${Math.min(count, 10)}`,
+      { signal: AbortSignal.timeout(8000) }
+    );
+    if (!r.ok) { console.warn(`[searchGoogle] HTTP ${r.status} for "${query.slice(0,40)}"`); return []; }
+    const d = await r.json();
+    const items = d.items || [];
+    console.log(`[searchGoogle] "${query.slice(0,50)}" → ${items.length} results (total=${d.searchInformation?.totalResults}, err=${d.error?.code})`);
+    return items.map(item => {
+      const itemUrl = item.link || '';
+      const displayLink = item.displayLink || itemUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+      const title = item.title || '';
+      const snippet = item.snippet || '';
+      const { type, confidence } = classify(title, snippet, displayLink, itemUrl);
+      const signals = extractSignals(title, snippet);
+      const category = categorise(displayLink, title, snippet);
+      return { title, link: itemUrl, snippet, displayLink, type, confidence, signals, category, thumbnail: null, age: null };
+    });
+  } catch (err) { console.warn(`[searchGoogle] error: ${err.message}`); return []; }
+}
+
 // Run several Brave queries resiliently — a failure in one query never kills the
 // whole search; we just use whatever results the successful queries returned.
+// Falls back to Google Custom Search when BRAVE_API_KEY is absent.
 async function braveMulti(queries) {
-  const settled = await Promise.allSettled(
-    queries.map(({ q, country = null, offset = 0 }) =>
-      BRAVE_API_KEY ? searchBrave(q, country, 20, offset) : Promise.resolve([])
-    )
-  );
-  return settled.map(s => (s.status === 'fulfilled' ? s.value : []));
+  if (BRAVE_API_KEY) {
+    const settled = await Promise.allSettled(
+      queries.map(({ q, country = null, offset = 0 }) => searchBrave(q, country, 20, offset))
+    );
+    const results = settled.map(s => (s.status === 'fulfilled' ? s.value : []));
+    const totalResults = results.reduce((n, r) => n + r.length, 0);
+    // If ALL queries returned nothing (likely 402 quota/billing issue), fall back to Google
+    if (totalResults === 0) {
+      if (GOOGLE_API_KEY && GOOGLE_CX) {
+        console.warn('[braveMulti] Brave returned 0 results — falling back to Google Search');
+        const googleResults = [];
+        for (const { q } of queries) googleResults.push(await searchGoogle(q, 10));
+        const googleTotal = googleResults.reduce((n, r) => n + r.length, 0);
+        if (googleTotal > 0) return googleResults;
+        console.warn('[braveMulti] Google also returned 0 results — falling back to DuckDuckGo');
+      } else {
+        console.warn('[braveMulti] Brave returned 0 results — falling back to DuckDuckGo');
+      }
+      const ddgResults = [];
+      // Use the simplest queries (last 2) for DDG — it doesn't handle complex boolean operators well
+      const ddgQueries = queries.slice(-2);
+      for (const { q } of ddgQueries) ddgResults.push(await searchDDG(q, 10));
+      // DDG often returns 0 for quoted multi-clause queries (e.g. `Brand "Country"`)
+      // even when the bare brand name alone works fine. If everything above came up
+      // empty, retry with quotes stripped from the simplest query as a last resort.
+      if (ddgResults.every(r => r.length === 0)) {
+        const bareQuery = queries[queries.length - 1].q.replace(/"/g, '');
+        const bareResults = await searchDDG(bareQuery, 10);
+        if (bareResults.length) ddgResults.push(bareResults);
+      }
+      // Spread the DDG results across all query slots so dedup/scoring still works
+      const merged = ddgResults.flat();
+      return queries.map((_, i) => (i < ddgResults.length ? ddgResults[i] : merged));
+
+    }
+    return results;
+  }
+  // No Brave key — try Google then DDG
+  const results = [];
+  for (const { q } of queries) {
+    const gr = await searchGoogle(q, 10);
+    results.push(gr.length ? gr : await searchDDG(q, 10));
+  }
+  return results;
 }
 
 function deduplicateResults(arrays, { maxPerDomain = 2, limit = 25, noiseFilter = true } = {}) {
@@ -1381,6 +1961,15 @@ app.get('/api/company-people', async (req, res) => {
   }
 });
 
+// Short-TTL cache for search results, keyed by the full query combination.
+// Repeat searches (refresh, back-button, two colleagues searching the same term)
+// currently re-run the whole multi-query pipeline — wasted seconds and, once the
+// Brave subscription is active, wasted paid quota. 10 min is short enough that
+// results stay fresh, long enough to absorb the repeat-search pattern.
+const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000;
+const SEARCH_CACHE_MAX = 200;
+const searchCache = new Map();
+
 app.get('/api/search', async (req, res) => {
   const subject = (req.query.q || '').trim();
   const country = (req.query.country || '').trim();
@@ -1392,6 +1981,25 @@ app.get('/api/search', async (req, res) => {
   if (!subject && !country && !company && !person) {
     return res.status(400).json({ error: 'Please provide a product subject, a country, a company name, or a person name to search.' });
   }
+
+  const searchKey = JSON.stringify([subject, country, company, person, gender, website]).toLowerCase();
+  const cachedSearch = searchCache.get(searchKey);
+  if (cachedSearch && (Date.now() - cachedSearch.time) < SEARCH_CACHE_TTL_MS) {
+    return res.json({ ...cachedSearch.data, cached: true });
+  }
+  // Intercept the outgoing JSON so every success path below populates the cache
+  // without having to touch each return statement individually.
+  const origJson = res.json.bind(res);
+  res.json = (body) => {
+    if (body && !body.error && Array.isArray(body.results) && body.results.length) {
+      if (searchCache.size >= SEARCH_CACHE_MAX) {
+        // Evict the oldest entry (Map preserves insertion order)
+        searchCache.delete(searchCache.keys().next().value);
+      }
+      searchCache.set(searchKey, { data: body, time: Date.now() });
+    }
+    return origJson(body);
+  };
 
   if (!LIVE_MODE) {
     let results;
@@ -1416,9 +2024,13 @@ app.get('/api/search', async (req, res) => {
     const q3 = `"${person}" (company OR business OR contact OR email OR interview OR biography)${countryClause}${genderClause}`;
     // q4: structured professional directories
     const q4 = `"${person}" (crunchbase OR zoominfo OR bloomberg OR "executive profile" OR "board member")${countryClause}${genderClause}`;
+    // q5 & q6: simple DDG-friendly fallback queries (no complex boolean operators)
+    const q5 = `${person} biography${countryClause}`;
+    const q6 = `${person}${countryClause}`;
     try {
-      const [r1, r2, r3, r4] = await braveMulti([
-        { q: q1, country }, { q: q2, country }, { q: q3, country }, { q: q4, country }
+      const [r1, r2, r3, r4, r5, r6] = await braveMulti([
+        { q: q1, country }, { q: q2, country }, { q: q3, country }, { q: q4, country },
+        { q: q5, country }, { q: q6, country }
       ]);
 
       const nameLower = person.toLowerCase();
@@ -1426,7 +2038,8 @@ app.get('/api/search', async (req, res) => {
       // Score every candidate first, then dedup so the best page per domain wins.
       const scoredAll = [
         ...r1.map(r=>({...r,_qs:3})), ...r2.map(r=>({...r,_qs:2})),
-        ...r3.map(r=>({...r,_qs:1})), ...r4.map(r=>({...r,_qs:2}))
+        ...r3.map(r=>({...r,_qs:1})), ...r4.map(r=>({...r,_qs:2})),
+        ...r5.map(r=>({...r,_qs:2})), ...r6.map(r=>({...r,_qs:1}))
       ].map(r => {
           const url     = (r.link    || '').toLowerCase();
           const title   = (r.title   || '').toLowerCase();
@@ -1471,7 +2084,7 @@ app.get('/api/search', async (req, res) => {
     }
     const siteClause = wantHost ? ` site:${wantHost}` : '';
 
-    // q1: official website / homepage
+    // q1: official website / homepage — try exact name first, brand as fallback
     const cq1 = `"${company}" (official website OR homepage OR "official site")${countryClause}`;
     // q2: company profile / about / overview
     const cq2 = `"${company}" (about OR "company profile" OR overview OR "who we are" OR headquarters)${countryClause}`;
@@ -1484,10 +2097,15 @@ app.get('/api/search', async (req, res) => {
     const cq5 = wantHost
       ? `${brand}${siteClause}`
       : `${brand} (company OR official website OR contact OR products)${countryClause}`;
+    // q6 & q7: unquoted relaxed queries using just the brand name (catches companies
+    //          whose web presence doesn't include the full legal name).
+    const cq6 = `${brand} company${countryClause}`;
+    const cq7 = `${brand}${countryClause}`;
     try {
-      const [cr1, cr2, cr3, cr4, cr5] = await braveMulti([
+      const [cr1, cr2, cr3, cr4, cr5, cr6, cr7] = await braveMulti([
         { q: cq1, country }, { q: cq2, country }, { q: cq3, country },
-        { q: cq4, country }, { q: cq5, country: wantHost ? null : country }
+        { q: cq4, country }, { q: cq5, country: wantHost ? null : country },
+        { q: cq6, country }, { q: cq7, country: wantHost ? null : country }
       ]);
 
       const companySlug  = company.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -1508,7 +2126,8 @@ app.get('/api/search', async (req, res) => {
       const all = [
         ...cr1.map(r=>({...r,_qs:3})), ...cr2.map(r=>({...r,_qs:3})),
         ...cr3.map(r=>({...r,_qs:2})), ...cr4.map(r=>({...r,_qs:2})),
-        ...cr5.map(r=>({...r,_qs:1}))
+        ...cr5.map(r=>({...r,_qs:1})),
+        ...cr6.map(r=>({...r,_qs:1})), ...cr7.map(r=>({...r,_qs:1}))
       ];
 
       // If the user supplied a website, guarantee its homepage is present as a result
@@ -1587,8 +2206,6 @@ app.get('/api/search', async (req, res) => {
       const scoredC = deduplicateResults([poolC], { maxPerDomain: 3, limit: 24, noiseFilter: false })
         .map(r => { const { _qs, _score, _relevant, ...rest } = r; return rest; });
 
-      // Filter to the selected country, but always keep the official / user-provided
-      // site (it's the exact company the user wants, regardless of where its TLD points).
       const { results: scored, note: countryNote } = applyCountryFilter(scoredC, country, { keep: r => r.isOfficial });
       return res.json({ subject: '', country, company, person: '', officialDomain, count: scored.length, results: scored, countryNote, demoMode: false });
     } catch(err) {
@@ -1616,8 +2233,9 @@ app.get('/api/search', async (req, res) => {
       ? `${subject} distributor wholesaler supplier ${cc} -site:amazon.com -site:ebay.com`
       : `${subject} wholesale distributor supplier B2B bulk -site:amazon.com`;
 
-    // q3: B2B directory listings — Alibaba, IndiaMART, MIC, GlobalSources, TradeKey
-    const q3 = `${subject}${cc ? ' ' + cc : ''} (site:alibaba.com OR site:indiamart.com OR site:made-in-china.com OR site:globalsources.com OR site:tradekey.com OR site:ec21.com)`;
+    // q3: B2B directory listings — Alibaba, IndiaMART, MIC, GlobalSources, TradeKey,
+    // plus Exporters.sg, Go4WorldBusiness, TradeWheel for broader exporter/trader coverage
+    const q3 = `${subject}${cc ? ' ' + cc : ''} (site:alibaba.com OR site:indiamart.com OR site:made-in-china.com OR site:globalsources.com OR site:tradekey.com OR site:ec21.com OR site:exporters.sg OR site:go4worldbusiness.com OR site:tradewheel.com)`;
 
     // q4: Export / trade companies
     const q4 = cc
@@ -1647,8 +2265,12 @@ app.get('/api/search', async (req, res) => {
       ? `${subject} manufacturer ${cc} -site:alibaba.com -site:amazon.com`
       : `${subject} manufacturer factory direct -site:alibaba.com`;
 
+    // q10 & q11: Simple DDG-friendly fallback queries (no complex boolean operators)
+    const q10 = cc ? `${subject} supplier ${cc}` : `${subject} supplier`;
+    const q11 = cc ? `${subject} ${cc}` : subject;
+
     try {
-      const [r1, r2, r3, r4, r5, r6, r7, r8, r9] = await braveMulti([
+      const [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11] = await braveMulti([
         { q: q1, country },
         { q: q2, country },
         { q: q3 },
@@ -1658,6 +2280,8 @@ app.get('/api/search', async (req, res) => {
         { q: q7, country },
         { q: q8, country },
         { q: q9, country, offset: 1 },
+        { q: q10, country },
+        { q: q11, country },
       ]);
 
       const subjectTerms = subject.toLowerCase().split(/\s+/).filter(Boolean);
@@ -1673,6 +2297,8 @@ app.get('/api/search', async (req, res) => {
         ...r4.map(r => ({ ...r, _qs: 3 })),   // exporters
         ...r5.map(r => ({ ...r, _qs: 2 })),   // industry directories
         ...r3.map(r => ({ ...r, _qs: 1 })),   // marketplace listings (lower priority)
+        ...r10.map(r => ({ ...r, _qs: 2 })), // simple DDG fallback
+        ...r11.map(r => ({ ...r, _qs: 1 })), // simple DDG fallback broad
       ].map(r => {
         const titleLc   = (r.title   || '').toLowerCase();
         const snippetLc = (r.snippet || '').toLowerCase();
@@ -1775,8 +2401,15 @@ app.get('/api/search', async (req, res) => {
       // fall back to full set so we never return empty on thin markets.
       const { results: allItems, note: countryNote } = applyCountryFilter(allItemsRaw, country);
 
+      // Merge in curated real-company reference entries (e.g. copper cathode
+      // producers) that match this query — skip any domain live search already
+      // surfaced on its own. Placed first since they're verified, high-confidence picks.
+      const existingDomains = new Set(allItems.map(r => (r.displayLink || '').toLowerCase()));
+      const curated = curatedRealMatches(subjectTerms)
+        .filter(r => !existingDomains.has((r.displayLink || '').toLowerCase()));
+
       // Present direct company sites first, marketplace listings as supplementary
-      const direct      = allItems.filter(r => r.category !== 'marketplace').slice(0, 40);
+      const direct      = [...curated, ...allItems.filter(r => r.category !== 'marketplace')].slice(0, 40);
       const marketplace = allItems.filter(r => r.category === 'marketplace').slice(0, 12);
       const items = [...direct, ...marketplace];
 
@@ -1922,13 +2555,22 @@ async function callAI(prompt) {
 
   if (GEMINI_KEY) {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 700 }
+          generationConfig: {
+            temperature: 0.3,
+            // gemini-2.5-flash is a thinking model: reasoning tokens count against
+            // maxOutputTokens, so a small cap truncates the JSON mid-string.
+            // Disable thinking (not needed for this extraction task) and force
+            // native JSON output so no markdown-fence stripping is needed.
+            maxOutputTokens: 4000,
+            responseMimeType: 'application/json',
+            thinkingConfig: { thinkingBudget: 0 }
+          }
         })
       }
     );
@@ -2094,6 +2736,57 @@ Rules:
   } catch (err) {
     res.status(500).json({ error: 'AI analysis failed: ' + err.message });
   }
+});
+
+// ── Saved suppliers (shared shortlist) ────────────────────────────────────────
+// Stored server-side in data/saved.json (not per-browser localStorage) so every
+// user on the LAN — you and your colleague — sees the same shortlist and notes.
+const fs = require('fs');
+const SAVED_FILE = path.join(__dirname, 'data', 'saved.json');
+
+function loadSaved() {
+  try { return JSON.parse(fs.readFileSync(SAVED_FILE, 'utf8')); } catch (_) { return []; }
+}
+function writeSaved(list) {
+  fs.mkdirSync(path.dirname(SAVED_FILE), { recursive: true });
+  fs.writeFileSync(SAVED_FILE, JSON.stringify(list, null, 2));
+}
+
+app.get('/api/saved', (req, res) => {
+  res.json({ saved: loadSaved() });
+});
+
+app.post('/api/saved', (req, res) => {
+  const item = req.body || {};
+  if (!item.link || !item.title) return res.status(400).json({ error: 'link and title are required' });
+  const list = loadSaved();
+  if (list.some(s => s.link === item.link)) return res.json({ saved: list, note: 'Already saved' });
+  list.unshift({
+    link: item.link, title: item.title, displayLink: item.displayLink || '',
+    type: item.type || '', country: item.country || '', snippet: (item.snippet || '').slice(0, 300),
+    phone: item.phone || null, email: item.email || null, whatsapp: item.whatsapp || null,
+    address: item.address || null, notes: '', savedAt: new Date().toISOString()
+  });
+  writeSaved(list);
+  res.json({ saved: list });
+});
+
+app.patch('/api/saved', (req, res) => {
+  const { link, notes } = req.body || {};
+  if (!link) return res.status(400).json({ error: 'link is required' });
+  const list = loadSaved();
+  const item = list.find(s => s.link === link);
+  if (!item) return res.status(404).json({ error: 'Not found' });
+  if (typeof notes === 'string') item.notes = notes.slice(0, 2000);
+  writeSaved(list);
+  res.json({ saved: list });
+});
+
+app.delete('/api/saved', (req, res) => {
+  const link = (req.query.link || '').trim();
+  if (!link) return res.status(400).json({ error: 'link is required' });
+  writeSaved(loadSaved().filter(s => s.link !== link));
+  res.json({ saved: loadSaved() });
 });
 
 app.listen(PORT, () => {
