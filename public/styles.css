@@ -2479,3 +2479,14 @@ h1{ color:var(--biz-text) !important; }
 .dossier-btn, .saved-export-btn, .hs-find-btn{ color:var(--biz-blue) !important; border-color:var(--biz-border) !important; }
 .hero-stat-num{ color:var(--biz-text) !important; -webkit-text-fill-color:var(--biz-text) !important; }
 .subtitle{ color:var(--biz-muted) !important; }
+
+/* Active tab: white text/icon on the blue — was indigo-on-blue (unreadable) */
+.mode-tabs .mode-tab.active,
+.mode-tabs .mode-tab.active *{
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+}
+.mode-tabs .mode-tab.active .tab-icon,
+.mode-tabs .mode-tab.active svg{
+  stroke:#ffffff !important; color:#ffffff !important; opacity:1 !important;
+}
