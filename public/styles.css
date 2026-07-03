@@ -2204,3 +2204,29 @@ tr.price-best td:first-child{ border-left:3px solid #10b981; }
 .price-info a:hover{ text-decoration:underline; }
 .price-badges{ display:flex; flex-wrap:wrap; gap:5px; margin-top:5px; }
 .price-visit{ white-space:nowrap; }
+
+/* ============ Mobile fixes (phones ≤ 480px) ============ */
+@media (max-width: 480px){
+  /* Decorative blob is wider than the phone viewport and forces horizontal scroll */
+  .welcome-orb, .hero-orb{ display:none !important; }
+  html, body{ overflow-x:hidden; }
+
+  /* 9 mode tabs: wrap into rows instead of clipping off-screen */
+  .mode-tabs{ flex-wrap:wrap !important; justify-content:center; }
+
+  /* Top bar: let the status pills wrap below the brand */
+  .topbar{ flex-wrap:wrap; gap:6px; padding:10px 12px; }
+  .topbar-right{ flex-wrap:wrap; }
+
+  /* Search rows stack vertically */
+  .search-box{ flex-direction:column !important; }
+  .search-field, .search-select-field{ max-width:100% !important; width:100%; }
+
+  /* Comparison/price tables scroll inside their wrapper, not the page */
+  .price-table-wrap, .modal-body{ max-width:100%; }
+  .modal-overlay{ padding:10px; }
+  .modal-box{ max-height:92vh; }
+
+  /* Compare bar stays within screen */
+  #compareBar{ width:calc(100vw - 24px); justify-content:center; flex-wrap:wrap; }
+}
