@@ -1655,6 +1655,39 @@ function categorise(displayLink, title, snippet) {
   return 'direct';
 }
 
+// ── Service health tracker ─────────────────────────────────────────────────────
+// Records the outcome of every Brave and Gemini call so the dashboard can show
+// a live green/amber/red indicator. Counters reset each calendar day.
+const svcStatus = {
+  brave:  { date: '', count: 0, status: 'unknown', detail: '', ts: 0 },
+  gemini: { date: '', count: 0, status: 'unknown', detail: '', ts: 0 }
+};
+function recordSvc(name, status, detail = '') {
+  const s = svcStatus[name];
+  if (!s) return;
+  const today = new Date().toISOString().slice(0, 10);
+  if (s.date !== today) { s.date = today; s.count = 0; }
+  s.count++;
+  s.status = status;   // 'ok' | 'rate-limited' | 'quota' | 'error'
+  s.detail = String(detail).slice(0, 160);
+  s.ts = Date.now();
+}
+
+app.get('/api/service-status', (req, res) => {
+  res.json({
+    brave: {
+      configured: Boolean(BRAVE_API_KEY),
+      ...svcStatus.brave
+    },
+    gemini: {
+      configured: Boolean(GEMINI_KEY || OPENAI_KEY),
+      // Known ceiling on the free tier — lets the UI warn BEFORE hitting the wall.
+      freeTierDailyLimit: 20,
+      ...svcStatus.gemini
+    }
+  });
+});
+
 async function searchBrave(query, country, count = 20, offset = 0) {
   const meta = country ? COUNTRY_META[country] : null;
   const params = new URLSearchParams({ q: query, count: String(Math.min(count, 20)) });
@@ -1672,6 +1705,8 @@ async function searchBrave(query, country, count = 20, offset = 0) {
       resp = await fetch(url, {
         headers: { 'Accept': 'application/json', 'Accept-Encoding': 'gzip', 'X-Subscription-Token': BRAVE_API_KEY }
       });
+      if (resp.status === 402) recordSvc('brave', 'quota', 'HTTP 402 — subscription/quota exhausted');
+      else if (resp.status === 429) recordSvc('brave', 'rate-limited', 'HTTP 429 — request rate too high');
       if (resp.status === 429 || resp.status >= 500) {
         lastErr = new Error(`Brave Search ${resp.status}`);
         await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
@@ -1679,6 +1714,7 @@ async function searchBrave(query, country, count = 20, offset = 0) {
       }
       data = await resp.json();
       if (!resp.ok) throw new Error((data && data.message) || `Brave Search error (${resp.status})`);
+      recordSvc('brave', 'ok');
       break;
     } catch (err) {
       lastErr = err;
@@ -2648,7 +2684,11 @@ async function callAI(prompt) {
       }
     );
     const data = await res.json();
-    if (data.error) throw new Error(data.error.message);
+    if (data.error) {
+      recordSvc('gemini', /quota|exceeded/i.test(data.error.message) ? 'quota' : 'error', data.error.message);
+      throw new Error(data.error.message);
+    }
+    recordSvc('gemini', 'ok');
     const raw = data.candidates[0].content.parts[0].text;
     return JSON.parse(raw.replace(/```json\n?|\n?```/g, '').trim());
   }
@@ -2956,7 +2996,11 @@ Return ONLY valid JSON: {"product":"...","keywords":"...","description":"one sen
       }
     );
     const data = await r.json();
-    if (data.error) throw new Error(data.error.message);
+    if (data.error) {
+      recordSvc('gemini', /quota|exceeded/i.test(data.error.message) ? 'quota' : 'error', data.error.message);
+      throw new Error(data.error.message);
+    }
+    recordSvc('gemini', 'ok');
     const result = JSON.parse(data.candidates[0].content.parts[0].text);
     res.json({
       product: String(result.product || '').slice(0, 120),

@@ -2177,3 +2177,12 @@
 .deal-badge.deal-price{ background:#f0fdf4; border-color:#bbf7d0; color:#047857; }
 
 .brief-trends{ margin:8px 0 4px; padding-left:20px; font-size:13px; color:#475569; line-height:1.7; }
+
+/* ============ Service health dots (Brave / Gemini) ============ */
+.svc-dot{ width:8px; height:8px; border-radius:50%; display:inline-block; }
+.svc-dot.svc-green{ background:#10b981; box-shadow:0 0 5px rgba(16,185,129,.5); }
+.svc-dot.svc-amber{ background:#f59e0b; box-shadow:0 0 5px rgba(245,158,11,.6); animation:svc-pulse 1.6s infinite; }
+.svc-dot.svc-red{ background:#dc2626; box-shadow:0 0 6px rgba(220,38,38,.6); animation:svc-pulse 1.1s infinite; }
+.svc-dot.svc-unknown{ background:#cbd5e1; }
+.svc-pill-alert{ border-color:#fecaca !important; background:#fef2f2 !important; color:#b91c1c !important; }
+@keyframes svc-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }

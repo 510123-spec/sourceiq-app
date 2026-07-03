@@ -667,5 +667,58 @@ async function runMarketBrief(industry, country, results){
   }catch(e){ holder.remove(); }
 }
 
+// ═══════════════ Service health indicators (Brave / Gemini) ═══════════════
+// Polls /api/service-status and colors the topbar dots:
+//   green = last call OK and not near a known limit
+//   amber = rate-limited, erroring, or approaching the free-tier daily cap
+//   red   = quota exhausted (searches/AI silently degrade until it resets)
+//   gray  = not used yet this session / not configured
+async function refreshServiceStatus(){
+  try{
+    const res = await fetch('/api/service-status');
+    const s = await res.json();
+
+    const apply = (dotId, pillId, info, opts) => {
+      const dot = document.getElementById(dotId);
+      const pill = document.getElementById(pillId);
+      if(!dot || !pill) return;
+      let cls = 'svc-unknown', tip = opts.name + ': no calls yet this session';
+      if(!info.configured){
+        tip = opts.name + ': no API key configured';
+      } else if(info.status === 'quota'){
+        cls = 'svc-red';
+        tip = opts.name + ' QUOTA EXHAUSTED — ' + (opts.quotaHint || 'running on fallback until it resets') +
+          (info.detail ? '\n' + info.detail : '');
+      } else if(info.status === 'rate-limited' || info.status === 'error'){
+        cls = 'svc-amber';
+        tip = opts.name + ': ' + info.status + (info.detail ? ' — ' + info.detail : '');
+      } else if(info.status === 'ok'){
+        cls = 'svc-green';
+        tip = opts.name + ': OK — ' + info.count + ' call' + (info.count === 1 ? '' : 's') + ' today';
+        // Warn BEFORE the wall when we know the ceiling (Gemini free tier)
+        if(opts.limit && info.count >= opts.limit * 0.75){
+          cls = 'svc-amber';
+          tip = opts.name + ': running low — ' + info.count + ' of ~' + opts.limit + ' free daily calls used';
+        }
+      }
+      dot.className = 'svc-dot ' + cls;
+      pill.title = tip;
+      pill.classList.toggle('svc-pill-alert', cls === 'svc-red');
+    };
+
+    apply('braveDot', 'braveStatusPill', s.brave, {
+      name: 'Brave Search',
+      quotaHint: 'searches fall back to DuckDuckGo (lower quality) — check billing at api-dashboard.search.brave.com'
+    });
+    apply('geminiDot', 'geminiStatusPill', s.gemini, {
+      name: 'Gemini AI',
+      limit: s.gemini.freeTierDailyLimit,
+      quotaHint: 'AI features paused until the daily free tier resets — enable billing at aistudio.google.com to remove the cap'
+    });
+  }catch(e){}
+}
+refreshServiceStatus();
+setInterval(refreshServiceStatus, 60000);
+
 // Load the shared shortlist state on startup
 loadSavedLinks();
