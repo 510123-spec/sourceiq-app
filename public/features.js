@@ -494,6 +494,55 @@ async function runPersonProfile(person, results){
   }catch(e){ holder.remove(); }
 }
 
+// -- Draft sales offer to a buyer (mirror of draftInquiry): AI-personalized,
+//    falls back to a static pitch template if AI is unavailable --
+function staticOffer(r, product){
+  const subject = 'Offer: ' + product + ' — competitive supply available';
+  const body = [
+    'Dear ' + (r.title || 'Sir/Madam') + ',',
+    '',
+    'We are a trading company supplying ' + product + ' and understand your company purchases this product.',
+    '',
+    'We can offer:',
+    '- Competitive FOB / CIF pricing',
+    '- Full product specifications and certificates on request',
+    '- Samples available',
+    '- Reliable delivery terms',
+    '',
+    'Could you share your target specifications and monthly quantity so we can quote accurately?',
+    '',
+    'Best regards,'
+  ].join('\n');
+  return { subject, body };
+}
+
+async function draftOffer(id, btn){
+  const r = cardRegistry[id];
+  if(!r) return;
+  const product = (window.lastBuyerData && window.lastBuyerData.product) || lastSubject || 'our products';
+  let draft;
+  if(btn){ btn.disabled = true; btn.textContent = '✨ Drafting…'; }
+  try{
+    const res = await fetch('/api/ai-offer', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        product,
+        buyer: { title:r.title, type:r.type, country:r.country || '', snippet:r.snippet, isRFQ: !!r.isRFQ }
+      })
+    });
+    const data = await res.json();
+    if(!res.ok || !data.subject) throw new Error(data.error || 'no draft');
+    draft = data;
+  }catch(e){
+    draft = staticOffer(r, product);
+  }finally{
+    if(btn){ btn.disabled = false; btn.textContent = '✍️ Offer'; }
+  }
+  window.location.href = 'mailto:' + encodeURIComponent(r.email || '') +
+    '?subject=' + encodeURIComponent(draft.subject) +
+    '&body=' + encodeURIComponent(draft.body);
+}
+
 // Shared helper: jump into company mode and search a name (used by cross-links)
 function searchCompanyByName(name){
   if(!name) return;

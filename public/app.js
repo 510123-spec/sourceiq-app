@@ -520,6 +520,9 @@ async function runBuyersSearch(){
     banner.style.display = data.demoMode ? 'block' : 'none';
     let results = data.results || [];
     if(btype) results = results.filter(r => r.type === btype);
+    // Keep the full set + context so the type-filter pills can re-render locally
+    window.lastBuyerData = { results, product, country, total: data.total, note: data.note };
+    window.buyerFilter = 'all';
     renderBuyerResults(results, { product, country, total: data.total, note: data.note });
   }catch(err){
     wrap.innerHTML = buildErrorState(err.message, ()=>runBuyersSearch());
@@ -536,24 +539,52 @@ const BUYER_TYPE_META = {
   buyer:       { label:'Buyer',       icon:'🏢', color:'#7dd3fc' }
 };
 
+// Quick links into the buy-leads / RFQ sections of the big B2B portals — these
+// list companies actively asking to buy, which search results only sample.
+function rfqLinksHtml(product){
+  const q = encodeURIComponent(product || '');
+  const links = [
+    ['🅰 Alibaba RFQ',    `https://sourcing.alibaba.com/rfq_search_list.htm?searchText=${q}`, 'live buy requests on Alibaba'],
+    ['🌍 Go4WorldBusiness', `https://www.go4worldbusiness.com/find?searchText=${q}&doctype=buyer`, 'buyer directory + buy leads'],
+    ['🛞 TradeWheel Buyers', 'https://www.tradewheel.com/buyers/', 'buy offers by category'],
+    ['🔑 TradeKey Buy Offers', 'https://www.tradekey.com/buyoffers/', 'posted buying leads']
+  ].map(([name, url, tip]) =>
+    `<a class="trade-db-link" href="${url}" target="_blank" rel="noopener" title="${tip}">${name}</a>`).join('');
+  return `<div class="trade-db-row"><span class="trade-db-label">Active buy requests on B2B portals:</span>${links}</div>`;
+}
+
+// Local re-filter by buyer type (pills) — no re-fetch needed
+function setBuyerFilter(t){
+  window.buyerFilter = t;
+  const d = window.lastBuyerData;
+  if(!d) return;
+  const filtered = t === 'all' ? d.results : d.results.filter(r => r.type === t);
+  renderBuyerResults(filtered, d);
+}
+
 function renderBuyerResults(results, { product, country, total, note }){
   const wrap = document.getElementById('resultsWrap');
   if(!results.length){
-    wrap.innerHTML = '<p class="empty">No buyers found. Try a broader product term or remove the country filter.</p>';
+    wrap.innerHTML = '<p class="empty">No buyers found. Try a broader product term or remove the country filter.</p>' + rfqLinksHtml(product);
     return;
   }
 
+  const all = (window.lastBuyerData && window.lastBuyerData.results) || results;
+  const activeF = window.buyerFilter || 'all';
   const countryLabel = country ? ` in <strong style="color:#38bdf8">${escapeHtml(country)}</strong>` : '';
   let html = `<div class="stats">`;
   if(note) html += `<div class="country-note" style="margin:0 0 8px;font-size:12px;">${escapeHtml(note)}</div>`;
   html += `<div style="font-size:13px;">Found <strong style="color:var(--text)">${results.length}</strong> buyers for <strong style="color:#38bdf8">${escapeHtml(product)}</strong>${countryLabel}</div>
     <div class="stats-counts">
+      <button class="stats-pill buyer-filter-pill${activeF==='all'?' active':''}" onclick="setBuyerFilter('all')">All (${all.length})</button>
       ${Object.entries(BUYER_TYPE_META).map(([t,m]) => {
-        const n = results.filter(r=>r.type===t).length;
-        return n ? `<span class="stats-pill" style="background:${m.color}18;color:${m.color};border:1px solid ${m.color}33">${m.icon} ${n} ${m.label}${n>1?'s':''}</span>` : '';
+        const n = all.filter(r=>r.type===t).length;
+        return n ? `<button class="stats-pill buyer-filter-pill${activeF===t?' active':''}" style="background:${m.color}18;color:${m.color};border:1px solid ${m.color}33" onclick="setBuyerFilter('${t}')">${m.icon} ${n} ${m.label}${n>1?'s':''}</button>` : '';
       }).join('')}
     </div>
-  </div><div class="card-grid">`;
+  </div>
+  ${rfqLinksHtml(product)}
+  <div class="card-grid">`;
 
   // Assign stable IDs before rendering so we can reference them after innerHTML
   const enrichQueue = [];
@@ -566,10 +597,14 @@ function renderBuyerResults(results, { product, country, total, note }){
       ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" onerror="this.parentElement.innerHTML='<span class=\\'card-favicon-fallback\\'>${meta.icon}</span>'" loading="lazy" />`
       : `<span class="card-favicon-fallback">${meta.icon}</span>`;
 
-    // Register card — _id is required by autoEnrichCard
-    const regEntry = { link: r.link, title: r.title, type: r.type, _id: id };
+    // Register card — _id is required by autoEnrichCard; carry the full result
+    // data so save/compare/offer work exactly like on supplier cards
+    const regEntry = { ...r, country: r.country || country || '', _id: id };
     cardRegistry[id] = regEntry;
     enrichQueue.push(regEntry);
+
+    // ImportYeti customs records for this company — verify they actually import
+    const iyUrl = 'https://www.importyeti.com/search?q=' + encodeURIComponent((r.title || '').replace(/\s*[-–|].*$/, '').trim());
 
     html += `<div class="card buyer-card" id="${id}" style="animation-delay:${results.indexOf(r)*0.05}s">
       <div class="card-inner">
@@ -584,7 +619,10 @@ function renderBuyerResults(results, { product, country, total, note }){
         </div>
         <div class="badge-row">
           <span class="badge ${r.type||'buyer'}" style="gap:5px">${meta.icon} ${meta.label}</span>
+          ${r.isRFQ ? '<span class="badge rfq-badge">📣 Active Buy Request</span>' : ''}
           ${r.confidence ? `<span class="confidence" style="font-size:11px;color:var(--muted)">${r.confidence}% match</span>` : ''}
+          <button class="card-save-btn${savedLinks.has(r.link) ? ' saved' : ''}" onclick="toggleSave('${id}', this)" title="Save to shared shortlist">${savedLinks.has(r.link) ? '★' : '☆'}</button>
+          <label class="cmp-label" title="Select to compare"><input type="checkbox" onchange="toggleCompare('${id}', this)"> ⚖</label>
         </div>
         <p class="desc">${escapeHtml(r.snippet||'')}</p>
         <div class="card-divider"></div>
@@ -593,6 +631,10 @@ function renderBuyerResults(results, { product, country, total, note }){
         </div>
         <div class="quick-contact" id="${id}-qc"></div>
         <div class="details-slot" id="${id}-slot"></div>
+        <div class="card-export-row">
+          <button class="card-export-btn" onclick="draftOffer('${id}', this)" title="Draft a personalized sales offer to this buyer">✍️ Offer</button>
+          <a class="card-export-btn" href="${escapeHtml(iyUrl)}" target="_blank" rel="noopener" title="Check this company's US customs import records on ImportYeti">🚢 Import records</a>
+        </div>
       </div>
     </div>`;
   }

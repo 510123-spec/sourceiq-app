@@ -1100,18 +1100,26 @@ app.get('/api/search-customers', async (req, res) => {
   const q5 = cc ? `${product} retail chain supermarket buyer ${cc} -site:amazon.com` : `${product} retail chain wholesale buyer -site:amazon.com`;
   const q6 = cc ? `site:importyeti.com ${product} ${cc}` : `site:importyeti.com ${product}`;
   const q7 = cc ? `${product} "buying agent" OR "trading company" OR "sourcing company" ${cc}` : `${product} "buying agent" OR "sourcing company" OR "trading company"`;
+  // q8: ACTIVE buying leads — posted buy requests / RFQs on B2B lead portals.
+  // These are companies asking to buy right now, the strongest signal there is.
+  const q8 = `${product}${cc ? ' ' + cc : ''} ("buy offer" OR "buying lead" OR "buy leads" OR "buyer inquiry" OR RFQ) (site:go4worldbusiness.com OR site:tradewheel.com OR site:tradekey.com OR site:ec21.com OR site:exporters.sg)`;
+  // q9 & q10: simple queries LAST — braveMulti's DuckDuckGo fallback uses the
+  // final queries, and DDG returns nothing for the boolean/site: ones above.
+  const q9  = cc ? `${product} importers ${cc}` : `${product} importers`;
+  const q10 = cc ? `${product} buyers ${cc}` : `${product} buyers`;
 
   try {
-    const [r1,r2,r3,r4,r5,r6,r7] = await braveMulti([
+    const [r1,r2,r3,r4,r5,r6,r7,r8,r9,r10] = await braveMulti([
       { q:q1, country:cc }, { q:q2, country:cc }, { q:q3, country:cc }, { q:q4, country:cc },
-      { q:q5, country:cc }, { q:q6 }, { q:q7, country:cc }
+      { q:q5, country:cc }, { q:q6 }, { q:q7, country:cc }, { q:q8 },
+      { q:q9, country:cc }, { q:q10, country:cc }
     ]);
 
     // Map raw results to buyer objects
     const BUYER_NOISE = ['alibaba.com','aliexpress.com','amazon.com','ebay.com','indiamart.com',
       'made-in-china.com','dhgate.com','tradeindia.com','thomasnet.com'];
 
-    const mapped = [r1,r2,r3,r4,r5,r6,r7].flat().map(item => {
+    const mapped = [r1,r2,r3,r4,r5,r6,r7,r8,r9,r10].flat().map(item => {
       const itemUrl    = item.url || item.link || '';
       const displayLink = itemUrl.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
       const title      = item.title || '';
@@ -1119,7 +1127,10 @@ app.get('/api/search-customers', async (req, res) => {
       const { type, confidence } = classifyBuyer(title, snippet, displayLink);
       const category   = categorise(displayLink, title, snippet);
       const thumbnail  = item.thumbnail?.src || null;
-      return { title, link: itemUrl, snippet, displayLink, type, confidence, category, thumbnail };
+      // Flag results that look like an ACTIVE buy request (posted RFQ / buying
+      // lead) rather than just a company that generally buys this product.
+      const isRFQ = /buy offer|buying lead|buy leads?\b|buyer inquiry|request for quotation|\bRFQ\b|looking for suppliers?|seeking (?:a )?(?:supplier|manufacturer)|want(?:ed)? to buy/i.test(title + ' ' + snippet);
+      return { title, link: itemUrl, snippet, displayLink, type, confidence, category, thumbnail, isRFQ };
     }).filter(r => r.link);
 
     // Deduplicate
@@ -1151,6 +1162,8 @@ app.get('/api/search-customers', async (req, res) => {
       // Boost specific buyer signals
       if (/importer|wholesale buyer|procurement|purchasing/i.test(r.title)) s += 12;
       if (/request for quotation|looking for supplier|seeking manufacturer/i.test(r.title + ' ' + r.snippet)) s += 10;
+      // Active buy requests outrank passive "this company buys X" results
+      if (r.isRFQ) s += 25;
       return { ...r, score: s };
     });
 
@@ -2882,6 +2895,42 @@ Return ONLY valid JSON: {"subject": "...", "body": "..."}`;
     res.json({ subject: draft.subject, body: draft.body });
   } catch (err) {
     res.status(500).json({ error: 'AI draft failed: ' + err.message });
+  }
+});
+
+// ── AI-drafted sales offer (mirror of ai-inquiry, seller side) ────────────────
+// Drafts a pitch TO a prospective buyer, personalized to what we know about them.
+app.post('/api/ai-offer', async (req, res) => {
+  const { buyer, product } = req.body || {};
+  if (!buyer || !buyer.title) return res.status(400).json({ error: 'buyer is required' });
+  if (!AI_PROVIDER) return res.status(503).json({ error: 'No AI key configured' });
+
+  const prompt = `You are a professional B2B sales manager at a trading company writing a first-contact sales email.
+
+PROSPECTIVE BUYER:
+- Company: ${buyer.title}
+- Buyer type: ${buyer.type || 'unknown'}
+- Country: ${buyer.country || 'unknown'}
+- About: ${(buyer.snippet || '').slice(0, 300)}
+${buyer.isRFQ ? '- NOTE: This buyer appears to have POSTED AN ACTIVE BUY REQUEST for this product — respond to their request directly.' : ''}
+
+PRODUCT WE ARE SELLING: ${product || 'our products'}
+
+Write a concise, professional sales email (under 170 words) offering to supply this product.
+Personalize it: reference something specific about THIS buyer (their type, market, country,
+or their buy request if noted). Mention we can provide specifications, competitive FOB/CIF
+pricing, and samples on request. Do not invent facts, prices, or certifications.
+End with a clear next step (e.g. asking for their target specs/quantity).
+Sign off with "Best regards," and nothing after it (the sender adds their name).
+
+Return ONLY valid JSON: {"subject": "...", "body": "..."}`;
+
+  try {
+    const draft = await callAI(prompt);
+    if (!draft.subject || !draft.body) throw new Error('AI returned incomplete draft');
+    res.json({ subject: draft.subject, body: draft.body });
+  } catch (err) {
+    res.status(500).json({ error: 'AI offer failed: ' + err.message });
   }
 });
 
