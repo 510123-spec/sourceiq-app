@@ -48,6 +48,7 @@ function setMode(mode){
   document.getElementById('personSearchBox').style.display    = mode === 'person'    ? 'flex' : 'none';
   document.getElementById('stockSearchBox').style.display     = mode === 'stock'     ? 'flex' : 'none';
   document.getElementById('imageSearchBox').style.display     = mode === 'image'     ? 'flex' : 'none';
+  document.getElementById('priceSearchBox').style.display     = mode === 'price'     ? 'flex' : 'none';
   document.getElementById('tradeSearchBox').style.display     = mode === 'trade'     ? 'flex' : 'none';
   document.getElementById('marketSearchBox').style.display    = mode === 'market'    ? 'flex' : 'none';
   document.getElementById('buyersSearchBox').style.display    = mode === 'buyers'    ? 'flex' : 'none';
@@ -59,7 +60,8 @@ function setMode(mode){
     image:     'Upload a business card to extract details, or a photo to reverse-search on Google Lens.',
     trade:     'Find importers, exporters, and trade data by product or HS code — with optional country and direction filters.',
     market:    'Explore market size, key players, trends, and industry outlook for any sector or region.',
-    buyers:    'Find companies that BUY your product — importers, retailers, wholesalers, and procurement teams by country.'
+    buyers:    'Find companies that BUY your product — importers, retailers, wholesalers, and procurement teams by country.',
+    price:     'Enter an exact product model to compare prices across trusted retailers in your region — lowest price, deals, and an AI buying verdict.'
   };
   document.getElementById('searchHint').textContent = hints[mode];
   if(mode !== 'image'){

@@ -3142,6 +3142,116 @@ Return ONLY valid JSON:
   }
 });
 
+// ── Best Price Finder ─────────────────────────────────────────────────────────
+// Searches retailers for a specific product model, extracts prices from the
+// results, and (when AI is available) adds a grounded buying verdict.
+// Region-specific retailer targeting: consumers buy from local stores.
+const PRICE_REGIONS = {
+  'Singapore':      { code: 'SG', currency: /S\$|SGD/i, sites: ['lazada.sg','shopee.sg','amazon.sg','courts.com.sg','challenger.sg','harveynorman.com.sg','qoo10.sg'] },
+  'Israel':         { code: 'IL', currency: /₪|ILS|NIS/i, sites: ['ksp.co.il','ivory.co.il','bug.co.il','zap.co.il','lastprice.co.il'] },
+  'USA':            { code: 'US', currency: /\$|USD/i, sites: ['amazon.com','bestbuy.com','walmart.com','newegg.com','bhphotovideo.com','target.com'] },
+  'Europe':         { code: 'DE', currency: /€|EUR/i, sites: ['amazon.de','mediamarkt.de','otto.de','fnac.com','bol.com','idealo.de'] },
+  'United Kingdom': { code: 'GB', currency: /£|GBP/i, sites: ['amazon.co.uk','currys.co.uk','argos.co.uk','johnlewis.com','very.co.uk'] },
+  'Global':         { code: null, currency: /\$|€|£|USD/i, sites: ['amazon.com','ebay.com','aliexpress.com'] }
+};
+
+function extractPrice(text) {
+  // Match "S$1,299", "$1,199.00", "€1.299,00", "₪4,590", "1,299 USD", "USD 1299"
+  const m = text.match(/(?:S\$|US?\$|\$|USD|€|£|₪|SGD|EUR|GBP|ILS|NIS)\s?([\d.,]{2,10})|([\d.,]{2,10})\s?(?:USD|SGD|EUR|GBP|ILS|NIS)/i);
+  if (!m) return null;
+  const raw = m[0].trim();
+  const numStr = (m[1] || m[2] || '').replace(/[.,](?=\d{3}\b)/g, '').replace(',', '.');
+  const value = parseFloat(numStr);
+  if (isNaN(value) || value < 1) return null;
+  return { display: raw.replace(/\s+/g, ''), value };
+}
+
+app.get('/api/price-search', async (req, res) => {
+  const product = (req.query.product || '').trim();
+  const region  = (req.query.region  || 'Global').trim();
+  if (!product) return res.status(400).json({ error: 'Please provide a product model to search.' });
+
+  const reg = PRICE_REGIONS[region] || PRICE_REGIONS['Global'];
+  const siteClause = reg.sites.map(s => 'site:' + s).join(' OR ');
+
+  // q1: regional retailers; q2: price/buy intent broad; q3: deals & coupons;
+  // q4/q5: simple queries last for the DuckDuckGo fallback.
+  const q1 = `"${product}" price (${siteClause})`;
+  const q2 = `"${product}" (price OR buy OR "in stock") (shop OR store OR retailer)`;
+  const q3 = `"${product}" (deal OR discount OR promo OR coupon OR sale OR offer)`;
+  const q4 = `${product} price ${region === 'Global' ? '' : region}`.trim();
+  const q5 = `${product} buy`;
+
+  try {
+    const braveCountry = reg.code ? Object.keys(COUNTRY_TLD).find(c => COUNTRY_TLD[c] === reg.code.toLowerCase()) : null;
+    const [r1, r2, r3, r4, r5] = await braveMulti([
+      { q: q1 }, { q: q2, country: braveCountry }, { q: q3, country: braveCountry },
+      { q: q4, country: braveCountry }, { q: q5, country: braveCountry }
+    ]);
+
+    const seen = new Set(); const seenDom = new Map();
+    const offers = [];
+    for (const r of [r1, r2, r3, r4, r5].flat()) {
+      const link = r.link || '';
+      if (!link || seen.has(link)) continue;
+      seen.add(link);
+      const dom = (r.displayLink || '').toLowerCase().replace(/^www\./, '');
+      if (NOISE_DOMAINS.some(d => dom.includes(d))) continue;
+      const dc = seenDom.get(dom) || 0;
+      if (dc >= 2) continue;
+      const text = `${r.title || ''} ${r.snippet || ''}`;
+      const price = extractPrice(text);
+      const isRegional = reg.sites.some(s => dom === s || dom.endsWith('.' + s));
+      const refurb = /refurbish|renewed|pre-?owned|second.?hand|used\b/i.test(text);
+      const deal = /deal|discount|promo|coupon|% off|sale\b|clearance/i.test(text);
+      // Relevance: model words should appear in the text
+      const words = product.toLowerCase().split(/\s+/).filter(w => w.length > 1);
+      const hits = words.filter(w => text.toLowerCase().includes(w)).length;
+      if (hits < Math.ceil(words.length * 0.5)) continue;
+      seenDom.set(dom, dc + 1);
+      offers.push({
+        store: dom, title: r.title, link, snippet: (r.snippet || '').slice(0, 220),
+        price: price ? price.display : null, priceValue: price ? price.value : null,
+        isRegional, refurb, deal
+      });
+      if (offers.length >= 30) break;
+    }
+
+    // Sort: priced offers first (ascending), regional stores preferred on ties
+    offers.sort((a, b) => {
+      if (a.priceValue != null && b.priceValue != null) return a.priceValue - b.priceValue;
+      if (a.priceValue != null) return -1;
+      if (b.priceValue != null) return 1;
+      return (b.isRegional ? 1 : 0) - (a.isRegional ? 1 : 0);
+    });
+
+    // AI buying verdict, grounded on the extracted offers
+    let verdict = null;
+    if (AI_PROVIDER && offers.length) {
+      try {
+        const evidence = offers.slice(0, 12).map((o, i) =>
+          `[${i + 1}] ${o.store} — ${o.price || 'no price shown'} — ${o.title} — ${o.snippet.slice(0, 120)}`).join('\n');
+        verdict = await callAI(`You are a price-comparison analyst. A shopper wants to buy: "${product}" (region: ${region}).
+
+OFFERS FOUND:
+${evidence}
+
+Rules:
+- Use ONLY the offers above. Never invent prices, stores, or warranty terms.
+- bestValue: the offer number [n] that looks like the best deal from a TRUSTWORTHY retailer (prefer known stores over unknown ones even at slightly higher price). null if no priced offers.
+- priceAssessment: is the visible price range reasonable for this product? Note if prices vary a lot, if anything looks too-good-to-be-true, or if listings are refurbished.
+- advice: 1-2 sentences: buy now vs wait, what to verify (warranty, authorized dealer, shipping) before ordering.
+
+Return ONLY valid JSON: {"bestValue": n or null, "priceRange":"e.g. $1,199–$1,349 or empty", "priceAssessment":"...", "advice":"..."}`);
+      } catch (_) { /* AI unavailable — table still useful on its own */ }
+    }
+
+    res.json({ product, region, count: offers.length, offers, verdict, demoMode: false });
+  } catch (err) {
+    res.status(500).json({ error: 'Price search failed: ' + err.message });
+  }
+});
+
 // ── HS code lookup ────────────────────────────────────────────────────────────
 // Suggests the Harmonized System code for a product description. HS codes are a
 // stable international standard (the first 6 digits are universal), which is

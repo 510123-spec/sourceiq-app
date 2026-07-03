@@ -720,5 +720,104 @@ async function refreshServiceStatus(){
 refreshServiceStatus();
 setInterval(refreshServiceStatus, 60000);
 
+// ═══════════════ Best Price Finder ═══════════════
+
+async function runPriceSearch(){
+  const wrap = document.getElementById('resultsWrap');
+  const btn  = document.getElementById('priceSearchBtn');
+  const product   = document.getElementById('priceProduct').value.trim();
+  const region    = document.getElementById('priceRegion').value.trim();
+  const condition = document.getElementById('priceCondition').value.trim();
+
+  if(!product){
+    wrap.innerHTML = '<p class="empty">Type the exact product model (e.g. "MacBook Air M4 13"), then click Compare Prices.</p>';
+    return;
+  }
+  btn.disabled = true; btn.classList.add('btn-loading');
+  hideAIPanel();
+  document.getElementById('toolbar').style.display = 'none';
+  wrap.innerHTML = buildSkeleton(4);
+
+  try{
+    const params = new URLSearchParams({ product, region });
+    const res = await fetch('/api/price-search?' + params.toString());
+    const data = await res.json();
+    if(!res.ok || data.error){ wrap.innerHTML = `<p class="error">${escapeHtml(data.error || 'Price search failed.')}</p>`; return; }
+    let offers = data.offers || [];
+    if(condition === 'new')    offers = offers.filter(o => !o.refurb);
+    if(condition === 'refurb') offers = offers.filter(o => o.refurb);
+    renderPriceResults({ ...data, offers });
+  }catch(err){
+    wrap.innerHTML = buildErrorState(err.message, ()=>runPriceSearch());
+  }finally{
+    btn.disabled = false; btn.classList.remove('btn-loading');
+  }
+}
+
+// Price-history / comparison tools, prefilled with the product
+function priceToolsHtml(product, region){
+  const q = encodeURIComponent(product);
+  const tools = [
+    ['🛍 Google Shopping', `https://www.google.com/search?q=${q}&tbm=shop`, 'live price comparison'],
+    ['📉 CamelCamelCamel', `https://camelcamelcamel.com/search?sq=${q}`, 'Amazon price history — is today’s price good?'],
+    ['📊 PriceSpy', `https://pricespy.co.uk/search?search=${q}`, 'price history & comparison'],
+    ...(region === 'Israel' ? [['🔎 Zap.co.il', `https://www.zap.co.il/search.aspx?keyword=${q}`, 'Israeli price comparison']] : []),
+    ...(region === 'Singapore' ? [['🔎 iPrice SG', `https://iprice.sg/search/?q=${q}`, 'Singapore price comparison']] : [])
+  ].map(([name, url, tip]) =>
+    `<a class="trade-db-link" href="${url}" target="_blank" rel="noopener" title="${tip}">${name}</a>`).join('');
+  return `<div class="trade-db-row"><span class="trade-db-label">Price history &amp; comparison tools:</span>${tools}</div>`;
+}
+
+function renderPriceResults(data){
+  const wrap = document.getElementById('resultsWrap');
+  const offers = data.offers || [];
+  const v = data.verdict;
+
+  if(!offers.length){
+    wrap.innerHTML = `<p class="empty">No retailer listings found for "${escapeHtml(data.product)}" — try a shorter model name, or use the comparison tools below.</p>`
+      + priceToolsHtml(data.product, data.region);
+    return;
+  }
+
+  // Best value: AI's pick if given, else the cheapest priced offer
+  let bestIdx = (v && typeof v.bestValue === 'number' && offers[v.bestValue - 1]) ? v.bestValue - 1
+    : offers.findIndex(o => o.priceValue != null);
+
+  const rows = offers.map((o, i) => {
+    const best = i === bestIdx;
+    const badges = [
+      o.isRegional ? '<span class="deal-badge">📍 Regional store</span>' : '',
+      o.refurb ? '<span class="deal-badge" style="background:#fef3c7;border-color:#fde68a;color:#92400e">♻️ Refurbished</span>' : '',
+      o.deal ? '<span class="deal-badge deal-price">🏷 Deal / Promo</span>' : ''
+    ].join('');
+    return `<tr class="${best ? 'price-best' : ''}">
+      <td class="price-store"><img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(o.store)}&sz=32" alt="" loading="lazy" onerror="this.style.display='none'"> ${escapeHtml(o.store)}</td>
+      <td class="price-amt">${o.price ? '<strong>' + escapeHtml(o.price) + '</strong>' : '<span class="price-na">see site</span>'}${best ? ' <span class="best-star">⭐ Best Value</span>' : ''}</td>
+      <td class="price-info"><a href="${escapeHtml(o.link)}" target="_blank" rel="noopener">${escapeHtml((o.title || '').slice(0, 75))}</a><div class="price-badges">${badges}</div></td>
+      <td class="price-visit"><a class="stock-card-link" href="${escapeHtml(o.link)}" target="_blank" rel="noopener">Visit →</a></td>
+    </tr>`;
+  }).join('');
+
+  const verdictHtml = v ? `
+    <div class="person-profile-panel">
+      <div class="profile-head">💡 <strong>Buying Verdict</strong>${v.priceRange ? `<span class="profile-role">${escapeHtml(v.priceRange)}</span>` : ''}</div>
+      ${v.priceAssessment ? `<p class="profile-summary">${escapeHtml(v.priceAssessment)}</p>` : ''}
+      ${v.advice ? `<p class="profile-summary" style="margin-top:2px"><strong>Advice:</strong> ${escapeHtml(v.advice)}</p>` : ''}
+      <div class="profile-note">Based only on the listings below — always verify final price, shipping, and warranty on the retailer’s site before ordering.</div>
+    </div>` : '';
+
+  wrap.innerHTML = `
+    <div class="stats"><div style="font-size:13px;"><strong style="color:var(--text)">${offers.length}</strong> listings for <strong style="color:#4f46e5">${escapeHtml(data.product)}</strong> — ${escapeHtml(data.region)}</div></div>
+    ${verdictHtml}
+    ${priceToolsHtml(data.product, data.region)}
+    <div class="price-table-wrap">
+      <table class="price-table">
+        <thead><tr><th>Store</th><th>Price</th><th>Listing</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="profile-note" style="margin-top:10px">Prices are extracted from live search listings and may be outdated — the retailer’s site is authoritative. Shipping and delivery times are shown on each store’s page.</div>`;
+}
+
 // Load the shared shortlist state on startup
 loadSavedLinks();
