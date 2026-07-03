@@ -2230,3 +2230,93 @@ tr.price-best td:first-child{ border-left:3px solid #10b981; }
   /* Compare bar stays within screen */
   #compareBar{ width:calc(100vw - 24px); justify-content:center; flex-wrap:wrap; }
 }
+
+/* ══════════════ COMPACT & FUN MAKEOVER ══════════════
+   Smaller everything, playful candy accents — still bright white. */
+
+/* ---- Compact hero: half the height, smaller type, smaller globe ---- */
+.hero{ padding:26px 40px 18px !important; }
+h1{ font-size:34px !important; letter-spacing:-1.2px !important; margin:0 0 10px !important; }
+.subtitle{ font-size:13.5px !important; margin:0 0 14px !important; max-width:460px; }
+.hero-eyebrow{ margin-bottom:12px !important; padding:4px 12px 4px 8px !important; font-size:10px !important; }
+.hero-stats{ gap:14px !important; margin:2px 0 10px !important; }
+.hero-stat-num{ font-size:17px !important; }
+.hero-stat-label{ font-size:10px !important; }
+.hero-trust{ gap:6px !important; }
+.hero-trust-pill{ padding:4px 10px !important; font-size:11px !important; border-radius:20px !important; }
+#globeHint{ margin-top:8px !important; font-size:10px !important; }
+.globe-wrap{ flex:0 0 280px !important; width:280px !important; height:280px !important; }
+#globeCanvas{ width:260px !important; height:260px !important; }
+.orbit-ring{ display:none !important; }
+.hero-separator{ display:none !important; }
+/* 515px decorative blob inside hero-text sits in normal flow and inflates the
+   hero to ~850px tall — remove it at every size, not just mobile */
+.hero-orb{ display:none !important; }
+
+/* ---- Compact panel & cards ---- */
+.panel{ margin-top:4px !important; }
+.card-inner{ padding:14px 16px !important; }
+.card h3{ font-size:14.5px !important; }
+.desc{ font-size:12px !important; line-height:1.5 !important; }
+.card-grid{ gap:14px !important; }
+
+/* ---- Fun: bouncy candy mode tabs ---- */
+.mode-tab{
+  border-radius:30px !important;
+  transition:transform .15s cubic-bezier(.34,1.56,.64,1), background .15s, color .15s !important;
+}
+.mode-tab:hover{ transform:translateY(-3px) rotate(-1deg) scale(1.05); }
+.mode-tab.active{
+  background:linear-gradient(135deg,#6366f1,#a855f7,#ec4899) !important;
+  color:#fff !important; border-color:transparent !important;
+  box-shadow:0 6px 18px rgba(139,92,246,.35) !important;
+}
+.mode-tab.active .tab-icon{ stroke:#fff !important; }
+
+/* ---- Fun: rainbow card stripes (cycle per card) + springy hover ---- */
+.card{ border-radius:18px !important; overflow:hidden; }
+.card::before{
+  content:''; display:block; height:4px; width:100%;
+  background:linear-gradient(90deg,#6366f1,#a855f7); opacity:1;
+}
+.card:nth-child(4n+1)::before{ background:linear-gradient(90deg,#6366f1,#8b5cf6); }
+.card:nth-child(4n+2)::before{ background:linear-gradient(90deg,#06b6d4,#3b82f6); }
+.card:nth-child(4n+3)::before{ background:linear-gradient(90deg,#10b981,#84cc16); }
+.card:nth-child(4n+4)::before{ background:linear-gradient(90deg,#f59e0b,#ec4899); }
+.card{ transition:transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s !important; }
+.card:hover{
+  transform:translateY(-5px) rotate(.4deg) !important;
+  box-shadow:0 14px 34px rgba(139,92,246,.16) !important;
+}
+
+/* ---- Fun: candy buttons & badges ---- */
+#searchBtn, #companySearchBtn, #personSearchBtn, #buyersSearchBtn,
+#stockSearchBtn, #tradeSearchBtn, #marketSearchBtn, #priceSearchBtn{
+  border-radius:30px !important;
+  background:linear-gradient(135deg,#6366f1,#a855f7,#ec4899) !important;
+  transition:transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s !important;
+}
+#searchBtn:hover, #companySearchBtn:hover, #personSearchBtn:hover, #buyersSearchBtn:hover,
+#stockSearchBtn:hover, #tradeSearchBtn:hover, #marketSearchBtn:hover, #priceSearchBtn:hover{
+  transform:scale(1.06) rotate(-1deg); box-shadow:0 8px 24px rgba(168,85,247,.4) !important;
+}
+.badge{ border-radius:20px !important; font-size:10.5px !important; }
+.chip{ border-radius:20px !important; transition:transform .15s cubic-bezier(.34,1.56,.64,1) !important; }
+.chip:hover{ transform:translateY(-2px) scale(1.08) rotate(-1.5deg); }
+
+/* ---- Fun: logo wiggle + topbar polish ---- */
+.topbar-logo{ transition:transform .3s cubic-bezier(.34,1.56,.64,1); }
+.topbar-brand:hover .topbar-logo{ transform:rotate(-12deg) scale(1.15); }
+.topbar{ padding:8px 20px !important; }
+.topbar-pill{ border-radius:20px !important; }
+
+/* ---- Compact search box ---- */
+.search-box input, .search-box select{ padding:10px 14px !important; font-size:13.5px !important; border-radius:14px !important; }
+.search-field label, .search-select-field label{ font-size:10.5px !important; }
+.mode-tabs{ margin-bottom:12px !important; }
+
+/* Mobile: keep the smaller globe centered */
+@media (max-width: 480px){
+  .globe-wrap{ margin:10px auto 0 !important; }
+  h1{ font-size:28px !important; }
+}
