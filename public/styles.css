@@ -2414,3 +2414,68 @@ h1{ color:var(--ink) !important; font-weight:700 !important; }
 
 /* Posh: replace the rainbow topbar underline with a single hairline */
 .topbar::after{ background:var(--hairline) !important; height:1px !important; }
+
+/* ══════════════ PROFESSIONAL BUSINESS LAYER ══════════════
+   Overrides the posh/dark layer: standard corporate SaaS look.
+   Light, conventional, serious — a business tool, not a toy. */
+
+:root{
+  --biz-blue:#2563eb;      /* one standard corporate blue */
+  --biz-blue-dark:#1d4ed8;
+  --biz-border:#e5e7eb;    /* cool neutral gray */
+  --biz-text:#111827;
+  --biz-muted:#6b7280;
+}
+
+/* Headline: plain, confident, no italics, no gradient */
+h1{ color:var(--biz-text) !important; }
+.h1-accent{
+  font-style:normal !important;
+  color:var(--biz-blue) !important; -webkit-text-fill-color:var(--biz-blue) !important;
+}
+
+/* Remove the decorative hero extras that read "toy" */
+.hero-trust{ display:none !important; }
+#globeHint{ display:none !important; }
+.hero-eyebrow{ display:none !important; }
+
+/* Buttons & active tab: standard blue, conventional radius */
+.mode-tab{ border-radius:8px !important; }
+.mode-tab.active{
+  background:var(--biz-blue) !important;
+  box-shadow:0 1px 3px rgba(37,99,235,.3) !important;
+}
+#searchBtn, #companySearchBtn, #personSearchBtn, #buyersSearchBtn,
+#stockSearchBtn, #tradeSearchBtn, #marketSearchBtn, #priceSearchBtn,
+.id-search-btn{
+  background:var(--biz-blue) !important; border-radius:8px !important;
+}
+#searchBtn:hover, #companySearchBtn:hover, #personSearchBtn:hover, #buyersSearchBtn:hover,
+#stockSearchBtn:hover, #tradeSearchBtn:hover, #marketSearchBtn:hover, #priceSearchBtn:hover{
+  background:var(--biz-blue-dark) !important; box-shadow:0 2px 8px rgba(37,99,235,.3) !important;
+}
+.topbar-logo{ background:var(--biz-blue) !important; }
+#compareBar{ background:#1f2937 !important; }
+#compareBar button{ background:var(--biz-blue) !important; }
+
+/* Surfaces: cool-gray hairlines, conventional radii, standard shadows */
+.panel{ border:1px solid var(--biz-border) !important; border-radius:12px !important; }
+.card{ border:1px solid var(--biz-border) !important; border-radius:10px !important; }
+.card::before,
+.card:nth-child(4n+1)::before, .card:nth-child(4n+2)::before,
+.card:nth-child(4n+3)::before, .card:nth-child(4n+4)::before{
+  display:none !important;
+}
+.card:hover{ box-shadow:0 4px 16px rgba(17,24,39,.08) !important; border-color:#d1d5db !important; }
+.search-box input, .search-box select{ border-radius:8px !important; border-color:var(--biz-border) !important; }
+.search-box input:focus, .search-box select:focus{ border-color:var(--biz-blue) !important; box-shadow:0 0 0 3px rgba(37,99,235,.1) !important; }
+.chip{ border-radius:8px !important; border-color:var(--biz-border) !important; color:var(--biz-muted) !important; }
+.chip:hover{ background:#f9fafb !important; color:var(--biz-text) !important; }
+.topbar-pill{ border-radius:8px !important; }
+.topbar::after{ background:var(--biz-border) !important; }
+
+/* Links and secondary buttons in the same blue */
+.detail-value a, .price-info a, .saved-item-head a{ color:var(--biz-blue) !important; }
+.dossier-btn, .saved-export-btn, .hs-find-btn{ color:var(--biz-blue) !important; border-color:var(--biz-border) !important; }
+.hero-stat-num{ color:var(--biz-text) !important; -webkit-text-fill-color:var(--biz-text) !important; }
+.subtitle{ color:var(--biz-muted) !important; }
