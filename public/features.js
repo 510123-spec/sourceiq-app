@@ -562,5 +562,110 @@ function personAffiliationHtml(r){
   return `<div class="person-affiliation"><button class="profile-company-chip" onclick="searchCompanyByName(this.dataset.co)" data-co="${escapeHtml(company)}" title="Search this company">🏢 ${escapeHtml(company)}</button></div>`;
 }
 
+// ═══════════════ Image identification & market brief ═══════════════
+
+// -- Product photo → Gemini Vision identifies it → auto supplier search --
+async function identifyProductImage(file){
+  const statusEl = document.getElementById('idStatus');
+  const resultEl = document.getElementById('idResult');
+  try{
+    // Downscale large photos client-side: identification doesn't need 12MP,
+    // and smaller payloads keep the request fast and under the server limit.
+    const dataUrl = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1280;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(img.width * scale);
+        cv.height = Math.round(img.height * scale);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = () => reject(new Error('Could not read the image'));
+      img.src = URL.createObjectURL(file);
+    });
+    const base64 = dataUrl.split(',')[1];
+
+    const res = await fetch('/api/identify-image', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ image: base64, mimeType: 'image/jpeg' })
+    });
+    const data = await res.json();
+    if(!res.ok || data.error) throw new Error(data.error || 'identification failed');
+
+    if(!data.product){
+      statusEl.innerHTML = '🤔 Could not identify a sellable product in this photo.';
+      resultEl.innerHTML = data.description ? `<div class="id-desc">${escapeHtml(data.description)}</div>` : '';
+      return;
+    }
+
+    const confCls = data.confidence === 'high' ? 'conf-high' : data.confidence === 'low' ? 'conf-low' : 'conf-mid';
+    statusEl.innerHTML = '✅ Identified';
+    resultEl.innerHTML = `
+      <div class="id-card">
+        <div class="id-product">📦 <strong>${escapeHtml(data.product)}</strong>
+          <span class="profile-conf ${confCls}">${escapeHtml(data.confidence)} confidence</span></div>
+        ${data.brand ? `<div class="id-brand">Brand visible: ${escapeHtml(data.brand)}</div>` : ''}
+        ${data.description ? `<div class="id-desc">${escapeHtml(data.description)}</div>` : ''}
+        <div class="id-actions">
+          <button class="id-search-btn" onclick="searchIdentifiedProduct(this.dataset.kw)" data-kw="${escapeHtml(data.keywords)}">🔍 Find suppliers of &quot;${escapeHtml(data.keywords)}&quot;</button>
+          <button class="id-search-btn id-buyers" onclick="searchIdentifiedBuyers(this.dataset.kw)" data-kw="${escapeHtml(data.keywords)}">🛒 Find buyers</button>
+        </div>
+      </div>`;
+  }catch(e){
+    statusEl.innerHTML = '⚠️ ' + escapeHtml(e.message);
+  }
+}
+
+function searchIdentifiedProduct(keywords){
+  setMode('product');
+  document.getElementById('query').value = keywords;
+  runSearch();
+}
+
+function searchIdentifiedBuyers(keywords){
+  setMode('buyers');
+  document.getElementById('buyersProduct').value = keywords;
+  runBuyersSearch();
+}
+
+// -- AI market brief: structured summary panel above market results --
+async function runMarketBrief(industry, country, results){
+  const wrap = document.getElementById('resultsWrap');
+  if(!wrap) return;
+  const holder = document.createElement('div');
+  holder.id = 'marketBriefPanel';
+  holder.className = 'person-profile-panel loading';
+  holder.innerHTML = '<span class="loading-dot"></span> Building market brief for ' + escapeHtml(industry) + '…';
+  wrap.prepend(holder);
+  try{
+    const res = await fetch('/api/ai-market-brief', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ industry, country, results: results.slice(0, 12).map(r => ({ title:r.title, snippet:r.snippet, displayLink:r.displayLink })) })
+    });
+    const data = await res.json();
+    if(!res.ok || !data.overview){ holder.remove(); return; }
+    const confCls = data.confidence === 'high' ? 'conf-high' : data.confidence === 'low' ? 'conf-low' : 'conf-mid';
+    const facts = [
+      data.marketSize ? `<span class="reg-cell"><span class="reg-label">Market size</span><strong>${escapeHtml(data.marketSize)}</strong></span>` : '',
+      data.growth ? `<span class="reg-cell"><span class="reg-label">Growth</span><strong>${escapeHtml(data.growth)}</strong></span>` : ''
+    ].join('');
+    const players = (data.keyPlayers || []).map(p =>
+      `<button class="profile-company-chip" onclick="searchCompanyByName(this.dataset.co)" data-co="${escapeHtml(p)}" title="Search this company">🏢 ${escapeHtml(p)}</button>`).join('');
+    const trends = (data.trends || []).map(t => `<li>${escapeHtml(t)}</li>`).join('');
+    holder.className = 'person-profile-panel';
+    holder.innerHTML = `
+      <div class="profile-head">📈 <strong>${escapeHtml(industry)}</strong>${country ? ' — ' + escapeHtml(country) : ''}
+        <span class="profile-conf ${confCls}">${escapeHtml(data.confidence)} confidence</span>
+      </div>
+      <p class="profile-summary">${escapeHtml(data.overview)}</p>
+      ${facts ? `<div style="display:flex;gap:24px;margin:8px 0">${facts}</div>` : ''}
+      ${players ? `<div class="profile-companies">${players}</div>` : ''}
+      ${trends ? `<ul class="brief-trends">${trends}</ul>` : ''}
+      <div class="profile-note">AI brief from the results below — figures come from those sources, verify before citing.</div>`;
+  }catch(e){ holder.remove(); }
+}
+
 // Load the shared shortlist state on startup
 loadSavedLinks();

@@ -27,7 +27,7 @@ const LOGIN_PASS = process.env.LOGIN_PASS || 'sourceiq2024';
 
 app.set('trust proxy', 1);
 app.use(compression()); // gzip responses — the dashboard HTML alone is ~260KB uncompressed
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // image identification uploads base64 photos
 app.use(express.urlencoded({ extended: false }));
 app.use(session({
   secret: process.env.SESSION_SECRET || 'sourceiq-secret',
@@ -2577,7 +2577,25 @@ app.get('/api/stock', async (req, res) => {
       // Product name in title
       if (title.includes(product.toLowerCase())) score += 12;
 
-      return { ...r, _score: score, subtype };
+      // ── Extract the actual deal numbers out of the snippet text ────────────
+      // A trader cares about price / MOQ / available quantity, not prose.
+      const raw = `${r.title || ''} ${r.snippet || ''}`;
+      const dealInfo = {};
+      const priceM = raw.match(/(?:US?\$|USD|€|£|₹|RM|S\$)\s?([\d,]+(?:\.\d+)?)(?:\s*[-–~]\s*(?:US?\$|USD)?\s?[\d,]+(?:\.\d+)?)?\s*(?:\/|per\s*)?\s*(pc|pcs|piece|unit|kg|mt|ton|tonne|meter|m\b|yard|set|Wp|watt)?/i);
+      if (priceM) dealInfo.price = priceM[0].replace(/\s+/g, ' ').trim().slice(0, 40);
+      const moqM = raw.match(/(?:MOQ|minimum order(?: quantity)?)[:\s]*([\d,]+\s*(?:pcs?|pieces?|units?|kg|mt|tons?|tonnes?|sets?|yards?|meters?)?)/i);
+      if (moqM) dealInfo.moq = moqM[1].trim().slice(0, 30);
+      const qtyM = raw.match(/([\d,]{3,}\+?\s*(?:pcs|pieces|units|kg|mt|tons?|tonnes?|sets|yards|meters))\s*(?:in stock|available|ready|surplus)/i) ||
+                   raw.match(/(?:in stock|available|stock)[:\s]*([\d,]{3,}\+?\s*(?:pcs|pieces|units|kg|mt|tons?|tonnes?|sets))/i);
+      if (qtyM) dealInfo.quantity = qtyM[1].trim().slice(0, 30);
+      const leadM = raw.match(/(?:ship(?:s|ping)? (?:with)?in|delivery(?: in)?|dispatch(?: in)?|lead time[:\s]*)\s*(\d+\s*[-–]?\s*\d*\s*(?:hours?|days?|weeks?|business days?))/i);
+      if (leadM) dealInfo.leadTime = leadM[1].trim().slice(0, 25);
+
+      // Results with concrete numbers outrank vague "we have stock" pages
+      const dealCount = Object.keys(dealInfo).length;
+      score += dealCount * 12;
+
+      return { ...r, _score: score, subtype, dealInfo: dealCount ? dealInfo : null };
     }).sort((a, b) => b._score - a._score)
       .slice(0, 24)
       .map(r => { const { _qs, _score, ...rest } = r; return { ...rest, type: 'stock' }; });
@@ -2898,6 +2916,60 @@ Return ONLY valid JSON: {"subject": "...", "body": "..."}`;
   }
 });
 
+// ── Product identification from a photo (Gemini Vision) ──────────────────────
+// Takes a base64 image, returns what product it shows plus search-ready
+// keywords — the frontend then feeds those straight into a supplier search.
+app.post('/api/identify-image', async (req, res) => {
+  const { image, mimeType } = req.body || {};
+  if (!image) return res.status(400).json({ error: 'image (base64) is required' });
+  if (!GEMINI_KEY) return res.status(503).json({ error: 'Image identification requires a Gemini API key' });
+
+  const prompt = `Identify the PRODUCT shown in this image for B2B sourcing purposes.
+
+Rules:
+- Name the product as a buyer would search for it (e.g. "copper cathode", "400W monocrystalline solar panel", "HDPE plastic bottle 500ml")
+- Include material, type, and key spec if visible
+- keywords: 2-4 word search phrase for finding suppliers of this exact product
+- If it shows a brand/logo prominently, note the brand but keep keywords generic (buyers source the product type, not the brand)
+- If you cannot identify a sellable product, set product to empty string and explain in description
+
+Return ONLY valid JSON: {"product":"...","keywords":"...","description":"one sentence about what is visible","brand":"brand name or empty string","confidence":"high|medium|low"}`;
+
+  try {
+    const r = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [
+            { text: prompt },
+            { inline_data: { mime_type: mimeType || 'image/jpeg', data: image } }
+          ] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 2000,
+            responseMimeType: 'application/json',
+            thinkingConfig: { thinkingBudget: 0 }
+          }
+        })
+      }
+    );
+    const data = await r.json();
+    if (data.error) throw new Error(data.error.message);
+    const result = JSON.parse(data.candidates[0].content.parts[0].text);
+    res.json({
+      product: String(result.product || '').slice(0, 120),
+      keywords: String(result.keywords || result.product || '').slice(0, 80),
+      description: String(result.description || '').slice(0, 300),
+      brand: String(result.brand || '').slice(0, 60),
+      confidence: ['high','medium','low'].includes(result.confidence) ? result.confidence : 'medium'
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Image identification failed: ' + err.message });
+  }
+});
+
 // ── AI-drafted sales offer (mirror of ai-inquiry, seller side) ────────────────
 // Drafts a pitch TO a prospective buyer, personalized to what we know about them.
 app.post('/api/ai-offer', async (req, res) => {
@@ -2977,6 +3049,52 @@ Return ONLY valid JSON:
     });
   } catch (err) {
     res.status(500).json({ error: 'Person summary failed: ' + err.message });
+  }
+});
+
+// ── AI market brief ───────────────────────────────────────────────────────────
+// Synthesizes market-search results into a structured brief. Grounded: only
+// figures/claims present in the provided snippets, with a confidence tag.
+app.post('/api/ai-market-brief', async (req, res) => {
+  const { industry, country, results } = req.body || {};
+  if (!industry || !Array.isArray(results) || !results.length) {
+    return res.status(400).json({ error: 'industry and results are required' });
+  }
+  if (!AI_PROVIDER) return res.status(503).json({ error: 'No AI key configured' });
+
+  const evidence = results.slice(0, 12).map((r, i) =>
+    `[${i + 1}] ${r.title || ''} — ${(r.snippet || '').slice(0, 220)} (${r.displayLink || ''})`).join('\n');
+
+  const prompt = `You are a market analyst summarizing search results about an industry.
+
+INDUSTRY: ${industry}${country ? ' — focus market: ' + country : ''}
+
+SEARCH RESULTS:
+${evidence}
+
+Rules:
+- Use ONLY facts and figures stated in the search results. Never invent market sizes, growth rates, or company names.
+- If different sources give conflicting figures, mention the range.
+- keyPlayers: only companies explicitly named in the results.
+- If the results contain no real data for a field, use an empty string / empty array for it.
+- confidence: "high" if multiple substantive sources, "medium" if thin, "low" if results are mostly irrelevant.
+
+Return ONLY valid JSON:
+{"overview":"2-3 sentence market summary","marketSize":"... or empty","growth":"... or empty","keyPlayers":["..."],"trends":["..."],"confidence":"high|medium|low"}`;
+
+  try {
+    const brief = await callAI(prompt);
+    if (!brief.overview) throw new Error('AI returned no overview');
+    res.json({
+      overview: String(brief.overview).slice(0, 700),
+      marketSize: String(brief.marketSize || '').slice(0, 200),
+      growth: String(brief.growth || '').slice(0, 200),
+      keyPlayers: (Array.isArray(brief.keyPlayers) ? brief.keyPlayers : []).slice(0, 8).map(p => String(p).slice(0, 80)),
+      trends: (Array.isArray(brief.trends) ? brief.trends : []).slice(0, 6).map(t => String(t).slice(0, 160)),
+      confidence: ['high','medium','low'].includes(brief.confidence) ? brief.confidence : 'medium'
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Market brief failed: ' + err.message });
   }
 });
 

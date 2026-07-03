@@ -729,7 +729,12 @@
 
   <div id="imageSearchBox" style="display:none; flex-direction:column; gap:12px; width:100%;">
     <div class="img-type-picker">
-      <div class="img-type-card selected" id="itc-card" onclick="setImageType('card')">
+      <div class="img-type-card selected" id="itc-product" onclick="setImageType('product')">
+        <div class="itc-icon">📦</div>
+        <div class="itc-label">Product Photo</div>
+        <div class="itc-desc">AI identifies the product &amp; finds suppliers</div>
+      </div>
+      <div class="img-type-card" id="itc-card" onclick="setImageType('card')">
         <div class="itc-icon">💼</div>
         <div class="itc-label">Business Card</div>
         <div class="itc-desc">Extract contact details automatically</div>

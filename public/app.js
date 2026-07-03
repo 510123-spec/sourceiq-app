@@ -286,8 +286,21 @@ function renderStockTable(data){
         ? `<img src="${faviconSrc}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='<span style=font-size:18px>${icon}</span>'" />`
         : `<span style="font-size:18px">${icon}</span>`;
 
+      // Register for save/star like other card types
+      const id = 'stk-' + Math.random().toString(36).slice(2,8);
+      cardRegistry[id] = { ...r, _id: id, country: r.country || data.country || '' };
+
+      // Structured deal numbers extracted server-side (price / MOQ / qty / lead time)
+      const d = r.dealInfo || {};
+      const dealBadges = [
+        d.price    ? `<span class="deal-badge deal-price">💰 ${escapeHtml(d.price)}</span>` : '',
+        d.moq      ? `<span class="deal-badge">📦 MOQ ${escapeHtml(d.moq)}</span>` : '',
+        d.quantity ? `<span class="deal-badge">🏭 ${escapeHtml(d.quantity)}</span>` : '',
+        d.leadTime ? `<span class="deal-badge">🚚 ${escapeHtml(d.leadTime)}</span>` : ''
+      ].join('');
+
       html += `
-        <div class="stock-card ${subtype}">
+        <div class="stock-card ${subtype}" id="${id}">
           <div class="stock-card-top">
             <div class="stock-card-favicon">${faviconImg}</div>
             <div class="stock-card-title-wrap">
@@ -295,7 +308,9 @@ function renderStockTable(data){
               <div class="stock-card-domain">${escapeHtml(domain)}</div>
             </div>
             ${avail ? `<div class="stock-card-avail ${subtype}">${escapeHtml(avail)}</div>` : ''}
+            <button class="card-save-btn${savedLinks.has(r.link) ? ' saved' : ''}" onclick="toggleSave('${id}', this)" title="Save to shared shortlist">${savedLinks.has(r.link) ? '★' : '☆'}</button>
           </div>
+          ${dealBadges ? `<div class="deal-badges">${dealBadges}</div>` : ''}
           ${snippet ? `<div class="stock-card-snippet">${escapeHtml(snippet)}</div>` : ''}
           <div class="stock-card-footer">
             <span class="stock-card-badge">${icon} ${escapeHtml(label)}</span>
@@ -359,8 +374,13 @@ function tradeDbLinksHtml(data){
   // results can only point at. Shown even (especially) when web search finds
   // nothing, since these databases are where the real records live.
   const q = encodeURIComponent(data.product || data.hsCode || '');
+  // HS code beats a product-name search where the database understands it —
+  // customs records are filed by HS heading, not by marketing names.
+  const hs = (data.hsCode || '').replace(/[^\d.]/g, '');
+  const iyQuery = encodeURIComponent(data.product || data.hsCode || '');
   const links = [
-    ['📦 ImportYeti',  `https://www.importyeti.com/search?q=${q}`,        'US customs records — free'],
+    ['📦 ImportYeti',  `https://www.importyeti.com/search?q=${iyQuery}`,   'US customs records — free'],
+    ...(hs ? [['#️⃣ ImportYeti HS ' + hs, `https://www.importyeti.com/search?q=${encodeURIComponent(hs)}`, 'customs records by HS code']] : []),
     ['🌐 UN Comtrade', 'https://comtradeplus.un.org/',                     'official global trade statistics'],
     ['📊 Trade Map',   'https://www.trademap.org/Index.aspx',              'import/export flows by country'],
     ['🚢 Volza',       `https://www.volza.com/global-trade-data/`,         'global shipment data']
@@ -385,6 +405,7 @@ function renderTradeResults(data){
   <div class="card-grid">`;
   for(const r of results){
     const id = 'tc-' + Math.random().toString(36).slice(2,8);
+    cardRegistry[id] = { ...r, _id: id, country: r.country || data.country || '' };
     const domain = r.displayLink || '';
     const favicon = domain ? `<img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=32" onerror="this.style.display='none'" loading="lazy" />` : '';
     const dirIcon = (r.snippet||'').toLowerCase().includes('import') ? '📥' : (r.snippet||'').toLowerCase().includes('export') ? '📤' : '🔄';
@@ -397,6 +418,7 @@ function renderTradeResults(data){
             <div class="card-domain">${escapeHtml(domain)}</div>
           </div>
           <span class="card-badge trade-badge">${dirIcon} Trade</span>
+          <button class="card-save-btn${savedLinks.has(r.link) ? ' saved' : ''}" onclick="toggleSave('${id}', this)" title="Save to shared shortlist">${savedLinks.has(r.link) ? '★' : '☆'}</button>
         </div>
         <p class="card-snippet">${escapeHtml(r.snippet||'')}</p>
         <div class="card-actions">
@@ -440,7 +462,10 @@ async function runMarketSearch(){
     if(!res.ok || data.error){ wrap.innerHTML = `<p class="error">${escapeHtml(data.error || 'Market search failed.')}</p>`; return; }
     banner.style.display = data.demoMode ? 'block' : 'none';
     renderMarketResults(data);
-    if(data.results && data.results.length) runAIAnalysis(industry + (country ? ' ' + country : ''), data.results, 'market');
+    if(data.results && data.results.length){
+      runAIAnalysis(industry + (country ? ' ' + country : ''), data.results, 'market');
+      runMarketBrief(industry, country, data.results);
+    }
   }catch(err){
     wrap.innerHTML = buildErrorState(err.message, ()=>runMarketSearch());
   }finally{
@@ -1512,16 +1537,20 @@ async function runTrustCheck(id, btn){
 }
 
 // ── Image / Card tab ─────────────────────────────────────
-let currentImageType = 'card';
+let currentImageType = 'product';
 let currentImageFile = null;
 
 function setImageType(type){
   currentImageType = type;
-  ['card','person','company'].forEach(t => {
-    document.getElementById('itc-'+t).classList.toggle('selected', t === type);
+  ['product','card','person','company'].forEach(t => {
+    const el = document.getElementById('itc-'+t);
+    if(el) el.classList.toggle('selected', t === type);
   });
   const zone = document.getElementById('uploadZone');
-  if(type === 'card'){
+  if(type === 'product'){
+    zone.querySelector('.uz-label').textContent = 'Click to upload a photo of the product';
+    zone.querySelector('.uz-hint').textContent = 'AI identifies what it is, then searches suppliers automatically';
+  } else if(type === 'card'){
     zone.querySelector('.uz-label').textContent = 'Click to upload a business card image';
     zone.querySelector('.uz-hint').textContent = 'We\'ll extract name, phone, email, company & address automatically';
   } else if(type === 'person'){
@@ -1549,7 +1578,12 @@ function handleImageFile(file){
   const objectUrl = URL.createObjectURL(file);
   const previewHtml = `<div class="img-preview-wrap"><img src="${objectUrl}" alt="preview"></div>`;
 
-  if(currentImageType === 'card'){
+  if(currentImageType === 'product'){
+    area.innerHTML = previewHtml + `
+      <div class="ocr-status" id="idStatus"><span class="loading-dot"></span> AI is identifying the product…</div>
+      <div class="ocr-result" id="idResult"></div>`;
+    identifyProductImage(file);
+  } else if(currentImageType === 'card'){
     area.innerHTML = previewHtml + `
       <div class="ocr-status" id="ocrStatus">Preparing OCR engine…</div>
       <div class="ocr-bar-wrap"><div class="ocr-bar-fill" id="ocrBar"></div></div>
