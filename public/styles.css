@@ -691,7 +691,7 @@
   /* Person card */
   .person-card .person-header{ display:flex; align-items:flex-start; gap:14px; margin-bottom:10px; }
   .person-photo-wrap{ flex-shrink:0; }
-  .person-photo{ width:68px; height:68px; border-radius:50%; object-fit:cover; border:2px solid rgba(139,92,246,.35); }
+  .person-photo{ width:68px; height:68px; border-radius:50%; object-fit:cover; border:2px solid rgba(6,182,212,.35); }
   .person-avatar{
     width:68px; height:68px; border-radius:50%;
     background:linear-gradient(135deg, rgba(139,92,246,.2), rgba(59,130,246,.2));
@@ -2267,9 +2267,9 @@ h1{ font-size:34px !important; letter-spacing:-1.2px !important; margin:0 0 10px
 }
 .mode-tab:hover{ transform:translateY(-3px) rotate(-1deg) scale(1.05); }
 .mode-tab.active{
-  background:linear-gradient(135deg,#6366f1,#a855f7,#ec4899) !important;
+  background:linear-gradient(135deg,#0284c7,#06b6d4,#10b981) !important;
   color:#fff !important; border-color:transparent !important;
-  box-shadow:0 6px 18px rgba(139,92,246,.35) !important;
+  box-shadow:0 6px 18px rgba(6,182,212,.35) !important;
 }
 .mode-tab.active .tab-icon{ stroke:#fff !important; }
 
@@ -2277,28 +2277,28 @@ h1{ font-size:34px !important; letter-spacing:-1.2px !important; margin:0 0 10px
 .card{ border-radius:18px !important; overflow:hidden; }
 .card::before{
   content:''; display:block; height:4px; width:100%;
-  background:linear-gradient(90deg,#6366f1,#a855f7); opacity:1;
+  background:linear-gradient(90deg,#0ea5e9,#06b6d4); opacity:1;
 }
-.card:nth-child(4n+1)::before{ background:linear-gradient(90deg,#6366f1,#8b5cf6); }
+.card:nth-child(4n+1)::before{ background:linear-gradient(90deg,#0ea5e9,#38bdf8); }
 .card:nth-child(4n+2)::before{ background:linear-gradient(90deg,#06b6d4,#3b82f6); }
 .card:nth-child(4n+3)::before{ background:linear-gradient(90deg,#10b981,#84cc16); }
 .card:nth-child(4n+4)::before{ background:linear-gradient(90deg,#f59e0b,#ec4899); }
 .card{ transition:transform .18s cubic-bezier(.34,1.56,.64,1), box-shadow .18s !important; }
 .card:hover{
   transform:translateY(-5px) rotate(.4deg) !important;
-  box-shadow:0 14px 34px rgba(139,92,246,.16) !important;
+  box-shadow:0 14px 34px rgba(6,182,212,.16) !important;
 }
 
 /* ---- Fun: candy buttons & badges ---- */
 #searchBtn, #companySearchBtn, #personSearchBtn, #buyersSearchBtn,
 #stockSearchBtn, #tradeSearchBtn, #marketSearchBtn, #priceSearchBtn{
   border-radius:30px !important;
-  background:linear-gradient(135deg,#6366f1,#a855f7,#ec4899) !important;
+  background:linear-gradient(135deg,#0284c7,#06b6d4,#10b981) !important;
   transition:transform .15s cubic-bezier(.34,1.56,.64,1), box-shadow .15s !important;
 }
 #searchBtn:hover, #companySearchBtn:hover, #personSearchBtn:hover, #buyersSearchBtn:hover,
 #stockSearchBtn:hover, #tradeSearchBtn:hover, #marketSearchBtn:hover, #priceSearchBtn:hover{
-  transform:scale(1.06) rotate(-1deg); box-shadow:0 8px 24px rgba(168,85,247,.4) !important;
+  transform:scale(1.06) rotate(-1deg); box-shadow:0 8px 24px rgba(16,185,129,.4) !important;
 }
 .badge{ border-radius:20px !important; font-size:10.5px !important; }
 .chip{ border-radius:20px !important; transition:transform .15s cubic-bezier(.34,1.56,.64,1) !important; }
@@ -2320,3 +2320,10 @@ h1{ font-size:34px !important; letter-spacing:-1.2px !important; margin:0 0 10px
   .globe-wrap{ margin:10px auto 0 !important; }
   h1{ font-size:28px !important; }
 }
+
+/* ---- Ocean recolor: pull remaining purples toward blue/cyan/emerald ---- */
+.h1-accent{
+  background:linear-gradient(130deg, #0284c7 0%, #06b6d4 45%, #10b981 100%) !important;
+  -webkit-background-clip:text !important; background-clip:text !important;
+}
+.hero-eyebrow{ color:#0369a1 !important; }
