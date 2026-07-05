@@ -2882,7 +2882,8 @@ app.post('/api/saved', (req, res) => {
     link: item.link, title: item.title, displayLink: item.displayLink || '',
     type: item.type || '', country: item.country || '', snippet: (item.snippet || '').slice(0, 300),
     phone: item.phone || null, email: item.email || null, whatsapp: item.whatsapp || null,
-    address: item.address || null, notes: '', status: 'new', savedAt: new Date().toISOString()
+    address: item.address || null, notes: '', status: 'new',
+    savedAt: new Date().toISOString(), statusChangedAt: new Date().toISOString()
   });
   writeSaved(list);
   res.json({ saved: list });
@@ -2898,7 +2899,17 @@ app.patch('/api/saved', (req, res) => {
   const item = list.find(s => s.link === link);
   if (!item) return res.status(404).json({ error: 'Not found' });
   if (typeof notes === 'string') item.notes = notes.slice(0, 2000);
-  if (typeof status === 'string' && PIPELINE_STATUSES.includes(status)) item.status = status;
+  if (typeof status === 'string' && PIPELINE_STATUSES.includes(status) && status !== item.status) {
+    item.status = status;
+    // Timestamp the transition so the UI can flag deals going quiet
+    item.statusChangedAt = new Date().toISOString();
+  }
+  // Deal economics (margin quick-check) — plain numbers, computed client-side
+  const deal = req.body.deal;
+  if (deal && typeof deal === 'object') {
+    const num = v => { const n = parseFloat(v); return isNaN(n) ? null : Math.max(0, Math.min(1e9, n)); };
+    item.deal = { buy: num(deal.buy), freight: num(deal.freight), duties: num(deal.duties), sell: num(deal.sell) };
+  }
   // Trust verdict from the background check run at save time
   const trust = req.body.trust;
   if (trust && typeof trust === 'object') {

@@ -2503,3 +2503,20 @@ h1{ color:var(--biz-text) !important; }
 .lead-domain{ font-size:11px; color:#9ca3af; margin-top:2px; }
 .leads-watch-head{ font-size:11.5px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.05em; margin:16px 0 8px; padding-top:12px; border-top:1px solid var(--biz-border); }
 .watch-row{ display:flex; align-items:center; justify-content:space-between; padding:7px 0; font-size:13px; color:#374151; border-bottom:1px solid #f3f4f6; }
+
+/* ============ Follow-up aging + deal math ============ */
+.age-badge{ border-radius:8px; padding:3px 9px; font-size:11px; font-weight:700; margin-left:auto; white-space:nowrap; }
+.age-badge.age-ok{ background:#f3f4f6; color:#6b7280; }
+.age-badge.age-amber{ background:#fef3c7; color:#b45309; border:1px solid #fde68a; }
+.age-badge.age-red{ background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; }
+.saved-count-attn{ background:#dc2626 !important; }
+
+.deal-math{ margin-top:8px; border:1px solid var(--biz-border); border-radius:9px; padding:8px 12px; background:#fafafa; }
+.deal-math summary{ font-size:12px; font-weight:700; color:#4b5563; cursor:pointer; user-select:none; }
+.deal-grid{ display:flex; flex-wrap:wrap; gap:8px; align-items:end; margin-top:8px; }
+.deal-grid label{ display:flex; flex-direction:column; gap:2px; font-size:10.5px; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:.03em; }
+.deal-grid input{ width:86px; border:1px solid var(--biz-border); border-radius:7px; padding:6px 8px; font-size:13px; font-family:inherit; }
+.deal-grid input:focus{ outline:none; border-color:var(--biz-blue); }
+.deal-result{ flex-basis:100%; font-size:12.5px; color:#6b7280; margin-top:2px; }
+.deal-result .deal-pos{ color:#047857; font-weight:700; }
+.deal-result .deal-neg{ color:#b91c1c; font-weight:700; }

@@ -9,13 +9,20 @@ async function loadSavedLinks(){
     const data = await res.json();
     savedLinks.clear();
     (data.saved || []).forEach(s => savedLinks.add(s.link));
-    updateSavedCount((data.saved || []).length);
+    updateSavedCount((data.saved || []).length, attentionCount(data.saved || []));
   }catch(e){}
 }
 
-function updateSavedCount(n){
+function updateSavedCount(n, attn = 0){
   const el = document.getElementById('savedCount');
-  if(el) el.textContent = n > 0 ? String(n) : '';
+  if(!el) return;
+  el.textContent = n > 0 ? String(n) : '';
+  // Red badge when saved deals have gone quiet for 7+ days
+  el.classList.toggle('saved-count-attn', attn > 0);
+  const pill = el.closest('.topbar-pill');
+  if(pill) pill.title = attn > 0
+    ? attn + ' supplier(s) waiting 7+ days in their stage — open to follow up'
+    : 'View shared shortlist';
 }
 
 async function toggleSave(id, btn){
@@ -27,7 +34,7 @@ async function toggleSave(id, btn){
       const data = await res.json();
       savedLinks.delete(r.link);
       btn.textContent = '☆'; btn.classList.remove('saved');
-      updateSavedCount((data.saved||[]).length);
+      updateSavedCount((data.saved||[]).length, attentionCount(data.saved||[]));
     }else{
       const res = await fetch('/api/saved', {
         method:'POST', headers:{'Content-Type':'application/json'},
@@ -41,7 +48,7 @@ async function toggleSave(id, btn){
       const data = await res.json();
       savedLinks.add(r.link);
       btn.textContent = '★'; btn.classList.add('saved');
-      updateSavedCount((data.saved||[]).length);
+      updateSavedCount((data.saved||[]).length, attentionCount(data.saved||[]));
       runTrustOnSave(r); // background — no await, star responds instantly
     }
   }catch(e){}
@@ -66,9 +73,10 @@ async function showSavedPanel(){
         ${s.email ? `<span>✉️ <a href="mailto:${escapeHtml(s.email)}">${escapeHtml(s.email)}</a></span>` : ''}
         ${trustBadgeHtml(s.trust)}
       </div>
-      <div class="pipeline-row">${pipelinePillsHtml(s)}</div>
+      <div class="pipeline-row">${pipelinePillsHtml(s)}${agingBadgeHtml(s)}</div>
       <textarea class="saved-notes" placeholder="Notes (e.g. quoted $6,400/MT, slow to reply)…"
         onblur="saveNotes('${escapeHtml(s.link)}', this)">${escapeHtml(s.notes || '')}</textarea>
+      ${dealMathHtml(s)}
     </div>`).join('') : '<p class="empty" style="padding:20px">Nothing saved yet — click the ☆ on any result card to add it here.</p>';
 
   const overlay = document.createElement('div');
@@ -171,6 +179,63 @@ async function findHSCode(btn){
   }
 }
 
+// -- Follow-up aging: how long has this supplier sat in its current stage? --
+// Deals die from silence; make staleness impossible to miss.
+const AGING_STATUSES = ['new', 'contacted', 'quoted', 'sampled']; // ordered/rejected are terminal
+function statusAgeDays(s){
+  const since = s.statusChangedAt || s.savedAt;
+  if(!since) return null;
+  return Math.floor((Date.now() - new Date(since).getTime()) / 86400000);
+}
+function agingBadgeHtml(s){
+  const days = statusAgeDays(s);
+  if(days == null || !AGING_STATUSES.includes(s.status || 'new')) return '';
+  const cls = days >= 14 ? 'age-red' : days >= 7 ? 'age-amber' : 'age-ok';
+  const label = days === 0 ? 'today' : days === 1 ? '1 day' : days + ' days';
+  const nudge = days >= 14 ? ' — follow up or close!' : days >= 7 ? ' — time to follow up' : '';
+  return `<span class="age-badge ${cls}" title="In this stage for ${label}${nudge}">⏱ ${label}${days >= 7 ? ' ⚠' : ''}</span>`;
+}
+function attentionCount(list){
+  return list.filter(s => AGING_STATUSES.includes(s.status || 'new') && (statusAgeDays(s) ?? 0) >= 7).length;
+}
+
+// -- Margin quick-check: buy + freight + duties vs sell, per unit --
+function dealMathHtml(s){
+  const d = s.deal || {};
+  const v = x => (x == null ? '' : x);
+  return `
+    <details class="deal-math" ${d.buy != null || d.sell != null ? 'open' : ''}>
+      <summary>💹 Deal math (per MT / unit)</summary>
+      <div class="deal-grid">
+        <label>Buy<input type="number" min="0" step="any" value="${v(d.buy)}" data-f="buy" onchange="saveDeal('${escapeHtml(s.link)}', this)"></label>
+        <label>Freight<input type="number" min="0" step="any" value="${v(d.freight)}" data-f="freight" onchange="saveDeal('${escapeHtml(s.link)}', this)"></label>
+        <label>Duties<input type="number" min="0" step="any" value="${v(d.duties)}" data-f="duties" onchange="saveDeal('${escapeHtml(s.link)}', this)"></label>
+        <label>Sell<input type="number" min="0" step="any" value="${v(d.sell)}" data-f="sell" onchange="saveDeal('${escapeHtml(s.link)}', this)"></label>
+        <div class="deal-result" id="deal-${btoa(s.link).replace(/[^a-z0-9]/gi,'')}">${dealResultText(d)}</div>
+      </div>
+    </details>`;
+}
+function dealResultText(d){
+  if(d == null || d.sell == null || d.buy == null) return 'Enter buy & sell to see margin';
+  const cost = (d.buy || 0) + (d.freight || 0) + (d.duties || 0);
+  const margin = d.sell - cost;
+  const pct = cost > 0 ? (margin / cost * 100) : 0;
+  const cls = margin > 0 ? 'deal-pos' : 'deal-neg';
+  return `<span class="${cls}">Margin: ${margin.toFixed(2)} / unit (${pct.toFixed(1)}%)</span> · cost ${cost.toFixed(2)}`;
+}
+async function saveDeal(link, input){
+  const grid = input.closest('.deal-grid');
+  const deal = {};
+  grid.querySelectorAll('input').forEach(i => { deal[i.dataset.f] = i.value === '' ? null : parseFloat(i.value); });
+  grid.querySelector('.deal-result').innerHTML = dealResultText(deal);
+  try{
+    await fetch('/api/saved', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ link, deal })
+    });
+  }catch(e){}
+}
+
 // -- Sourcing pipeline: each saved supplier moves through workflow stages --
 const PIPELINE = [
   ['new',       '🆕 New'],
@@ -197,6 +262,7 @@ async function setSavedStatus(link, status, btn){
     const row = btn.parentElement;
     row.querySelectorAll('.pipeline-pill').forEach(p => p.className = 'pipeline-pill');
     btn.className = 'pipeline-pill active st-' + status;
+    loadSavedLinks(); // refresh attention badge after a stage change
   }catch(e){}
 }
 
