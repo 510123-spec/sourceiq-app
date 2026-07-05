@@ -12,7 +12,7 @@ function ok(name) { passed++; console.log(`  PASS  ${name}`); }
 function bad(name, why) { failed++; failures.push(`${name}: ${why}`); console.log(`  FAIL  ${name} — ${why}`); }
 function skip(name, why) { skipped++; console.log(`  SKIP  ${name} — ${why}`); }
 
-const QUOTA_RE = /quota|exceeded|rate.?limit|503|No AI key/i;
+const QUOTA_RE = /quota|exceeded|rate.?limit|503|No AI key|high demand|overloaded|temporar/i;
 
 async function jfetch(path, opts = {}) {
   const r = await fetch(BASE + path, { ...opts, signal: AbortSignal.timeout(opts.timeout || 60000) });
