@@ -2919,6 +2919,121 @@ app.delete('/api/saved', (req, res) => {
   res.json({ saved: loadSaved() });
 });
 
+// ── Morning lead monitor ──────────────────────────────────────────────────────
+// Watched searches run automatically once per day; the dashboard shows only the
+// NEW results since the last run. Turns the app from search-on-demand into a
+// lead feed: open it in the morning, see what appeared overnight.
+const WATCHLIST_FILE = path.join(__dirname, 'data', 'watchlist.json');
+const MONITOR_SEEN_FILE = path.join(__dirname, 'data', 'monitor-seen.json');
+const MONITOR_REPORT_FILE = path.join(__dirname, 'data', 'monitor-report.json');
+
+function loadJson(file, fallback) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (_) { return fallback; }
+}
+function writeJson(file, data) {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(data, null, 2));
+}
+
+const watchKey = w => `${w.mode}|${w.query}|${w.country || ''}`.toLowerCase();
+
+app.get('/api/watchlist', (req, res) => res.json({ watchlist: loadJson(WATCHLIST_FILE, []) }));
+
+app.post('/api/watchlist', (req, res) => {
+  const { mode, query, country } = req.body || {};
+  if (!query || !['product', 'buyers'].includes(mode)) {
+    return res.status(400).json({ error: 'mode (product|buyers) and query are required' });
+  }
+  const list = loadJson(WATCHLIST_FILE, []);
+  const w = { mode, query: String(query).slice(0, 100), country: String(country || '').slice(0, 50), addedAt: new Date().toISOString() };
+  if (list.some(x => watchKey(x) === watchKey(w))) return res.json({ watchlist: list, note: 'Already watching' });
+  if (list.length >= 10) return res.status(400).json({ error: 'Watchlist limit is 10 searches — remove one first.' });
+  list.push(w);
+  writeJson(WATCHLIST_FILE, list);
+  res.json({ watchlist: list });
+});
+
+app.delete('/api/watchlist', (req, res) => {
+  const key = (req.query.key || '').trim().toLowerCase();
+  const list = loadJson(WATCHLIST_FILE, []).filter(w => watchKey(w) !== key);
+  writeJson(WATCHLIST_FILE, list);
+  res.json({ watchlist: list });
+});
+
+app.get('/api/monitor-report', (req, res) => {
+  res.json(loadJson(MONITOR_REPORT_FILE, { date: null, items: [], running: monitorRunning }));
+});
+
+let monitorRunning = false;
+async function runLeadMonitor(trigger = 'schedule') {
+  if (monitorRunning) return;
+  const watchlist = loadJson(WATCHLIST_FILE, []);
+  if (!watchlist.length) return;
+  monitorRunning = true;
+  console.log(`[monitor] run started (${trigger}) — ${watchlist.length} watch(es)`);
+  const seen = loadJson(MONITOR_SEEN_FILE, {});
+  const items = [];
+  try {
+    for (const w of watchlist) {
+      const key = watchKey(w);
+      try {
+        // Call our own HTTP API so every watch reuses the full search pipeline
+        // (Brave -> Google -> DDG fallbacks, caching, scoring) with no duplication.
+        const params = new URLSearchParams();
+        if (w.mode === 'product') { params.set('q', w.query); if (w.country) params.set('country', w.country); }
+        else { params.set('product', w.query); if (w.country) params.set('country', w.country); }
+        const url = `http://localhost:${PORT}/api/${w.mode === 'product' ? 'search' : 'search-customers'}?${params}`;
+        const r = await fetch(url, { signal: AbortSignal.timeout(120000) });
+        const data = await r.json();
+        const results = (data.results || []).filter(x => x.link);
+
+        const firstRun = !seen[key];
+        const seenSet = new Set(seen[key] || []);
+        const fresh = firstRun ? [] : results.filter(x => !seenSet.has(x.link));
+        for (const x of results) seenSet.add(x.link);
+        seen[key] = [...seenSet].slice(-500);
+
+        items.push({
+          watch: w, key, firstRun,
+          totalResults: results.length,
+          newResults: fresh.slice(0, 10).map(x => ({
+            title: x.title, link: x.link, displayLink: x.displayLink,
+            type: x.type, isRFQ: !!x.isRFQ, snippet: (x.snippet || '').slice(0, 160)
+          }))
+        });
+      } catch (err) {
+        items.push({ watch: w, key, error: String(err.message).slice(0, 120), newResults: [] });
+      }
+      // Pace between watches — be gentle on rate limits
+      await new Promise(r => setTimeout(r, 3000));
+    }
+    writeJson(MONITOR_SEEN_FILE, seen);
+    writeJson(MONITOR_REPORT_FILE, {
+      date: new Date().toISOString().slice(0, 10),
+      generatedAt: new Date().toISOString(),
+      trigger, items
+    });
+    console.log(`[monitor] run complete — ${items.reduce((n, i) => n + (i.newResults || []).length, 0)} new lead(s)`);
+  } finally {
+    monitorRunning = false;
+  }
+}
+
+app.post('/api/monitor-run', (req, res) => {
+  if (monitorRunning) return res.json({ started: false, note: 'Already running' });
+  runLeadMonitor('manual'); // fire and forget — frontend polls the report
+  res.json({ started: true });
+});
+
+// Internal scheduler: first check after 7am each day runs the watchlist.
+// The watchdog keeps the server alive 24/7, so this fires reliably each morning.
+setInterval(() => {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const report = loadJson(MONITOR_REPORT_FILE, {});
+  if (report.date !== today && now.getHours() >= 7) runLeadMonitor('schedule');
+}, 30 * 60 * 1000);
+
 // ── AI-drafted inquiry email ──────────────────────────────────────────────────
 // Personalizes the RFQ using whatever we know about the supplier (type, country,
 // snippet, scraped contact info). Falls back to the static template client-side

@@ -603,6 +603,7 @@ function renderBuyerResults(results, { product, country, total, note }){
   if(note) html += `<div class="country-note" style="margin:0 0 8px;font-size:12px;">${escapeHtml(note)}</div>`;
   html += `<div style="font-size:13px;">Found <strong style="color:var(--text)">${results.length}</strong> buyers for <strong style="color:#38bdf8">${escapeHtml(product)}</strong>${countryLabel}</div>
     <div class="stats-counts">
+      <button class="stats-pill buyer-filter-pill" onclick="watchCurrentSearch('buyers')" title="Get notified of NEW buyers for this search every morning">🔔 Watch</button>
       <button class="stats-pill buyer-filter-pill${activeF==='all'?' active':''}" onclick="setBuyerFilter('all')">All (${all.length})</button>
       ${Object.entries(BUYER_TYPE_META).map(([t,m]) => {
         const n = all.filter(r=>r.type===t).length;

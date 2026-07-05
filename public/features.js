@@ -819,5 +819,120 @@ function renderPriceResults(data){
     <div class="profile-note" style="margin-top:10px">Prices are extracted from live search listings and may be outdated — the retailer’s site is authoritative. Shipping and delivery times are shown on each store’s page.</div>`;
 }
 
+// ═══════════════ Morning lead monitor ═══════════════
+// Watched searches run server-side every morning; this UI shows what's NEW.
+
+async function refreshLeadsBadge(){
+  try{
+    const r = await fetch('/api/monitor-report');
+    const rep = await r.json();
+    const n = (rep.items || []).reduce((s, i) => s + (i.newResults || []).length, 0);
+    const el = document.getElementById('leadsCount');
+    if(el) el.textContent = n > 0 ? String(n) : '';
+  }catch(e){}
+}
+
+// Watch the search currently on screen (called from toolbar / buyers header)
+async function watchCurrentSearch(mode){
+  let query = '', country = '';
+  if(mode === 'product'){
+    query = document.getElementById('query').value.trim();
+    country = document.getElementById('country').value.trim();
+  } else {
+    query = document.getElementById('buyersProduct').value.trim();
+    country = document.getElementById('buyersCountry').value.trim();
+  }
+  if(!query){ alert('Run a search first, then watch it.'); return; }
+  const res = await fetch('/api/watchlist', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ mode, query, country })
+  });
+  const data = await res.json();
+  if(data.error){ alert(data.error); return; }
+  alert(data.note ? 'Already on your watchlist.' :
+    '🔔 Watching "' + query + '"' + (country ? ' in ' + country : '') +
+    ' — new ' + (mode === 'buyers' ? 'buyers' : 'suppliers') + ' will appear in the Leads panel each morning.');
+}
+
+async function removeWatch(key){
+  await fetch('/api/watchlist?key=' + encodeURIComponent(key), { method: 'DELETE' });
+  showLeadsPanel();
+}
+
+async function runMonitorNow(btn){
+  btn.disabled = true; btn.textContent = '⏳ Running…';
+  await fetch('/api/monitor-run', { method: 'POST' });
+  // Poll until the report regenerates (watches are paced ~3s apart)
+  const started = Date.now();
+  const poll = setInterval(async () => {
+    const rep = await (await fetch('/api/monitor-report')).json();
+    const fresh = rep.generatedAt && (Date.now() - new Date(rep.generatedAt).getTime()) < 30000;
+    if(fresh || Date.now() - started > 180000){
+      clearInterval(poll);
+      refreshLeadsBadge();
+      showLeadsPanel();
+    }
+  }, 4000);
+}
+
+async function showLeadsPanel(){
+  const old = document.getElementById('leadsOverlay');
+  if(old) old.remove();
+  const [repR, wlR] = await Promise.all([fetch('/api/monitor-report'), fetch('/api/watchlist')]);
+  const rep = await repR.json();
+  const wl = (await wlR.json()).watchlist || [];
+
+  const watchRows = wl.length ? wl.map(w => {
+    const key = (w.mode + '|' + w.query + '|' + (w.country || '')).toLowerCase();
+    return `<div class="watch-row">
+      <span>${w.mode === 'buyers' ? '🛒' : '🔍'} <strong>${escapeHtml(w.query)}</strong>${w.country ? ' · ' + escapeHtml(w.country) : ''}</span>
+      <button class="saved-remove" onclick="removeWatch('${escapeHtml(key)}')" title="Stop watching">✕</button>
+    </div>`;
+  }).join('') : '<p class="empty" style="padding:8px 0">No watched searches yet — run a Product or Buyers search and click "🔔 Watch this search".</p>';
+
+  let leadsHtml = '';
+  if(rep.date){
+    const groups = (rep.items || []).map(i => {
+      if(i.error) return `<div class="leads-group"><div class="leads-group-head">⚠️ ${escapeHtml(i.watch.query)} — ${escapeHtml(i.error)}</div></div>`;
+      if(i.firstRun) return `<div class="leads-group"><div class="leads-group-head">📌 ${escapeHtml(i.watch.query)} — baseline captured (${i.totalResults} results). New items appear from tomorrow.</div></div>`;
+      if(!(i.newResults || []).length) return `<div class="leads-group"><div class="leads-group-head">✓ ${escapeHtml(i.watch.query)} — nothing new</div></div>`;
+      const rows = i.newResults.map(x => `
+        <div class="lead-item">
+          <a href="${escapeHtml(x.link)}" target="_blank" rel="noopener">${escapeHtml(x.title)}</a>
+          ${x.isRFQ ? '<span class="badge rfq-badge" style="font-size:10px">📣 Buy Request</span>' : ''}
+          <div class="lead-snippet">${escapeHtml(x.snippet || '')}</div>
+          <div class="lead-domain">${escapeHtml(x.displayLink || '')}</div>
+        </div>`).join('');
+      return `<div class="leads-group"><div class="leads-group-head leads-new">🆕 ${escapeHtml(i.watch.query)} — ${i.newResults.length} new</div>${rows}</div>`;
+    }).join('');
+    leadsHtml = `<div class="leads-date">Last run: ${escapeHtml(rep.generatedAt ? new Date(rep.generatedAt).toLocaleString() : rep.date)}</div>` + groups;
+  } else {
+    leadsHtml = '<p class="empty" style="padding:8px 0">No runs yet — the monitor runs automatically every morning after 7:00, or click Run Now.</p>';
+  }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'leadsOverlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>🔔 Lead Monitor <span style="font-weight:400;font-size:13px;color:var(--muted)">(runs every morning)</span></h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="saved-export-btn" onclick="runMonitorNow(this)">▶ Run Now</button>
+          <button class="modal-close" onclick="document.getElementById('leadsOverlay').remove()">✕</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        ${leadsHtml}
+        <div class="leads-watch-head">Watched searches (${wl.length}/10)</div>
+        ${watchRows}
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+refreshLeadsBadge();
+
 // Load the shared shortlist state on startup
 loadSavedLinks();

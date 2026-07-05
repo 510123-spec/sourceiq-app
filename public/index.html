@@ -26,6 +26,7 @@
     </div>
   </div>
   <div class="topbar-right" aria-label="Status indicators">
+    <button class="topbar-pill topbar-saved-btn" onclick="showLeadsPanel()" title="Daily lead monitor — new results from your watched searches">🔔 Leads <span id="leadsCount" class="saved-count"></span></button>
     <button class="topbar-pill topbar-saved-btn" onclick="showSavedPanel()" title="View shared shortlist">⭐ Saved <span id="savedCount" class="saved-count"></span></button>
     <div class="topbar-pill" id="braveStatusPill" title="Brave Search status"><span class="svc-dot svc-unknown" id="braveDot"></span>Search</div>
     <div class="topbar-pill" id="geminiStatusPill" title="Gemini AI status"><span class="svc-dot svc-unknown" id="geminiDot"></span>AI</div>
@@ -948,6 +949,7 @@
     <option value="confidence">Sort: Confidence</option>
     <option value="name">Sort: Name (A-Z)</option>
   </select>
+  <button class="export-btn" onclick="watchCurrentSearch('product')" title="Get notified of NEW suppliers for this search every morning">🔔 Watch</button>
   <button class="export-btn" onclick="exportExcel()">📊 Excel</button>
   <button class="export-btn" onclick="exportCsv()">⬇ CSV</button>
   <button class="export-btn" onclick="exportWord()">📄 Word</button>

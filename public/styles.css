@@ -2490,3 +2490,16 @@ h1{ color:var(--biz-text) !important; }
 .mode-tabs .mode-tab.active svg{
   stroke:#ffffff !important; color:#ffffff !important; opacity:1 !important;
 }
+
+/* ============ Lead monitor panel ============ */
+.leads-date{ font-size:11.5px; color:#9ca3af; margin-bottom:10px; }
+.leads-group{ border:1px solid var(--biz-border); border-radius:10px; padding:10px 14px; margin-bottom:10px; }
+.leads-group-head{ font-size:13px; color:#6b7280; font-weight:600; }
+.leads-group-head.leads-new{ color:#1d4ed8; }
+.lead-item{ border-top:1px solid #f3f4f6; padding:9px 0 7px; }
+.lead-item a{ color:var(--biz-blue); font-weight:600; font-size:13.5px; text-decoration:none; }
+.lead-item a:hover{ text-decoration:underline; }
+.lead-snippet{ font-size:12px; color:#4b5563; margin-top:3px; line-height:1.5; }
+.lead-domain{ font-size:11px; color:#9ca3af; margin-top:2px; }
+.leads-watch-head{ font-size:11.5px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.05em; margin:16px 0 8px; padding-top:12px; border-top:1px solid var(--biz-border); }
+.watch-row{ display:flex; align-items:center; justify-content:space-between; padding:7px 0; font-size:13px; color:#374151; border-bottom:1px solid #f3f4f6; }
