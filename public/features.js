@@ -775,7 +775,7 @@ async function refreshServiceStatus(){
         value = 0.45; color = '#f59e0b'; word = 'Slow';
         tip = opts.name + ': ' + info.status + (info.detail ? ' — ' + info.detail : '');
       } else if(info.status === 'ok'){
-        if(opts.limit){
+        if(opts.limit && info.count < opts.limit){
           // Gauge shows REMAINING daily AI allowance — it visibly drains with use
           const remaining = Math.max(0, 1 - (info.count / opts.limit));
           value = remaining;
@@ -783,8 +783,11 @@ async function refreshServiceStatus(){
           word = remaining > 0.4 ? 'OK' : remaining > 0.15 ? 'Low' : 'Almost out';
           tip = opts.name + ': ' + info.count + ' of ~' + opts.limit + ' free daily calls used (' + Math.round(remaining * 100) + '% left)';
         } else {
+          // Either no known ceiling, or usage sailed past the free-tier limit
+          // while still succeeding — that means a PAID tier is active: full green.
           value = 1; color = '#10b981'; word = 'OK';
-          tip = opts.name + ': OK — ' + info.count + ' call' + (info.count === 1 ? '' : 's') + ' today';
+          tip = opts.name + ': OK — ' + info.count + ' call' + (info.count === 1 ? '' : 's') + ' today' +
+            (opts.limit && info.count >= opts.limit ? ' (paid tier active)' : '');
         }
       }
       gauge.innerHTML = gaugeSvg(value, color);
