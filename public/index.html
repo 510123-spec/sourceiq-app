@@ -26,14 +26,21 @@
     </div>
   </div>
   <div class="topbar-right" aria-label="Status indicators">
-    <button class="topbar-pill topbar-saved-btn" onclick="showLeadsPanel()" title="Daily lead monitor — new results from your watched searches">🔔 Leads <span id="leadsCount" class="saved-count"></span></button>
-    <button class="topbar-pill topbar-saved-btn" onclick="showSavedPanel()" title="View shared shortlist">⭐ Saved <span id="savedCount" class="saved-count"></span></button>
-    <div class="topbar-pill" id="braveStatusPill" title="Brave Search status"><span class="svc-dot svc-unknown" id="braveDot"></span>Search</div>
-    <div class="topbar-pill" id="geminiStatusPill" title="Gemini AI status"><span class="svc-dot svc-unknown" id="geminiDot"></span>AI</div>
-    <div class="topbar-pill"><span class="topbar-pill-dot" aria-hidden="true"></span>Live Results</div>
-    <div class="topbar-pill">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-      195+ Countries
+    <button class="tb-btn" onclick="showLeadsPanel()" title="Daily lead monitor — new results from your watched searches">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      Leads <span id="leadsCount" class="saved-count"></span>
+    </button>
+    <button class="tb-btn" onclick="showSavedPanel()" title="Shared shortlist — your team's supplier pipeline">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      Saved <span id="savedCount" class="saved-count"></span>
+    </button>
+    <div class="tb-status" id="braveStatusPill" title="Web search service status">
+      <span class="tb-status-name">Search</span>
+      <span class="tb-status-word" id="braveWord"><span class="svc-dot svc-unknown" id="braveDot"></span>&nbsp;–</span>
+    </div>
+    <div class="tb-status" id="geminiStatusPill" title="AI service status">
+      <span class="tb-status-name">AI</span>
+      <span class="tb-status-word" id="geminiWord"><span class="svc-dot svc-unknown" id="geminiDot"></span>&nbsp;–</span>
     </div>
     <a href="/logout" class="topbar-logout" title="Sign out">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>

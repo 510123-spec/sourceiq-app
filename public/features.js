@@ -748,28 +748,36 @@ async function refreshServiceStatus(){
       const dot = document.getElementById(dotId);
       const pill = document.getElementById(pillId);
       if(!dot || !pill) return;
-      let cls = 'svc-unknown', tip = opts.name + ': no calls yet this session';
+      // word: a plain-language state shown right in the topbar — dots alone
+      // were too cryptic ("what does the little circle mean?")
+      let cls = 'svc-unknown', word = '–', tip = opts.name + ': no calls yet this session';
       if(!info.configured){
+        word = 'Off';
         tip = opts.name + ': no API key configured';
       } else if(info.status === 'quota'){
-        cls = 'svc-red';
+        cls = 'svc-red'; word = 'Down';
         tip = opts.name + ' QUOTA EXHAUSTED — ' + (opts.quotaHint || 'running on fallback until it resets') +
           (info.detail ? '\n' + info.detail : '');
       } else if(info.status === 'rate-limited' || info.status === 'error'){
-        cls = 'svc-amber';
+        cls = 'svc-amber'; word = 'Slow';
         tip = opts.name + ': ' + info.status + (info.detail ? ' — ' + info.detail : '');
       } else if(info.status === 'ok'){
-        cls = 'svc-green';
+        cls = 'svc-green'; word = 'OK';
         tip = opts.name + ': OK — ' + info.count + ' call' + (info.count === 1 ? '' : 's') + ' today';
         // Warn BEFORE the wall when we know the ceiling (Gemini free tier)
         if(opts.limit && info.count >= opts.limit * 0.75){
-          cls = 'svc-amber';
+          cls = 'svc-amber'; word = 'Low';
           tip = opts.name + ': running low — ' + info.count + ' of ~' + opts.limit + ' free daily calls used';
         }
       }
-      dot.className = 'svc-dot ' + cls;
+      const wordEl = document.getElementById(dotId === 'braveDot' ? 'braveWord' : 'geminiWord');
+      if(wordEl) wordEl.innerHTML = '<span class="svc-dot ' + cls + '" id="' + dotId + '"></span> ' + word;
+      else dot.className = 'svc-dot ' + cls;
       pill.title = tip;
-      pill.classList.toggle('svc-pill-alert', cls === 'svc-red');
+      pill.classList.remove('svc-word-green','svc-word-amber','svc-word-red');
+      if(cls === 'svc-green') pill.classList.add('svc-word-green');
+      if(cls === 'svc-amber') pill.classList.add('svc-word-amber');
+      if(cls === 'svc-red') pill.classList.add('svc-word-red');
     };
 
     apply('braveDot', 'braveStatusPill', s.brave, {
