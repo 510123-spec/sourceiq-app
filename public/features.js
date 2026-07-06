@@ -87,6 +87,7 @@ async function showSavedPanel(){
       <div class="modal-head">
         <h2>⭐ Saved Suppliers <span style="font-weight:400;font-size:13px;color:var(--muted)">(shared with your team)</span></h2>
         <div style="display:flex;gap:8px;align-items:center">
+          ${list.length ? '<button class="saved-export-btn" onclick="document.getElementById(\'savedOverlay\').remove();showCampaign()">📣 Campaign</button>' : ''}
           ${list.length ? '<button class="saved-export-btn" onclick="exportSavedExcel()">📊 Export</button>' : ''}
           <button class="modal-close" onclick="document.getElementById('savedOverlay').remove()">✕</button>
         </div>
@@ -1117,6 +1118,186 @@ async function sendCopilot(){
   b.onclick = toggleCopilot;
   document.body.appendChild(b);
 })();
+
+// ═══════════════ Marketing: kit generator + outreach campaign ═══════════════
+
+function showMarketingKit(){
+  const old = document.getElementById('mkOverlay');
+  if(old){ old.remove(); return; }
+  const overlay = document.createElement('div');
+  overlay.id = 'mkOverlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>📣 Marketing Kit <span style="font-weight:400;font-size:13px;color:var(--muted)">(for a product you sell)</span></h2>
+        <button class="modal-close" onclick="document.getElementById('mkOverlay').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="mk-form">
+          <label>Product you sell *<input id="mkProduct" type="text" placeholder='e.g. "Copper scrap, Grade A (Millberry)"'></label>
+          <label>Details (specs, quality, quantities — only what is TRUE)<textarea id="mkDetails" rows="2" placeholder="e.g. 99.9% purity, 25MT monthly, ISO-certified supplier network"></textarea></label>
+          <div class="mk-row">
+            <label>Origin<input id="mkOrigin" type="text" placeholder="e.g. Singapore / mixed Asia"></label>
+            <label>Terms<input id="mkTerms" type="text" placeholder="e.g. FOB Singapore, CIF on request"></label>
+          </div>
+          <button class="mk-generate" onclick="generateMarketingKit(this)">✨ Generate Kit</button>
+        </div>
+        <div id="mkResult"></div>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  document.getElementById('mkProduct').focus();
+}
+
+function mkCopyBtn(text){
+  return `<button class="mk-copy" onclick="navigator.clipboard.writeText(this.dataset.t).then(()=>{this.textContent='✓ Copied';setTimeout(()=>this.textContent='📋 Copy',1200)})" data-t="${escapeHtml(text)}">📋 Copy</button>`;
+}
+
+async function generateMarketingKit(btn){
+  const product = document.getElementById('mkProduct').value.trim();
+  if(!product){ alert('Enter the product you sell.'); return; }
+  const result = document.getElementById('mkResult');
+  btn.disabled = true; btn.textContent = '✨ Writing…';
+  result.innerHTML = '<p class="empty" style="padding:10px">Generating your kit — a few seconds…</p>';
+  try{
+    const res = await fetch('/api/marketing-kit', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        product,
+        details: document.getElementById('mkDetails').value.trim(),
+        origin: document.getElementById('mkOrigin').value.trim(),
+        terms: document.getElementById('mkTerms').value.trim()
+      })
+    });
+    const kit = await res.json();
+    if(!res.ok || kit.error) throw new Error(kit.error || 'generation failed');
+    window._lastKit = { product, kit };
+    const sec = (title, text) => `
+      <div class="mk-section">
+        <div class="mk-sec-head">${title}${mkCopyBtn(text)}</div>
+        <div class="mk-sec-body">${escapeHtml(text).replace(/\n/g,'<br>')}</div>
+      </div>`;
+    result.innerHTML = `
+      ${sec('🏷 Portal Listing Title', kit.listingTitle)}
+      ${sec('📝 Portal Listing (TradeWheel / Alibaba / Go4WorldBusiness)', kit.listingBody)}
+      ${sec('💼 LinkedIn Post', kit.linkedinPost)}
+      ${sec('✉️ Outreach Email', 'Subject: ' + kit.outreachEmail.subject + '\n\n' + kit.outreachEmail.body)}
+      <div class="mk-section"><div class="mk-sec-head">#️⃣ HS Code &amp; Buyer Keywords</div>
+        <div class="mk-sec-body"><strong>${escapeHtml(kit.hsCode)}</strong> · ${kit.keywords.map(escapeHtml).join(' · ')}</div></div>
+      <div class="mk-actions">
+        <button class="saved-export-btn" onclick="exportKitWord()">📄 Export all to Word</button>
+        <a class="saved-export-btn" style="text-decoration:none" href="https://www.tradewheel.com/sell/" target="_blank" rel="noopener">Post on TradeWheel ↗</a>
+        <a class="saved-export-btn" style="text-decoration:none" href="https://www.go4worldbusiness.com/register" target="_blank" rel="noopener">Post on Go4WorldBusiness ↗</a>
+      </div>`;
+  }catch(e){
+    result.innerHTML = `<p class="error">⚠️ ${escapeHtml(e.message)}</p>`;
+  }finally{
+    btn.disabled = false; btn.textContent = '✨ Generate Kit';
+  }
+}
+
+function exportKitWord(){
+  const lk = window._lastKit;
+  if(!lk) return;
+  const esc = escapeHtml;
+  const k = lk.kit;
+  const html = `<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">
+<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#222;margin:40px}h1{font-size:18pt;color:#1a2040}h2{font-size:13pt;color:#1a2040;margin-top:22px}</style></head><body>
+<h1>Marketing Kit — ${esc(lk.product)}</h1>
+<p style="color:#666;font-size:10pt">Generated by SourceIQ on ${new Date().toLocaleDateString()}</p>
+<h2>Portal Listing Title</h2><p>${esc(k.listingTitle)}</p>
+<h2>Portal Listing</h2><p>${esc(k.listingBody).replace(/\n/g,'<br>')}</p>
+<h2>LinkedIn Post</h2><p>${esc(k.linkedinPost).replace(/\n/g,'<br>')}</p>
+<h2>Outreach Email</h2><p><b>Subject:</b> ${esc(k.outreachEmail.subject)}</p><p>${esc(k.outreachEmail.body).replace(/\n/g,'<br>')}</p>
+<h2>HS Code &amp; Keywords</h2><p><b>${esc(k.hsCode)}</b> — ${k.keywords.map(esc).join(', ')}</p>
+</body></html>`;
+  const blob = new Blob(['﻿' + html], { type: 'application/msword' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = lk.product.replace(/[^a-z0-9]+/gi,'_').slice(0,40) + '_marketing_kit.doc';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// -- Outreach campaign: batch offers for shortlisted companies --
+async function showCampaign(){
+  const res = await fetch('/api/saved');
+  const list = ((await res.json()).saved) || [];
+  if(!list.length){ alert('Save some buyers to the shortlist first (☆ on buyer cards).'); return; }
+  const old = document.getElementById('campOverlay');
+  if(old) old.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'campOverlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box">
+      <div class="modal-head">
+        <h2>📣 Outreach Campaign</h2>
+        <button class="modal-close" onclick="document.getElementById('campOverlay').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="mk-form">
+          <label>Product you are offering *<input id="campProduct" type="text" placeholder='e.g. "Copper scrap, Grade A"'></label>
+          <div class="camp-pick-head">Send to (${list.length} on shortlist — max 15):</div>
+          <div class="camp-list">
+            ${list.map(s => `<label class="camp-item"><input type="checkbox" value="${escapeHtml(s.link)}" checked>
+              ${escapeHtml(s.title)} <span class="camp-meta">${escapeHtml(s.type||'')}${s.country ? ' · ' + escapeHtml(s.country) : ''}${s.email ? ' · ✉️' : ' · <i>no email found</i>'}</span></label>`).join('')}
+          </div>
+          <button class="mk-generate" onclick="runCampaign(this)">✨ Generate Personalized Emails</button>
+        </div>
+        <div id="campResult"></div>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+async function runCampaign(btn){
+  const product = document.getElementById('campProduct').value.trim();
+  if(!product){ alert('Enter the product you are offering.'); return; }
+  const links = [...document.querySelectorAll('.camp-item input:checked')].map(i => i.value).slice(0, 15);
+  if(!links.length){ alert('Select at least one company.'); return; }
+  const result = document.getElementById('campResult');
+  btn.disabled = true; btn.textContent = '✨ Writing ' + links.length + ' emails…';
+  result.innerHTML = '<p class="empty" style="padding:10px">Personalizing one email per company — about ' + links.length * 3 + ' seconds…</p>';
+  try{
+    const res = await fetch('/api/campaign', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ product, links })
+    });
+    const data = await res.json();
+    if(!res.ok || data.error) throw new Error(data.error || 'campaign failed');
+    window._lastCampaign = data;
+    result.innerHTML = `
+      <div class="mk-sec-head" style="margin-top:14px">✓ ${data.rows.length} emails ready
+        <button class="saved-export-btn" onclick="exportCampaignExcel()">📊 Export to Excel</button></div>
+      ${data.rows.map(r => `
+        <div class="mk-section">
+          <div class="mk-sec-head">${escapeHtml(r.company)}${r.email ? ' · <a href="mailto:' + escapeHtml(r.email) + '?subject=' + encodeURIComponent(r.subject) + '&body=' + encodeURIComponent(r.body) + '">✉️ Open in email</a>' : ' · <i>no email — find contact first</i>'}${mkCopyBtn('Subject: ' + r.subject + '\n\n' + r.body)}</div>
+          <div class="mk-sec-body"><strong>${escapeHtml(r.subject)}</strong><br>${escapeHtml(r.body).replace(/\n/g,'<br>')}${r.error ? '<br>⚠️ ' + escapeHtml(r.error) : ''}</div>
+        </div>`).join('')}`;
+  }catch(e){
+    result.innerHTML = `<p class="error">⚠️ ${escapeHtml(e.message)}</p>`;
+  }finally{
+    btn.disabled = false; btn.textContent = '✨ Generate Personalized Emails';
+  }
+}
+
+function exportCampaignExcel(){
+  const c = window._lastCampaign;
+  if(!c || typeof XLSX === 'undefined') return;
+  const rows = c.rows.map(r => ({
+    'Company': r.company, 'Country': r.country, 'Email': r.email,
+    'Subject': r.subject, 'Body': r.body, 'Website': r.link
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:30},{wch:14},{wch:28},{wch:45},{wch:80},{wch:40}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Campaign');
+  XLSX.writeFile(wb, 'sourceiq_campaign_' + new Date().toISOString().slice(0,10) + '.xlsx');
+}
 
 // Load the shared shortlist state on startup
 loadSavedLinks();

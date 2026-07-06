@@ -3045,6 +3045,96 @@ setInterval(() => {
   if (report.date !== today && now.getHours() >= 7) runLeadMonitor('schedule');
 }, 30 * 60 * 1000);
 
+// ── Marketing Kit generator ───────────────────────────────────────────────────
+// One product in -> a complete B2B marketing kit out: portal listing, LinkedIn
+// post, outreach email, HS code and buyer-search keywords. Grounded on the
+// details the user provides; the AI must not invent specs or certifications.
+app.post('/api/marketing-kit', async (req, res) => {
+  const { product, details, origin, terms } = req.body || {};
+  if (!product) return res.status(400).json({ error: 'product is required' });
+  if (!AI_PROVIDER) return res.status(503).json({ error: 'No AI key configured' });
+
+  const prompt = `You are a B2B trade marketing specialist at a Singapore trading company. Create a marketing kit for this product they SELL:
+
+PRODUCT: ${product}
+${details ? 'DETAILS PROVIDED BY SELLER: ' + String(details).slice(0, 500) : ''}
+${origin ? 'ORIGIN: ' + origin : ''}
+${terms ? 'TRADE TERMS: ' + terms : ''}
+
+Rules:
+- Use ONLY the details provided. Where a spec is unknown, write placeholders like "[grade]" or omit — NEVER invent specs, certifications, capacities, or prices.
+- listingTitle: portal-style title buyers search for (under 80 chars, keyword-rich).
+- listingBody: 120-180 word B2B portal listing (TradeWheel/Alibaba style): what it is, quality/spec line, supply capability phrasing, terms, call to action. Professional trade English.
+- linkedinPost: 60-100 words, professional but human, ends with a call to action. No hashtag spam — max 3 relevant hashtags.
+- outreachEmail: first-contact email to a prospective buyer of this product. Under 150 words, subject under 60 chars, ends "Best regards," (sender adds name).
+- hsCode: the 6-digit HS code (format XXXX.XX) for this product.
+- keywords: 5-8 search terms buyers actually use for this product.
+
+Return ONLY valid JSON:
+{"listingTitle":"...","listingBody":"...","linkedinPost":"...","outreachEmail":{"subject":"...","body":"..."},"hsCode":"...","keywords":["..."]}`;
+
+  try {
+    const kit = await callAI(prompt);
+    if (!kit.listingTitle || !kit.listingBody) throw new Error('AI returned incomplete kit');
+    res.json({
+      listingTitle: String(kit.listingTitle).slice(0, 120),
+      listingBody: String(kit.listingBody).slice(0, 2000),
+      linkedinPost: String(kit.linkedinPost || '').slice(0, 1200),
+      outreachEmail: {
+        subject: String(kit.outreachEmail?.subject || '').slice(0, 120),
+        body: String(kit.outreachEmail?.body || '').slice(0, 2000)
+      },
+      hsCode: String(kit.hsCode || '').slice(0, 12),
+      keywords: (Array.isArray(kit.keywords) ? kit.keywords : []).slice(0, 8).map(k => String(k).slice(0, 50))
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Marketing kit failed: ' + err.message });
+  }
+});
+
+// ── Outreach campaign: batch-personalized offer emails for shortlisted buyers ──
+app.post('/api/campaign', async (req, res) => {
+  const { links, product } = req.body || {};
+  if (!product || !Array.isArray(links) || !links.length) {
+    return res.status(400).json({ error: 'product and links[] are required' });
+  }
+  if (!AI_PROVIDER) return res.status(503).json({ error: 'No AI key configured' });
+
+  const saved = loadSaved();
+  const targets = links.slice(0, 15) // hard cap — each row is an AI call
+    .map(l => saved.find(s => s.link === l)).filter(Boolean);
+  if (!targets.length) return res.status(400).json({ error: 'None of the links are on the shortlist' });
+
+  const rows = [];
+  for (const t of targets) {
+    try {
+      const draft = await callAI(`You are a B2B sales manager at a Singapore trading company writing a first-contact sales email.
+
+PROSPECTIVE BUYER:
+- Company: ${t.title}
+- Type: ${t.type || 'unknown'}
+- Country: ${t.country || 'unknown'}
+- What we know: ${(t.snippet || '').slice(0, 250)}
+${t.notes ? '- Internal notes: ' + t.notes.slice(0, 200) : ''}
+
+PRODUCT WE ARE SELLING: ${product}
+
+Write a concise, personalized sales email (under 150 words) offering to supply this product.
+Reference something specific about THIS buyer. Do not invent facts, prices, or certifications.
+End with a clear next step. Sign off "Best regards," (sender adds their name).
+Return ONLY valid JSON: {"subject":"...","body":"..."}`);
+      rows.push({
+        company: t.title, country: t.country || '', email: t.email || '',
+        link: t.link, subject: draft.subject || '', body: draft.body || ''
+      });
+    } catch (err) {
+      rows.push({ company: t.title, country: t.country || '', email: t.email || '', link: t.link, subject: '', body: '', error: String(err.message).slice(0, 100) });
+    }
+    await new Promise(r => setTimeout(r, 800)); // pace the AI calls
+  }
+  res.json({ product, count: rows.length, rows });
+});
+
 // ── SourceIQ Copilot ──────────────────────────────────────────────────────────
 // Agentic chat: Gemini gets the app's capabilities as callable tools and chains
 // them to answer business questions ("find X, check trust, save the best") in
