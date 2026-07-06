@@ -744,47 +744,60 @@ async function refreshServiceStatus(){
     const res = await fetch('/api/service-status');
     const s = await res.json();
 
-    const apply = (dotId, pillId, info, opts) => {
-      const dot = document.getElementById(dotId);
+    // Mini speedometer gauge: value 0..1 fills a semicircular arc whose color
+    // moves green -> amber -> red as health drops. Far clearer at a glance
+    // than dots or words alone.
+    const gaugeSvg = (value, color) => {
+      const R = 13, CX = 17, CY = 17, LEN = Math.PI * R; // semicircle length ≈ 40.8
+      const v = Math.max(0.04, Math.min(1, value));      // always show a sliver
+      return `<svg width="34" height="21" viewBox="0 0 34 21">
+        <path d="M 4 17 A ${R} ${R} 0 0 1 30 17" fill="none" stroke="#e5e7eb" stroke-width="5" stroke-linecap="round"/>
+        <path d="M 4 17 A ${R} ${R} 0 0 1 30 17" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round"
+          stroke-dasharray="${(v * LEN).toFixed(1)} ${LEN.toFixed(1)}" style="transition:stroke-dasharray .6s, stroke .6s"/>
+        <circle cx="${CX}" cy="${CY}" r="2.2" fill="${color}"/>
+      </svg>`;
+    };
+
+    const apply = (gaugeId, wordId, pillId, info, opts) => {
+      const gauge = document.getElementById(gaugeId);
+      const wordEl = document.getElementById(wordId);
       const pill = document.getElementById(pillId);
-      if(!dot || !pill) return;
-      // word: a plain-language state shown right in the topbar — dots alone
-      // were too cryptic ("what does the little circle mean?")
-      let cls = 'svc-unknown', word = '–', tip = opts.name + ': no calls yet this session';
+      if(!gauge || !pill) return;
+      let value = 0, color = '#9ca3af', word = '–', tip = opts.name + ': no calls yet this session';
       if(!info.configured){
         word = 'Off';
         tip = opts.name + ': no API key configured';
       } else if(info.status === 'quota'){
-        cls = 'svc-red'; word = 'Down';
+        value = 0.06; color = '#dc2626'; word = 'Down';
         tip = opts.name + ' QUOTA EXHAUSTED — ' + (opts.quotaHint || 'running on fallback until it resets') +
           (info.detail ? '\n' + info.detail : '');
       } else if(info.status === 'rate-limited' || info.status === 'error'){
-        cls = 'svc-amber'; word = 'Slow';
+        value = 0.45; color = '#f59e0b'; word = 'Slow';
         tip = opts.name + ': ' + info.status + (info.detail ? ' — ' + info.detail : '');
       } else if(info.status === 'ok'){
-        cls = 'svc-green'; word = 'OK';
-        tip = opts.name + ': OK — ' + info.count + ' call' + (info.count === 1 ? '' : 's') + ' today';
-        // Warn BEFORE the wall when we know the ceiling (Gemini free tier)
-        if(opts.limit && info.count >= opts.limit * 0.75){
-          cls = 'svc-amber'; word = 'Low';
-          tip = opts.name + ': running low — ' + info.count + ' of ~' + opts.limit + ' free daily calls used';
+        if(opts.limit){
+          // Gauge shows REMAINING daily AI allowance — it visibly drains with use
+          const remaining = Math.max(0, 1 - (info.count / opts.limit));
+          value = remaining;
+          color = remaining > 0.4 ? '#10b981' : remaining > 0.15 ? '#f59e0b' : '#dc2626';
+          word = remaining > 0.4 ? 'OK' : remaining > 0.15 ? 'Low' : 'Almost out';
+          tip = opts.name + ': ' + info.count + ' of ~' + opts.limit + ' free daily calls used (' + Math.round(remaining * 100) + '% left)';
+        } else {
+          value = 1; color = '#10b981'; word = 'OK';
+          tip = opts.name + ': OK — ' + info.count + ' call' + (info.count === 1 ? '' : 's') + ' today';
         }
       }
-      const wordEl = document.getElementById(dotId === 'braveDot' ? 'braveWord' : 'geminiWord');
-      if(wordEl) wordEl.innerHTML = '<span class="svc-dot ' + cls + '" id="' + dotId + '"></span> ' + word;
-      else dot.className = 'svc-dot ' + cls;
+      gauge.innerHTML = gaugeSvg(value, color);
+      if(wordEl){ wordEl.textContent = word; wordEl.style.color = color === '#9ca3af' ? '#6b7280' : color; }
       pill.title = tip;
-      pill.classList.remove('svc-word-green','svc-word-amber','svc-word-red');
-      if(cls === 'svc-green') pill.classList.add('svc-word-green');
-      if(cls === 'svc-amber') pill.classList.add('svc-word-amber');
-      if(cls === 'svc-red') pill.classList.add('svc-word-red');
+      pill.classList.toggle('svc-word-red', color === '#dc2626');
     };
 
-    apply('braveDot', 'braveStatusPill', s.brave, {
+    apply('braveGauge', 'braveWord', 'braveStatusPill', s.brave, {
       name: 'Brave Search',
       quotaHint: 'searches fall back to DuckDuckGo (lower quality) — check billing at api-dashboard.search.brave.com'
     });
-    apply('geminiDot', 'geminiStatusPill', s.gemini, {
+    apply('geminiGauge', 'geminiWord', 'geminiStatusPill', s.gemini, {
       name: 'Gemini AI',
       limit: s.gemini.freeTierDailyLimit,
       quotaHint: 'AI features paused until the daily free tier resets — enable billing at aistudio.google.com to remove the cap'

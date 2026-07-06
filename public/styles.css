@@ -2588,3 +2588,9 @@ h1{ color:var(--biz-text) !important; }
 .tb-status.svc-word-amber .tb-status-word{ color:#b45309; }
 .tb-status.svc-word-red .tb-status-word{ color:#b91c1c; }
 .tb-status.svc-word-red{ background:#fef2f2; border-color:#fecaca; }
+
+/* ============ Gauge status pills ============ */
+.tb-gauge-pill{ gap:9px; padding:5px 12px 4px; background:#fff; }
+.tb-gauge{ display:inline-flex; align-items:flex-end; }
+.tb-gauge-text{ display:flex; flex-direction:column; line-height:1.25; }
+.tb-gauge-text .tb-status-word{ font-size:11.5px; }
