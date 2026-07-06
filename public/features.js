@@ -1000,5 +1000,99 @@ async function showLeadsPanel(){
 
 refreshLeadsBadge();
 
+// ═══════════════ SourceIQ Copilot chat ═══════════════
+const copilotHistory = [];
+
+function toggleCopilot(){
+  let box = document.getElementById('copilotBox');
+  if(box){ box.remove(); return; }
+  box = document.createElement('div');
+  box.id = 'copilotBox';
+  box.innerHTML = `
+    <div class="cp-head">🧠 SourceIQ Copilot
+      <button class="modal-close" onclick="document.getElementById('copilotBox').remove()">✕</button>
+    </div>
+    <div class="cp-msgs" id="cpMsgs">
+      <div class="cp-msg cp-bot">Ask me anything — I can search suppliers and buyers, check trust, read your shortlist and margins, review today's leads, and save or update companies for you.<br><br>
+      <em>Try: "Which of my deals are going stale?" or "Find aluminium scrap buyers in India and save the best two."</em></div>
+    </div>
+    <div class="cp-input-row">
+      <input id="cpInput" type="text" placeholder="Ask the Copilot…" onkeydown="if(event.key==='Enter')sendCopilot()">
+      <button id="cpSend" onclick="sendCopilot()">➤</button>
+    </div>`;
+  document.body.appendChild(box);
+  // Re-render history if the panel was closed and reopened
+  copilotHistory.forEach(m => appendCopilotMsg(m.role === 'user' ? 'cp-user' : 'cp-bot', m.text));
+  document.getElementById('cpInput').focus();
+}
+
+function appendCopilotMsg(cls, html){
+  const msgs = document.getElementById('cpMsgs');
+  if(!msgs) return null;
+  const div = document.createElement('div');
+  div.className = 'cp-msg ' + cls;
+  div.innerHTML = html;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+const TOOL_LABELS = {
+  search_suppliers:'🔍 Searched suppliers', search_buyers:'🛒 Searched buyers',
+  get_shortlist:'⭐ Read shortlist', save_supplier:'⭐ Saved to shortlist',
+  update_supplier:'✏️ Updated shortlist', enrich_company:'📇 Fetched contact details',
+  trust_check:'🛡 Ran trust check', get_new_leads:'🔔 Checked new leads'
+};
+
+async function sendCopilot(){
+  const input = document.getElementById('cpInput');
+  const btn = document.getElementById('cpSend');
+  const text = input.value.trim();
+  if(!text) return;
+  input.value = '';
+  input.disabled = true; btn.disabled = true;
+  appendCopilotMsg('cp-user', escapeHtml(text));
+  copilotHistory.push({ role:'user', text });
+  const thinking = appendCopilotMsg('cp-bot cp-thinking', '<span class="loading-dot"></span> Working — this can take up to a minute when I search…');
+  try{
+    const res = await fetch('/api/copilot', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ messages: copilotHistory.slice(-10) })
+    });
+    const data = await res.json();
+    if(thinking) thinking.remove();
+    if(!res.ok || data.error){
+      appendCopilotMsg('cp-bot cp-err', '⚠️ ' + escapeHtml(data.error || 'Copilot failed — try again.'));
+      copilotHistory.pop(); // let the user retry the same question
+      return;
+    }
+    const actionsHtml = (data.actions || []).length
+      ? '<div class="cp-actions">' + data.actions.map(a =>
+          `<span>${TOOL_LABELS[a.tool] || a.tool}${a.ok ? '' : ' ⚠️'}</span>`).join('') + '</div>'
+      : '';
+    appendCopilotMsg('cp-bot', escapeHtml(data.reply).replace(/\n/g, '<br>') + actionsHtml);
+    copilotHistory.push({ role:'model', text: data.reply });
+    // Shortlist may have changed — refresh badges
+    loadSavedLinks();
+  }catch(e){
+    if(thinking) thinking.remove();
+    appendCopilotMsg('cp-bot cp-err', '⚠️ ' + escapeHtml(e.message));
+    copilotHistory.pop();
+  }finally{
+    input.disabled = false; btn.disabled = false;
+    input.focus();
+  }
+}
+
+// Floating launcher button
+(function(){
+  const b = document.createElement('button');
+  b.id = 'copilotFab';
+  b.title = 'SourceIQ Copilot — ask anything';
+  b.textContent = '🧠';
+  b.onclick = toggleCopilot;
+  document.body.appendChild(b);
+})();
+
 // Load the shared shortlist state on startup
 loadSavedLinks();

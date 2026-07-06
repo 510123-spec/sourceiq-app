@@ -3045,6 +3045,183 @@ setInterval(() => {
   if (report.date !== today && now.getHours() >= 7) runLeadMonitor('schedule');
 }, 30 * 60 * 1000);
 
+// ── SourceIQ Copilot ──────────────────────────────────────────────────────────
+// Agentic chat: Gemini gets the app's capabilities as callable tools and chains
+// them to answer business questions ("find X, check trust, save the best") in
+// one conversation. Tool results are trimmed hard to keep token usage sane.
+
+const trimResults = (arr, n = 6) => (arr || []).slice(0, n).map(r => ({
+  title: r.title, link: r.link, domain: r.displayLink, type: r.type,
+  country: r.country || undefined, isRFQ: r.isRFQ || undefined,
+  snippet: (r.snippet || '').slice(0, 120)
+}));
+
+const COPILOT_TOOLS = {
+  search_suppliers: {
+    decl: { name: 'search_suppliers', description: 'Search the web for suppliers/manufacturers of a product. Returns top results.',
+      parameters: { type: 'OBJECT', properties: { query: { type: 'STRING' }, country: { type: 'STRING', description: 'optional country filter' } }, required: ['query'] } },
+    run: async (a) => {
+      const p = new URLSearchParams({ q: a.query }); if (a.country) p.set('country', a.country);
+      const d = await (await fetch(`http://localhost:${PORT}/api/search?${p}`, { signal: AbortSignal.timeout(90000) })).json();
+      return { count: d.count, results: trimResults(d.results) };
+    }
+  },
+  search_buyers: {
+    decl: { name: 'search_buyers', description: 'Find companies that BUY a product (importers, wholesalers, active buy requests/RFQs).',
+      parameters: { type: 'OBJECT', properties: { product: { type: 'STRING' }, country: { type: 'STRING' } }, required: ['product'] } },
+    run: async (a) => {
+      const p = new URLSearchParams({ product: a.product }); if (a.country) p.set('country', a.country);
+      const d = await (await fetch(`http://localhost:${PORT}/api/search-customers?${p}`, { signal: AbortSignal.timeout(90000) })).json();
+      return { count: (d.results || []).length, results: trimResults(d.results) };
+    }
+  },
+  get_shortlist: {
+    decl: { name: 'get_shortlist', description: 'Get the team shortlist (saved suppliers/buyers) with pipeline status, days in stage, notes, trust verdict, and deal margins.',
+      parameters: { type: 'OBJECT', properties: {} } },
+    run: async () => ({
+      shortlist: loadSaved().map(s => {
+        const days = Math.floor((Date.now() - new Date(s.statusChangedAt || s.savedAt).getTime()) / 86400000);
+        const d = s.deal || {};
+        const cost = (d.buy || 0) + (d.freight || 0) + (d.duties || 0);
+        return {
+          title: s.title, link: s.link, status: s.status || 'new', daysInStage: days,
+          country: s.country || undefined, phone: s.phone || undefined, email: s.email || undefined,
+          notes: s.notes || undefined, trust: s.trust ? `${s.trust.rating} ${s.trust.score ?? ''}` : undefined,
+          margin: (d.sell != null && d.buy != null) ? +(d.sell - cost).toFixed(2) : undefined,
+          marginPct: (d.sell != null && d.buy != null && cost > 0) ? +((d.sell - cost) / cost * 100).toFixed(1) : undefined
+        };
+      })
+    })
+  },
+  save_supplier: {
+    decl: { name: 'save_supplier', description: 'Save a company to the shared shortlist. Use link+title from a prior search result.',
+      parameters: { type: 'OBJECT', properties: { link: { type: 'STRING' }, title: { type: 'STRING' }, type: { type: 'STRING' }, country: { type: 'STRING' }, snippet: { type: 'STRING' } }, required: ['link', 'title'] } },
+    run: async (a) => {
+      const d = await (await fetch(`http://localhost:${PORT}/api/saved`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link: a.link, title: a.title, displayLink: (a.link.match(/\/\/(?:www\.)?([^\/]+)/) || [])[1] || '', type: a.type || '', country: a.country || '', snippet: a.snippet || '' })
+      })).json();
+      return { saved: true, shortlistSize: (d.saved || []).length, note: d.note };
+    }
+  },
+  update_supplier: {
+    decl: { name: 'update_supplier', description: 'Update a shortlisted company: set pipeline status (new/contacted/quoted/sampled/ordered/rejected) and/or append notes.',
+      parameters: { type: 'OBJECT', properties: { link: { type: 'STRING' }, status: { type: 'STRING' }, notes: { type: 'STRING' } }, required: ['link'] } },
+    run: async (a) => {
+      const body = { link: a.link };
+      if (a.status) body.status = a.status;
+      if (a.notes) {
+        const cur = loadSaved().find(s => s.link === a.link);
+        body.notes = ((cur && cur.notes ? cur.notes + '\n' : '') + a.notes).slice(0, 2000);
+      }
+      const r = await fetch(`http://localhost:${PORT}/api/saved`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      return { updated: r.ok };
+    }
+  },
+  enrich_company: {
+    decl: { name: 'enrich_company', description: 'Scrape a company website for contact details: phone, email, address, WhatsApp, key people, size.',
+      parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, name: { type: 'STRING' } }, required: ['url'] } },
+    run: async (a) => {
+      const p = new URLSearchParams({ url: a.url }); if (a.name) p.set('name', a.name);
+      const d = await (await fetch(`http://localhost:${PORT}/api/enrich?${p}`, { signal: AbortSignal.timeout(60000) })).json();
+      const { success, website, phone, fax, email, address, whatsapp, country, founded, employeeCount, description } = d;
+      return { success, website, phone, fax, email, address, whatsapp, country, founded, employeeCount, description: (description || '').slice(0, 200) };
+    }
+  },
+  trust_check: {
+    decl: { name: 'trust_check', description: 'Run a trust/reputation check on a company website. Returns rating and score /100.',
+      parameters: { type: 'OBJECT', properties: { url: { type: 'STRING' }, name: { type: 'STRING' } }, required: ['url'] } },
+    run: async (a) => {
+      const p = new URLSearchParams({ url: a.url }); if (a.name) p.set('name', a.name);
+      const d = await (await fetch(`http://localhost:${PORT}/api/trust-check?${p}`, { signal: AbortSignal.timeout(60000) })).json();
+      return { rating: d.rating, score: d.score, findings: (d.findings || []).slice(0, 4).map(f => f.text) };
+    }
+  },
+  get_new_leads: {
+    decl: { name: 'get_new_leads', description: 'Get the latest lead-monitor report: NEW suppliers/buyers/RFQs found by the watched searches since the previous run.',
+      parameters: { type: 'OBJECT', properties: {} } },
+    run: async () => {
+      const rep = loadJson(MONITOR_REPORT_FILE, {});
+      return {
+        lastRun: rep.generatedAt || null,
+        watches: (rep.items || []).map(i => ({
+          query: i.watch.query, mode: i.watch.mode, error: i.error,
+          newLeads: (i.newResults || []).map(x => ({ title: x.title, link: x.link, domain: x.displayLink, isRFQ: x.isRFQ }))
+        }))
+      };
+    }
+  }
+};
+
+app.post('/api/copilot', async (req, res) => {
+  const { messages } = req.body || {};
+  if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: 'messages array required' });
+  if (!GEMINI_KEY) return res.status(503).json({ error: 'Copilot requires a Gemini API key' });
+
+  const systemText = `You are SourceIQ Copilot, the assistant inside a B2B sourcing app used by a Singapore trading company (commodities: copper, metals, and other products).
+You have tools: web supplier/buyer search, the team's shared shortlist (pipeline statuses, notes, margins), contact enrichment, trust checks, and the overnight lead monitor.
+Rules:
+- Use tools to answer with real data; never invent companies, prices, or contact details.
+- Chain tools when useful (search -> trust check -> save), but be economical: no more than needed.
+- When the user asks to draft an email, write it yourself directly in the reply.
+- Be concise and businesslike. Summarize what actions you took. Currency amounts: repeat them exactly as stored.
+- If a tool errors or search quality is limited (e.g. quota issues), say so plainly.`;
+
+  const contents = messages.slice(-12).map(m => ({ role: m.role === 'user' ? 'user' : 'model', parts: [{ text: String(m.text || '').slice(0, 2000) }] }));
+  const actions = [];
+
+  try {
+    for (let turn = 0; turn < 6; turn++) {
+      const r = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: systemText }] },
+            contents,
+            tools: [{ functionDeclarations: Object.values(COPILOT_TOOLS).map(t => t.decl) }],
+            generationConfig: { temperature: 0.2, maxOutputTokens: 2500 }
+          }),
+          signal: AbortSignal.timeout(120000)
+        }
+      );
+      const data = await r.json();
+      if (data.error) {
+        recordSvc('gemini', /quota|exceeded/i.test(data.error.message) ? 'quota' : 'error', data.error.message);
+        throw new Error(data.error.message);
+      }
+      recordSvc('gemini', 'ok');
+      const parts = data.candidates?.[0]?.content?.parts || [];
+      const calls = parts.filter(p => p.functionCall);
+
+      if (!calls.length) {
+        const text = parts.map(p => p.text || '').join('').trim();
+        return res.json({ reply: text || 'I could not produce a reply — please rephrase.', actions });
+      }
+
+      // Execute the requested tool calls, feed results back, continue the loop
+      contents.push({ role: 'model', parts: calls.map(c => ({ functionCall: c.functionCall })) });
+      const responses = [];
+      for (const c of calls) {
+        const { name, args } = c.functionCall;
+        const tool = COPILOT_TOOLS[name];
+        let result;
+        try {
+          result = tool ? await tool.run(args || {}) : { error: 'unknown tool' };
+        } catch (err) {
+          result = { error: String(err.message).slice(0, 150) };
+        }
+        actions.push({ tool: name, args: args || {}, ok: !result.error });
+        responses.push({ functionResponse: { name, response: { result } } });
+      }
+      contents.push({ role: 'user', parts: responses });
+    }
+    res.json({ reply: 'I ran out of steps for this request — try breaking it into smaller questions.', actions });
+  } catch (err) {
+    res.status(500).json({ error: 'Copilot failed: ' + err.message, actions });
+  }
+});
+
 // ── AI-drafted inquiry email ──────────────────────────────────────────────────
 // Personalizes the RFQ using whatever we know about the supplier (type, country,
 // snippet, scraped contact info). Falls back to the static template client-side

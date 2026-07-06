@@ -164,6 +164,12 @@ const assertOkOrQuota = (res, shapeCheck) => {
     assertOkOrQuota(r, b => assert(b.overview, 'no overview'));
   });
 
+  await check('POST /api/copilot', async () => {
+    const r = await jfetch('/api/copilot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, timeout: 150000,
+      body: JSON.stringify({ messages: [{ role: 'user', text: 'How many companies are on my shortlist? Answer with the tool only.' }] }) });
+    assertOkOrQuota(r, b => assert(typeof b.reply === 'string' && b.reply.length > 0, 'no reply'));
+  });
+
   await check('POST /api/identify-image', async () => {
     // 1x1 red pixel PNG — enough to prove the endpoint parses and forwards the image
     const px = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
