@@ -47,6 +47,9 @@
       <li><a href="#shortlist">The Saved shortlist — your pipeline</a></li>
       <li><a href="#leads">The Lead Monitor</a></li>
       <li><a href="#copilot">The 🧠 Copilot</a></li>
+      <li><a href="#prices">Live market prices</a></li>
+      <li><a href="#marketing">Marketing tools</a></li>
+      <li><a href="#catalog">Your product catalog</a></li>
       <li><a href="#exports">Exports &amp; reports</a></li>
       <li><a href="#trouble">Troubleshooting</a></li>
     </ol>
@@ -69,8 +72,12 @@
     <tr><td>⭐ <strong>Saved</strong></td><td>The shared shortlist (you and your colleague see the same list). Badge = number saved; badge turns <strong>red</strong> when deals need follow-up.</td></tr>
     <tr><td><strong>SEARCH gauge</strong></td><td>Health of the web-search engine. Full green arc = full power. Red sliver + "Down" = quota/billing problem; searches still work but with lower quality. Hover for details.</td></tr>
     <tr><td><strong>AI gauge</strong></td><td>Health of the AI engine (Copilot, analysis, drafts). Green = fine. On a free plan it drains as you use it; on the paid plan it stays green.</td></tr>
+    <tr><td>📣 <strong>Marketing</strong></td><td>Generate a full marketing kit for a product you sell — portal listing, LinkedIn post, outreach email, HS code, keywords (see section 9).</td></tr>
+    <tr><td>🗂 <strong>Catalog</strong></td><td>Manage your shareable product catalog and read incoming quote requests. Badge = unread quote requests (see section 10).</td></tr>
+    <tr><td>❓ <strong>Help</strong></td><td>This manual.</td></tr>
     <tr><td><strong>Log Out</strong></td><td>Ends the session (login is currently disabled, so this is rarely needed).</td></tr>
   </table>
+  <p>Below the top bar runs the <strong>live commodity price bar</strong> — see section 8.</p>
 
   <h2 id="modes">3. The 9 search tabs</h2>
   <table>
@@ -131,7 +138,30 @@
   </ul>
   <div class="tip">💡 The Copilot only uses real data from searches and your shortlist — it is instructed never to invent companies, prices, or contacts. Complex requests can take up to a minute.</div>
 
-  <h2 id="exports">8. Exports &amp; reports</h2>
+  <h2 id="prices">8. Live market prices</h2>
+  <p>The strip under the top bar shows the metals you trade:</p>
+  <ul>
+    <li><strong>Copper, Gold, Silver</strong> — live market prices (futures), refreshed every 15 minutes, with the recent change so you see the direction. Copper also shows the converted USD/MT figure traders quote in.</li>
+    <li><strong>Tin &amp; Antimony</strong> — these minor metals have no free live feed, so the bar keeps a <em>reference price you maintain yourself</em>: click the ✏ to update it whenever you have a fresh market quote. It's clearly marked as your reference, not a live price.</li>
+  </ul>
+  <div class="tip">💡 Use it before quoting: if copper moved 3% since a supplier's offer, that offer may be stale — renegotiate.</div>
+
+  <h2 id="marketing">9. Marketing tools</h2>
+  <h3>📣 Marketing Kit (top bar)</h3>
+  <p>Enter a product you <em>sell</em> plus only TRUE details (specs, quantities, terms). The AI writes: a portal listing (title + body) ready for TradeWheel / Go4WorldBusiness / Alibaba, a LinkedIn post, an outreach email, the HS code, and the keywords buyers search. Copy each section, export all to Word, or jump straight to the portals' posting pages. Unknown specs become <code>[placeholders]</code> — it never invents claims.</p>
+  <h3>📣 Outreach Campaign (inside ⭐ Saved)</h3>
+  <p>Pick up to 15 shortlisted companies and the product you're offering. The AI writes <em>one personalized email per company</em> (it uses their type, country, and your notes). Review each, open in your email app, or export the whole batch to Excel for mail-merge. <strong>You</strong> press send — the system never emails anyone by itself.</p>
+
+  <h2 id="catalog">10. Your product catalog</h2>
+  <p>A professional product page you can share with any customer:</p>
+  <ol>
+    <li>Click <strong>🗂 Catalog</strong> → add your products (name, description, specs, terms).</li>
+    <li>Share the public page: <code>http://192.168.1.109:3001/catalog.html</code> (works for anyone on the office network; customers visiting your office can scan/open it too).</li>
+    <li>Visitors can send a <strong>quote request</strong> from the page — it lands back in your 🗂 Catalog inbox, and the badge shows unread requests.</li>
+  </ol>
+  <div class="tip">💡 The Company Brain also works for you here: search results show a <strong>🧠 Known</strong> badge on any company the system has dealt with before — hover it to see your history with them. You can also ask the Copilot: <em>"Have we dealt with codelco.com before?"</em></div>
+
+  <h2 id="exports">11. Exports &amp; reports</h2>
   <table>
     <tr><th>Export</th><th>Where</th><th>Contains</th></tr>
     <tr><td>📊 Excel (search)</td><td>Toolbar above results</td><td>All results incl. phone/email/WhatsApp/address columns</td></tr>
@@ -140,7 +170,7 @@
     <tr><td>📄 Word / ⬇ CSV / 📧 Email</td><td>Toolbar &amp; cards</td><td>Alternative formats for single cards or full result lists</td></tr>
   </table>
 
-  <h2 id="trouble">9. Troubleshooting</h2>
+  <h2 id="trouble">12. Troubleshooting</h2>
   <table>
     <tr><th>Problem</th><th>What to do</th></tr>
     <tr><td>Page looks old / a button is missing</td><td>Press <span class="key">Ctrl</span>+<span class="key">F5</span> (hard refresh).</td></tr>

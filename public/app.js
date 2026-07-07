@@ -1363,6 +1363,8 @@ async function autoEnrichCard(r) {
 }
 
 async function autoEnrichAll() {
+  // Tag companies the app already has permanent memory of (Company Brain)
+  if (typeof annotateKnownCompanies === 'function') annotateKnownCompanies();
   const toEnrich = lastResults.filter(r =>
     r._id && r.link && r.type !== 'person' && r.category !== 'marketplace'
   );

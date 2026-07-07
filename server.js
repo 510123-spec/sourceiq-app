@@ -3052,6 +3052,22 @@ app.get('/api/company-brain', (req, res) => {
   res.json({ count: Object.keys(brain).length, companies: list });
 });
 
+// Bulk lookup so search results can be annotated "you know this company" in one call
+app.post('/api/company-brain/lookup', (req, res) => {
+  const hosts = (req.body?.hosts || []).slice(0, 120).map(brainHost);
+  const brain = loadJson(BRAIN_FILE, {});
+  const found = {};
+  for (const h of hosts) {
+    const r = brain[h];
+    if (r) found[h] = {
+      name: r.name, country: r.country, trustRating: r.trustRating, trustScore: r.trustScore,
+      firstSeen: (r.firstSeen || '').slice(0, 10), lastSeen: (r.lastSeen || '').slice(0, 10),
+      events: (r.interactions || []).slice(-5).map(i => (i.at || '').slice(0, 10) + ' ' + i.event)
+    };
+  }
+  res.json({ found });
+});
+
 // ── Morning lead monitor ──────────────────────────────────────────────────────
 // Watched searches run automatically once per day; the dashboard shows only the
 // NEW results since the last run. Turns the app from search-on-demand into a

@@ -1446,5 +1446,38 @@ async function markQuotesRead(btn){
 refreshQuoteBadge();
 setInterval(refreshQuoteBadge, 5 * 60 * 1000);
 
+// ═══════════════ Company Brain: "you know this company" badges ═══════════════
+// After results render, ask the server which domains it has permanent memory of
+// and tag those cards — so a familiar supplier is recognized instantly.
+async function annotateKnownCompanies(){
+  const entries = Object.entries(cardRegistry)
+    .filter(([id, r]) => r.displayLink && document.getElementById(id) && !document.getElementById(id).querySelector('.brain-badge'));
+  if(!entries.length) return;
+  const hosts = [...new Set(entries.map(([, r]) => r.displayLink.toLowerCase().replace(/^www\./, '')))];
+  try{
+    const res = await fetch('/api/company-brain/lookup', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ hosts })
+    });
+    const { found } = await res.json();
+    if(!found) return;
+    for(const [id, r] of entries){
+      const rec = found[(r.displayLink || '').toLowerCase().replace(/^www\./, '')];
+      if(!rec) continue;
+      const card = document.getElementById(id);
+      const row = card && card.querySelector('.badge-row');
+      if(!row || row.querySelector('.brain-badge')) continue;
+      const tip = 'Known company — first seen ' + (rec.firstSeen || '?') +
+        (rec.trustRating ? ' · trust: ' + rec.trustRating : '') +
+        (rec.events && rec.events.length ? '\n' + rec.events.join('\n') : '');
+      const b = document.createElement('span');
+      b.className = 'badge brain-badge';
+      b.title = tip;
+      b.textContent = '🧠 Known';
+      row.appendChild(b);
+    }
+  }catch(e){}
+}
+
 // Load the shared shortlist state on startup
 loadSavedLinks();
