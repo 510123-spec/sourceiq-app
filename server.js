@@ -383,7 +383,7 @@ async function enrichFromExternalSources(companyName, websiteOrigin) {
       try {
         const wikiName = companyName.replace(/\s+/g, '_');
         const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(wikiName)}`, {
-          headers: { 'User-Agent': 'SourceIQ/1.0 (contact@sourceiq.com)' },
+          headers: { 'User-Agent': 'ErezImpex/1.0' },
           signal: AbortSignal.timeout(5000)
         });
         if (!r.ok) return;
@@ -402,7 +402,7 @@ async function enrichFromExternalSources(companyName, websiteOrigin) {
       try {
         const r = await fetch(
           `https://api.duckduckgo.com/?q=${encodeURIComponent(companyName)}&format=json&no_html=1&skip_disambig=1`,
-          { headers: { 'User-Agent': 'SourceIQ/1.0' }, signal: AbortSignal.timeout(5000) }
+          { headers: { 'User-Agent': 'ErezImpex/1.0' }, signal: AbortSignal.timeout(5000) }
         );
         if (!r.ok) return;
         const d = await r.json();
@@ -1761,7 +1761,7 @@ async function searchDDG(query, count = 10) {
   try {
     const r = await fetch(
       `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`,
-      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; SourceIQ/1.0)', 'Accept-Language': 'en-US,en;q=0.9' }, signal: AbortSignal.timeout(10000) }
+      { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ErezImpex/1.0)', 'Accept-Language': 'en-US,en;q=0.9' }, signal: AbortSignal.timeout(10000) }
     );
     if (!r.ok) { console.warn(`[searchDDG] HTTP ${r.status}`); return []; }
     const html = await r.text();
@@ -3356,7 +3356,7 @@ Return ONLY valid JSON: {"subject":"...","body":"..."}`);
   res.json({ product, count: rows.length, rows });
 });
 
-// ── SourceIQ Copilot ──────────────────────────────────────────────────────────
+// ── Erez Assistant (AI copilot) ───────────────────────────────────────────────
 // Agentic chat: Gemini gets the app's capabilities as callable tools and chains
 // them to answer business questions ("find X, check trust, save the best") in
 // one conversation. Tool results are trimmed hard to keep token usage sane.
@@ -3492,7 +3492,7 @@ app.post('/api/copilot', async (req, res) => {
   if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: 'messages array required' });
   if (!GEMINI_KEY) return res.status(503).json({ error: 'Copilot requires a Gemini API key' });
 
-  const systemText = `You are SourceIQ Copilot, the assistant inside a B2B sourcing app used by a Singapore trading company (commodities: copper, metals, and other products).
+  const systemText = `You are Erez Assistant, the AI assistant inside Erez Impex Pte Ltd's B2B sourcing app used by a Singapore trading company (commodities: copper, metals, and other products).
 You have tools: web supplier/buyer search, the team's shared shortlist (pipeline statuses, notes, margins), contact enrichment, trust checks, and the overnight lead monitor.
 Rules:
 - Use tools to answer with real data; never invent companies, prices, or contact details.

@@ -1,4 +1,4 @@
-// SourceIQ smoke test — hits every endpoint and checks the response shape.
+// Erez Impex smoke test — hits every endpoint and checks the response shape.
 // Run: npm test   (server must be running on port 3001)
 //
 // AI-backed endpoints are QUOTA-TOLERANT: a Gemini free-tier quota error counts
@@ -37,7 +37,7 @@ const assertOkOrQuota = (res, shapeCheck) => {
 };
 
 (async () => {
-  console.log(`SourceIQ smoke test → ${BASE}\n`);
+  console.log(`Erez Impex smoke test → ${BASE}\n`);
   const t0 = Date.now();
 
   // ── Static assets ────────────────────────────────────────────────────────

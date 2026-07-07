@@ -1025,7 +1025,7 @@ async function showLeadsPanel(){
 
 refreshLeadsBadge();
 
-// ═══════════════ SourceIQ Copilot chat ═══════════════
+// ═══════════════ Erez Assistant (AI copilot) chat ═══════════════
 const copilotHistory = [];
 
 function toggleCopilot(){
@@ -1034,7 +1034,7 @@ function toggleCopilot(){
   box = document.createElement('div');
   box.id = 'copilotBox';
   box.innerHTML = `
-    <div class="cp-head">🧠 SourceIQ Copilot
+    <div class="cp-head">🧠 Erez Assistant
       <button class="modal-close" onclick="document.getElementById('copilotBox').remove()">✕</button>
     </div>
     <div class="cp-msgs" id="cpMsgs">
@@ -1113,7 +1113,7 @@ async function sendCopilot(){
 (function(){
   const b = document.createElement('button');
   b.id = 'copilotFab';
-  b.title = 'SourceIQ Copilot — ask anything';
+  b.title = 'Erez Assistant — ask anything';
   b.textContent = '🧠';
   b.onclick = toggleCopilot;
   document.body.appendChild(b);
