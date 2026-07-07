@@ -2641,3 +2641,17 @@ h1{ color:var(--biz-text) !important; }
 .cm-pencil{ color:#9ca3af; font-size:11px; }
 .cm-updated{ color:#9ca3af; font-size:11px; margin-left:auto; }
 @media(max-width:480px){ .commodity-bar{ padding:8px 14px; } .cm-updated{ margin-left:0; } }
+
+/* ============ Product catalog manager ============ */
+.cat-share{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#f0f7ff; border:1px solid #bfdbfe; border-radius:10px; padding:10px 14px; font-size:13px; }
+.cat-share a{ color:var(--biz-blue); font-weight:600; word-break:break-all; }
+.cat-quotes{ margin-top:14px; }
+.quote-req{ border:1px solid var(--biz-border); border-radius:9px; padding:9px 12px; margin-top:8px; font-size:13px; }
+.quote-req.quote-new{ border-color:#bfdbfe; background:#f0f7ff; }
+.quote-when{ color:#9ca3af; font-size:11px; margin-left:6px; }
+.quote-body{ color:#374151; margin:4px 0; }
+.quote-contact a{ color:var(--biz-blue); }
+.cat-prod{ border:1px solid var(--biz-border); border-radius:9px; padding:10px 12px; margin-bottom:8px; display:flex; flex-direction:column; gap:7px; }
+.cat-prod-head{ display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; }
+.cat-prod input, .cat-prod textarea{ border:1px solid var(--biz-border); border-radius:8px; padding:8px 10px; font-size:13px; font-family:inherit; width:100%; }
+.cat-prod .mk-row input{ flex:1; }

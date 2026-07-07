@@ -2949,6 +2949,65 @@ app.delete('/api/saved', (req, res) => {
   res.json({ saved: loadSaved() });
 });
 
+// ── Shareable product catalog ─────────────────────────────────────────────────
+// A public page (/catalog.html) you can send to buyers, listing your products
+// with a "request a quote" form. Managed from the dashboard.
+const CATALOG_FILE = path.join(__dirname, 'data', 'catalog.json');
+const QUOTES_FILE = path.join(__dirname, 'data', 'quote-requests.json');
+
+function defaultCatalog() {
+  return { company: 'Erez Impex', tagline: 'Global trading — metals & commodities', email: '', phone: '', whatsapp: '', products: [] };
+}
+
+app.get('/api/catalog', (req, res) => res.json(loadJson(CATALOG_FILE, defaultCatalog())));
+
+app.post('/api/catalog', (req, res) => {
+  const b = req.body || {};
+  const cat = {
+    company: String(b.company || '').slice(0, 100),
+    tagline: String(b.tagline || '').slice(0, 200),
+    email: String(b.email || '').slice(0, 120),
+    phone: String(b.phone || '').slice(0, 60),
+    whatsapp: String(b.whatsapp || '').slice(0, 60),
+    products: (Array.isArray(b.products) ? b.products : []).slice(0, 40).map(p => ({
+      name: String(p.name || '').slice(0, 100),
+      description: String(p.description || '').slice(0, 600),
+      specs: String(p.specs || '').slice(0, 300),
+      origin: String(p.origin || '').slice(0, 80),
+      terms: String(p.terms || '').slice(0, 120)
+    })).filter(p => p.name)
+  };
+  writeJson(CATALOG_FILE, cat);
+  res.json(cat);
+});
+
+// Public: a buyer submits a quote request from the catalog page
+app.post('/api/catalog/quote', (req, res) => {
+  const b = req.body || {};
+  if (!b.name || !b.contact) return res.status(400).json({ error: 'name and contact are required' });
+  const list = loadJson(QUOTES_FILE, []);
+  list.unshift({
+    at: new Date().toISOString(),
+    name: String(b.name).slice(0, 100), company: String(b.company || '').slice(0, 100),
+    contact: String(b.contact).slice(0, 120), country: String(b.country || '').slice(0, 60),
+    product: String(b.product || '').slice(0, 100), message: String(b.message || '').slice(0, 1000),
+    read: false
+  });
+  writeJson(QUOTES_FILE, list.slice(0, 500));
+  res.json({ ok: true });
+});
+
+// Dashboard: view incoming quote requests
+app.get('/api/catalog/quotes', (req, res) => {
+  const list = loadJson(QUOTES_FILE, []);
+  res.json({ quotes: list, unread: list.filter(q => !q.read).length });
+});
+app.post('/api/catalog/quotes/read', (req, res) => {
+  const list = loadJson(QUOTES_FILE, []).map(q => ({ ...q, read: true }));
+  writeJson(QUOTES_FILE, list);
+  res.json({ ok: true });
+});
+
 // ── Company Brain ─────────────────────────────────────────────────────────────
 // A permanent local record of every company the app has ever enriched or trust-
 // checked. Turns one-off lookups into institutional memory: next time you search

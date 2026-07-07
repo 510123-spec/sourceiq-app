@@ -1338,5 +1338,113 @@ async function editManualPrice(key, name, unit){
 refreshCommodities();
 setInterval(refreshCommodities, 15 * 60 * 1000);
 
+// ═══════════════ Shareable product catalog ═══════════════
+async function refreshQuoteBadge(){
+  try{
+    const d = await (await fetch('/api/catalog/quotes')).json();
+    const el = document.getElementById('quoteCount');
+    if(el){ el.textContent = d.unread > 0 ? String(d.unread) : ''; el.classList.toggle('saved-count-attn', d.unread > 0); }
+  }catch(e){}
+}
+
+let _catProducts = [];
+async function showCatalog(){
+  const old = document.getElementById('catOverlay');
+  if(old){ old.remove(); return; }
+  const cat = await (await fetch('/api/catalog')).json();
+  const q = await (await fetch('/api/catalog/quotes')).json();
+  _catProducts = cat.products || [];
+  const shareUrl = location.origin + '/catalog.html';
+  const overlay = document.createElement('div');
+  overlay.id = 'catOverlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-box modal-wide">
+      <div class="modal-head">
+        <h2>📗 Product Catalog</h2>
+        <button class="modal-close" onclick="document.getElementById('catOverlay').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="cat-share">
+          <span>Your public link:</span>
+          <a href="${escapeHtml(shareUrl)}" target="_blank" rel="noopener">${escapeHtml(shareUrl)}</a>
+          <button class="mk-copy" onclick="navigator.clipboard.writeText('${escapeHtml(shareUrl)}').then(()=>{this.textContent='✓ Copied';setTimeout(()=>this.textContent='📋 Copy link',1200)})">📋 Copy link</button>
+        </div>
+        ${q.quotes && q.quotes.length ? `
+          <div class="cat-quotes">
+            <div class="mk-sec-head">📨 Quote Requests (${q.unread} new)
+              ${q.unread ? '<button class="mk-copy" onclick="markQuotesRead(this)">Mark all read</button>' : ''}</div>
+            ${q.quotes.slice(0,20).map(r=>`
+              <div class="quote-req ${r.read?'':'quote-new'}">
+                <strong>${escapeHtml(r.name)}</strong>${r.company?' · '+escapeHtml(r.company):''}${r.country?' · '+escapeHtml(r.country):''}
+                <span class="quote-when">${new Date(r.at).toLocaleString()}</span>
+                <div class="quote-body">${r.product?'<b>'+escapeHtml(r.product)+'</b> — ':''}${escapeHtml(r.message||'')}</div>
+                <div class="quote-contact">↩ <a href="mailto:${escapeHtml(r.contact)}">${escapeHtml(r.contact)}</a></div>
+              </div>`).join('')}
+          </div>` : ''}
+        <div class="mk-form" style="margin-top:14px">
+          <div class="mk-sec-head">Catalog details</div>
+          <div class="mk-row">
+            <label>Company name<input id="catCompany" value="${escapeHtml(cat.company||'')}"></label>
+            <label>Contact email<input id="catEmail" value="${escapeHtml(cat.email||'')}"></label>
+          </div>
+          <label>Tagline<input id="catTagline" value="${escapeHtml(cat.tagline||'')}"></label>
+          <div class="mk-row">
+            <label>Phone<input id="catPhone" value="${escapeHtml(cat.phone||'')}"></label>
+            <label>WhatsApp<input id="catWhatsapp" value="${escapeHtml(cat.whatsapp||'')}"></label>
+          </div>
+          <div class="mk-sec-head" style="margin-top:6px">Products <button class="mk-copy" onclick="addCatProduct()">＋ Add product</button></div>
+          <div id="catProducts"></div>
+          <button class="mk-generate" onclick="saveCatalog(this)">💾 Save Catalog</button>
+        </div>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+  renderCatProducts();
+}
+
+function renderCatProducts(){
+  const wrap = document.getElementById('catProducts');
+  if(!wrap) return;
+  wrap.innerHTML = _catProducts.map((p,i)=>`
+    <div class="cat-prod">
+      <div class="cat-prod-head">Product ${i+1} <button class="saved-remove" onclick="removeCatProduct(${i})">✕</button></div>
+      <input placeholder="Product name *" value="${escapeHtml(p.name||'')}" oninput="_catProducts[${i}].name=this.value">
+      <textarea placeholder="Description" rows="2" oninput="_catProducts[${i}].description=this.value">${escapeHtml(p.description||'')}</textarea>
+      <div class="mk-row">
+        <input placeholder="Specs (e.g. 99.9% purity)" value="${escapeHtml(p.specs||'')}" oninput="_catProducts[${i}].specs=this.value">
+        <input placeholder="Origin" value="${escapeHtml(p.origin||'')}" oninput="_catProducts[${i}].origin=this.value">
+        <input placeholder="Terms (e.g. FOB)" value="${escapeHtml(p.terms||'')}" oninput="_catProducts[${i}].terms=this.value">
+      </div>
+    </div>`).join('') || '<p class="empty" style="padding:8px 0">No products yet — click "＋ Add product".</p>';
+}
+function addCatProduct(){ _catProducts.push({name:'',description:'',specs:'',origin:'',terms:''}); renderCatProducts(); }
+function removeCatProduct(i){ _catProducts.splice(i,1); renderCatProducts(); }
+
+async function saveCatalog(btn){
+  btn.disabled = true; btn.textContent = '💾 Saving…';
+  const body = {
+    company: document.getElementById('catCompany').value.trim(),
+    tagline: document.getElementById('catTagline').value.trim(),
+    email: document.getElementById('catEmail').value.trim(),
+    phone: document.getElementById('catPhone').value.trim(),
+    whatsapp: document.getElementById('catWhatsapp').value.trim(),
+    products: _catProducts.filter(p=>p.name && p.name.trim())
+  };
+  await fetch('/api/catalog',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  btn.disabled = false; btn.textContent = '✓ Saved';
+  setTimeout(()=>{ btn.textContent='💾 Save Catalog'; }, 1500);
+}
+
+async function markQuotesRead(btn){
+  await fetch('/api/catalog/quotes/read',{method:'POST'});
+  refreshQuoteBadge();
+  btn.textContent = '✓';
+}
+
+refreshQuoteBadge();
+setInterval(refreshQuoteBadge, 5 * 60 * 1000);
+
 // Load the shared shortlist state on startup
 loadSavedLinks();
