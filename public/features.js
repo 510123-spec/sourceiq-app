@@ -1299,5 +1299,44 @@ function exportCampaignExcel(){
   XLSX.writeFile(wb, 'sourceiq_campaign_' + new Date().toISOString().slice(0,10) + '.xlsx');
 }
 
+// ═══════════════ Live commodity prices ═══════════════
+async function refreshCommodities(){
+  const bar = document.getElementById('commodityBar');
+  if(!bar) return;
+  try{
+    const data = await (await fetch('/api/commodity-prices')).json();
+    const arrow = p => p > 0.01 ? '▲' : p < -0.01 ? '▼' : '▬';
+    const cls = p => p > 0.01 ? 'cm-up' : p < -0.01 ? 'cm-down' : 'cm-flat';
+    const live = (data.live || []).map(m => `
+      <span class="cm-item" title="${escapeHtml(m.name)}: ${m.price} ${escapeHtml(m.unit)}${m.pricePerMT ? ' ≈ $' + m.pricePerMT.toLocaleString() + '/MT' : ''} (live)">
+        <span class="cm-name">${escapeHtml(m.name)}</span>
+        <span class="cm-price">${m.price.toLocaleString(undefined,{maximumFractionDigits:2})}<small> ${escapeHtml(m.unit.replace('USD',''))}</small></span>
+        <span class="cm-chg ${cls(m.changePct)}">${arrow(m.changePct)} ${Math.abs(m.changePct).toFixed(1)}%</span>
+      </span>`).join('');
+    const manual = (data.manual || []).map(m => `
+      <span class="cm-item cm-manual" title="${escapeHtml(m.name)} — reference price you maintain. Click to update.${m.updatedAt ? ' Updated ' + new Date(m.updatedAt).toLocaleDateString() : ''}" onclick="editManualPrice('${m.key}','${escapeHtml(m.name)}','${escapeHtml(m.unit)}')">
+        <span class="cm-name">${escapeHtml(m.name)}</span>
+        <span class="cm-price">${m.price != null ? m.price.toLocaleString() + '<small> ' + escapeHtml(m.unit.replace('USD/','/')) + '</small>' : '<em>set price</em>'}</span>
+        <span class="cm-pencil">✎</span>
+      </span>`).join('');
+    bar.innerHTML = `<span class="cm-label">💹 Market</span>${live}${manual}
+      <span class="cm-updated">${data.live && data.live.length ? 'live · ' + new Date(data.updatedAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}) : 'prices unavailable'}</span>`;
+    bar.style.display = 'flex';
+  }catch(e){ bar.style.display = 'none'; }
+}
+
+async function editManualPrice(key, name, unit){
+  const val = prompt(`Reference price for ${name} (${unit}) — enter the current market figure from your broker:`, '');
+  if(val === null) return;
+  await fetch('/api/commodity-manual', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ key, price: val.replace(/[^\d.]/g,''), unit })
+  });
+  refreshCommodities();
+}
+
+refreshCommodities();
+setInterval(refreshCommodities, 15 * 60 * 1000);
+
 // Load the shared shortlist state on startup
 loadSavedLinks();

@@ -2615,3 +2615,29 @@ h1{ color:var(--biz-text) !important; }
 .camp-list{ max-height:180px; overflow-y:auto; border:1px solid var(--biz-border); border-radius:9px; padding:6px 10px; }
 .camp-item{ display:flex !important; flex-direction:row !important; align-items:center; gap:8px !important; padding:5px 0; font-size:13px !important; font-weight:500 !important; color:#374151 !important; text-transform:none !important; letter-spacing:0 !important; border-bottom:1px solid #f3f4f6; }
 .camp-meta{ color:#9ca3af; font-size:11.5px; }
+
+/* ============ Live commodity price bar ============ */
+.commodity-bar{
+  display:none; align-items:center; gap:8px; flex-wrap:wrap;
+  max-width:1300px; margin:0 auto 4px; padding:8px 40px;
+  font-size:12.5px;
+}
+.cm-label{ font-weight:700; color:var(--biz-text); margin-right:2px; }
+.cm-item{
+  display:inline-flex; align-items:center; gap:6px;
+  background:#fff; border:1px solid var(--biz-border); border-radius:8px;
+  padding:4px 10px;
+}
+.cm-item.cm-manual{ cursor:pointer; border-style:dashed; }
+.cm-item.cm-manual:hover{ background:#f9fafb; border-color:var(--biz-blue); }
+.cm-name{ font-weight:700; color:#374151; }
+.cm-price{ color:#111827; font-weight:600; }
+.cm-price small{ color:#9ca3af; font-weight:500; }
+.cm-price em{ color:#9ca3af; font-style:normal; font-weight:500; }
+.cm-chg{ font-size:11px; font-weight:700; }
+.cm-chg.cm-up{ color:#047857; }
+.cm-chg.cm-down{ color:#b91c1c; }
+.cm-chg.cm-flat{ color:#9ca3af; }
+.cm-pencil{ color:#9ca3af; font-size:11px; }
+.cm-updated{ color:#9ca3af; font-size:11px; margin-left:auto; }
+@media(max-width:480px){ .commodity-bar{ padding:8px 14px; } .cm-updated{ margin-left:0; } }

@@ -3045,6 +3045,69 @@ setInterval(() => {
   if (report.date !== today && now.getHours() >= 7) runLeadMonitor('schedule');
 }, 30 * 60 * 1000);
 
+// ── Live commodity prices ─────────────────────────────────────────────────────
+// Copper/gold/silver come live from Yahoo Finance (free, no key), cached 15 min.
+// Tin and antimony have no reliable free feed (minor/opaque markets), so they are
+// maintained manually by the trader (stored, editable) with a clear "reference" note.
+const COMMODITY_MANUAL_FILE = path.join(__dirname, 'data', 'commodity-manual.json');
+const LB_PER_MT = 2204.62;
+let commodityCache = { time: 0, data: null };
+
+const LIVE_METALS = [
+  { key: 'copper', name: 'Copper', symbol: 'HG=F', unit: 'USD/lb', toMT: p => p * LB_PER_MT },
+  { key: 'gold',   name: 'Gold',   symbol: 'GC=F', unit: 'USD/oz' },
+  { key: 'silver', name: 'Silver', symbol: 'SI=F', unit: 'USD/oz' }
+];
+
+async function fetchLiveMetal(m) {
+  try {
+    const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${m.symbol}`,
+      { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) });
+    const meta = (await r.json())?.chart?.result?.[0]?.meta;
+    if (!meta || meta.regularMarketPrice == null) return null;
+    const price = meta.regularMarketPrice;
+    const prev = meta.chartPreviousClose ?? meta.previousClose ?? price;
+    const changePct = prev ? ((price - prev) / prev) * 100 : 0;
+    return {
+      key: m.key, name: m.name, price, unit: m.unit,
+      pricePerMT: m.toMT ? Math.round(m.toMT(price)) : null,
+      changePct: +changePct.toFixed(2), source: 'live', currency: meta.currency || 'USD'
+    };
+  } catch (_) { return null; }
+}
+
+app.get('/api/commodity-prices', async (req, res) => {
+  const now = Date.now();
+  if (commodityCache.data && now - commodityCache.time < 15 * 60 * 1000) {
+    return res.json({ ...commodityCache.data, cached: true, manual: loadJson(COMMODITY_MANUAL_FILE, defaultManual()) });
+  }
+  const live = (await Promise.all(LIVE_METALS.map(fetchLiveMetal))).filter(Boolean);
+  const payload = { live, updatedAt: new Date().toISOString() };
+  if (live.length) commodityCache = { time: now, data: payload };
+  res.json({ ...payload, manual: loadJson(COMMODITY_MANUAL_FILE, defaultManual()) });
+});
+
+function defaultManual() {
+  return [
+    { key: 'tin', name: 'Tin', price: null, unit: 'USD/MT', updatedAt: null },
+    { key: 'antimony', name: 'Antimony', price: null, unit: 'USD/MT', updatedAt: null }
+  ];
+}
+
+app.post('/api/commodity-manual', (req, res) => {
+  const { key, price, unit } = req.body || {};
+  if (!key) return res.status(400).json({ error: 'key is required' });
+  const list = loadJson(COMMODITY_MANUAL_FILE, defaultManual());
+  const item = list.find(m => m.key === key);
+  if (!item) return res.status(404).json({ error: 'unknown metal' });
+  const n = parseFloat(price);
+  item.price = isNaN(n) ? null : Math.max(0, n);
+  if (unit) item.unit = String(unit).slice(0, 20);
+  item.updatedAt = new Date().toISOString();
+  writeJson(COMMODITY_MANUAL_FILE, list);
+  res.json({ manual: list });
+});
+
 // ── Marketing Kit generator ───────────────────────────────────────────────────
 // One product in -> a complete B2B marketing kit out: portal listing, LinkedIn
 // post, outreach email, HS code and buyer-search keywords. Grounded on the
@@ -3238,6 +3301,18 @@ const COPILOT_TOOLS = {
           query: i.watch.query, mode: i.watch.mode, error: i.error,
           newLeads: (i.newResults || []).map(x => ({ title: x.title, link: x.link, domain: x.displayLink, isRFQ: x.isRFQ }))
         }))
+      };
+    }
+  },
+  get_commodity_prices: {
+    decl: { name: 'get_commodity_prices', description: 'Get current market prices for copper, gold, silver (live) and tin, antimony (reference). Use for pricing advice, margin checks, and buy/sell timing.',
+      parameters: { type: 'OBJECT', properties: {} } },
+    run: async () => {
+      const live = (await Promise.all(LIVE_METALS.map(fetchLiveMetal))).filter(Boolean);
+      return {
+        live: live.map(m => ({ metal: m.name, price: m.price, unit: m.unit, pricePerMT: m.pricePerMT, changePct: m.changePct })),
+        reference: loadJson(COMMODITY_MANUAL_FILE, defaultManual()).filter(m => m.price != null)
+          .map(m => ({ metal: m.name, price: m.price, unit: m.unit, note: 'manually maintained' }))
       };
     }
   }
