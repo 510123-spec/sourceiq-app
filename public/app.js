@@ -958,6 +958,13 @@ function toggleSnippet(id) {
 function renderDetailsHtml(d, website){
   const rows = [];
 
+  // Company Brain: flag if we've dealt with this company before
+  if(d.memory && d.memory.known){
+    const when = d.memory.lastSeen ? new Date(d.memory.lastSeen).toLocaleDateString() : '';
+    const tr = d.memory.trustRating ? ' · trust: ' + escapeHtml(d.memory.trustRating) : '';
+    rows.push(['📓 Seen before', `<span style="color:#b45309;font-weight:600">You've looked at this company ${d.memory.interactionCount}× (last ${escapeHtml(when)})${tr}</span>`]);
+  }
+
   // Description from Wikipedia / DuckDuckGo
   if(d.description){
     const srcLinks = [];

@@ -1024,11 +1024,24 @@ app.get('/api/enrich', async (req, res) => {
       fundingStage: extData.fundingStage,
       founders
     };
+    // Company Brain: was this company known BEFORE this visit? (capture first)
+    const prior = cacheHost ? lookupCompanyBrain(cacheHost) : null;
+    if (prior && (prior.interactions || []).length) {
+      responseData.memory = {
+        known: true, lastSeen: prior.lastSeen, firstSeen: prior.firstSeen,
+        trustRating: prior.trustRating || null, interactionCount: (prior.interactions || []).length
+      };
+    }
     // Only cache real, usable results — a blocked/empty scrape shouldn't poison the
     // cache for 12h in case a retry later would succeed.
     if (cacheHost && hasAny) {
       if (enrichCache.size >= 500) enrichCache.delete(enrichCache.keys().next().value); // evict oldest
       enrichCache.set(cacheHost, { data: responseData, time: Date.now() });
+      // ...then record this visit for next time
+      recordCompanyBrain(cacheHost, {
+        name: nameHint || combinedInfo.title, phone: combinedInfo.phone, email: combinedInfo.email,
+        address: combinedInfo.address, country: combinedInfo.country, event: 'enriched'
+      });
     }
     res.json(responseData);
   } catch (err) {
@@ -1349,6 +1362,12 @@ app.get('/api/trust-check', async (req, res) => {
   if      (score >= 75) { rating = 'Appears Trustworthy';        ratingClass = 'trust-good';   }
   else if (score >= 45) { rating = 'Exercise Caution';           ratingClass = 'trust-warn';   }
   else                  { rating = 'High Risk — Verify Carefully'; ratingClass = 'trust-danger'; }
+
+  // Company Brain: remember the trust verdict for this company
+  try {
+    const th = brainHost(new URL(url).host);
+    if (th) recordCompanyBrain(th, { name, trustRating: rating, trustScore: score, event: 'trust-checked' });
+  } catch (_) {}
 
   res.json({ score, rating, ratingClass, findings, searchLinks, reviewLinks, peopleResults, demoMode: false });
 });
@@ -2930,6 +2949,50 @@ app.delete('/api/saved', (req, res) => {
   res.json({ saved: loadSaved() });
 });
 
+// ── Company Brain ─────────────────────────────────────────────────────────────
+// A permanent local record of every company the app has ever enriched or trust-
+// checked. Turns one-off lookups into institutional memory: next time you search
+// a company you've dealt with, the app reminds you what it already knows.
+const BRAIN_FILE = path.join(__dirname, 'data', 'company-brain.json');
+const brainHost = h => String(h || '').toLowerCase().replace(/^www\./, '');
+
+function recordCompanyBrain(host, info) {
+  host = brainHost(host);
+  if (!host) return;
+  const brain = loadJson(BRAIN_FILE, {});
+  const rec = brain[host] || { host, firstSeen: new Date().toISOString(), interactions: [] };
+  // Merge in any newly-learned facts (never overwrite a known value with null)
+  for (const k of ['name', 'phone', 'email', 'address', 'country', 'trustRating', 'trustScore']) {
+    if (info[k] != null && info[k] !== '') rec[k] = info[k];
+  }
+  rec.lastSeen = new Date().toISOString();
+  rec.interactions = (rec.interactions || []).concat([{ at: rec.lastSeen, event: info.event || 'seen' }]).slice(-20);
+  brain[host] = rec;
+  // Cap the brain so it can't grow unbounded (keep the 2000 most-recently-seen)
+  const keys = Object.keys(brain);
+  if (keys.length > 2000) {
+    keys.sort((a, b) => new Date(brain[a].lastSeen) - new Date(brain[b].lastSeen));
+    keys.slice(0, keys.length - 2000).forEach(k => delete brain[k]);
+  }
+  writeJson(BRAIN_FILE, brain);
+}
+
+function lookupCompanyBrain(host) {
+  return loadJson(BRAIN_FILE, {})[brainHost(host)] || null;
+}
+
+app.get('/api/company-brain', (req, res) => {
+  const host = (req.query.host || '').trim();
+  if (host) return res.json({ record: lookupCompanyBrain(host) });
+  // No host: return a compact list (for a "companies we know" overview)
+  const brain = loadJson(BRAIN_FILE, {});
+  const list = Object.values(brain)
+    .sort((a, b) => new Date(b.lastSeen) - new Date(a.lastSeen))
+    .slice(0, 200)
+    .map(r => ({ host: r.host, name: r.name, country: r.country, trustRating: r.trustRating, lastSeen: r.lastSeen, interactions: (r.interactions || []).length }));
+  res.json({ count: Object.keys(brain).length, companies: list });
+});
+
 // ── Morning lead monitor ──────────────────────────────────────────────────────
 // Watched searches run automatically once per day; the dashboard shows only the
 // NEW results since the last run. Turns the app from search-on-demand into a
@@ -3314,6 +3377,17 @@ const COPILOT_TOOLS = {
         reference: loadJson(COMMODITY_MANUAL_FILE, defaultManual()).filter(m => m.price != null)
           .map(m => ({ metal: m.name, price: m.price, unit: m.unit, note: 'manually maintained' }))
       };
+    }
+  },
+  recall_company: {
+    decl: { name: 'recall_company', description: 'Check the Company Brain: has the app dealt with this company before? Returns remembered contacts, trust verdict, and past interactions. Pass the website domain (e.g. "acme.com").',
+      parameters: { type: 'OBJECT', properties: { host: { type: 'STRING' } }, required: ['host'] } },
+    run: async (a) => {
+      const rec = lookupCompanyBrain(a.host);
+      if (!rec) return { known: false };
+      return { known: true, name: rec.name, country: rec.country, phone: rec.phone, email: rec.email,
+        trust: rec.trustRating ? `${rec.trustRating} ${rec.trustScore ?? ''}` : undefined,
+        firstSeen: rec.firstSeen, lastSeen: rec.lastSeen, interactionCount: (rec.interactions || []).length };
     }
   }
 };
