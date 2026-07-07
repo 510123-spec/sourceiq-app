@@ -2658,3 +2658,11 @@ h1{ color:var(--biz-text) !important; }
 
 /* ============ Company Brain badge ============ */
 .brain-badge{ background:#f5f3ff !important; color:#6d28d9 !important; border:1px solid #ddd6fe !important; font-weight:700; cursor:help; }
+
+/* ============ Erez Impex Pte Ltd branding: real logo in the topbar ============ */
+.topbar-logo{
+  width:40px !important; height:40px !important; border-radius:8px !important;
+  background:#fff !important; box-shadow:0 0 0 1px var(--biz-border, #e5e7eb) !important;
+  padding:3px;
+}
+.topbar-logo img{ display:block; }

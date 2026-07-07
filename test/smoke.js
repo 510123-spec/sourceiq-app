@@ -45,7 +45,7 @@ const assertOkOrQuota = (res, shapeCheck) => {
     const r = await fetch(BASE + '/');
     assert(r.status === 200, `HTTP ${r.status}`);
     const html = await r.text();
-    assert(html.includes('SourceIQ'), 'missing SourceIQ in html');
+    assert(html.includes('Erez Impex'), 'missing brand name in html');
     assert(html.includes('app.js') && html.includes('features.js') && html.includes('styles.css'), 'missing asset references');
   });
   for (const asset of ['/styles.css', '/app.js', '/features.js']) {
