@@ -108,6 +108,7 @@ async function runSearch(){
                 : searchMode === 'person'  ? document.getElementById('personCountry').value.trim() : '';
   const company = searchMode === 'company' ? document.getElementById('companyQuery').value.trim() : '';
   const website = searchMode === 'company' ? document.getElementById('companyWebsite').value.trim() : '';
+  const regno   = searchMode === 'company' ? document.getElementById('companyRegno').value.trim() : '';
   const person  = searchMode === 'person'  ? document.getElementById('personQuery').value.trim() : '';
   const gender  = searchMode === 'person'  ? document.getElementById('personGender').value.trim() : '';
 
@@ -116,7 +117,7 @@ async function runSearch(){
     toolbar.style.display = 'none';
     return;
   }
-  if(searchMode === 'company' && !company){
+  if(searchMode === 'company' && !company && !regno){
     wrap.innerHTML = '<p class="empty">Type a company name, then click Search.</p>';
     toolbar.style.display = 'none';
     return;
@@ -140,6 +141,7 @@ async function runSearch(){
     if(country) params.set('country', country);
     if(company) params.set('company', company);
     if(website) params.set('website', website);
+    if(regno) params.set('regno', regno);
     if(person) params.set('person', person);
     if(gender) params.set('gender', gender);
     const res = await fetch('/api/search?' + params.toString());
@@ -160,13 +162,13 @@ async function runSearch(){
     setActiveFilterButton('all');
     document.getElementById('sortBy').value = 'relevance';
 
-    const label = person ? `👤:${person}` : company ? `🏢:${company}` : (q && country ? `${q} — ${country}` : (q || country));
+    const label = person ? `👤:${person}` : company ? `🏢:${company}` : regno ? `🏢:${regno}` : (q && country ? `${q} — ${country}` : (q || country));
     addRecent(label);
     render();
     showCountryNote(data.countryNote);
     // AI analysis runs after render so it can highlight cards
     if (lastResults.length) {
-      const aiQuery = person || company || (q && country ? `${q} ${country}` : q || country);
+      const aiQuery = person || company || regno || (q && country ? `${q} ${country}` : q || country);
       runAIAnalysis(aiQuery, lastResults, searchMode);
       // Person mode also gets a synthesized profile panel above the raw results
       if (person) runPersonProfile(person, lastResults);

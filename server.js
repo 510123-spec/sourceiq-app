@@ -2084,12 +2084,13 @@ app.get('/api/search', async (req, res) => {
   const person  = (req.query.person  || '').trim();
   const gender  = (req.query.gender  || '').trim().toLowerCase(); // 'male', 'female', or ''
   const website = (req.query.website || '').trim(); // optional known company website
+  const regno   = (req.query.regno   || '').trim(); // optional registration number / UEN
 
-  if (!subject && !country && !company && !person) {
+  if (!subject && !country && !company && !person && !regno) {
     return res.status(400).json({ error: 'Please provide a product subject, a country, a company name, or a person name to search.' });
   }
 
-  const searchKey = JSON.stringify([subject, country, company, person, gender, website]).toLowerCase();
+  const searchKey = JSON.stringify([subject, country, company, person, gender, website, regno]).toLowerCase();
   const cachedSearch = searchCache.get(searchKey);
   if (cachedSearch && (Date.now() - cachedSearch.time) < SEARCH_CACHE_TTL_MS) {
     return res.json({ ...cachedSearch.data, cached: true });
@@ -2177,7 +2178,7 @@ app.get('/api/search', async (req, res) => {
     } catch(err) {
       return res.status(500).json({ error: 'Person search failed: ' + err.message });
     }
-  } else if (company) {
+  } else if (company || regno) {
     const countryClause = country ? ` "${country}"` : '';
     const brand = stripLegalSuffix(company) || company; // "Erez Pte Ltd" → "Erez"
 
@@ -2209,11 +2210,29 @@ app.get('/api/search', async (req, res) => {
     const cq6 = `${brand} company${countryClause}`;
     const cq7 = `${brand}${countryClause}`;
     try {
-      const [cr1, cr2, cr3, cr4, cr5, cr6, cr7] = await braveMulti([
+      // Registration-number queries run FIRST: registries (ACRA resellers,
+      // OpenCorporates…) index the exact number, so these hits are authoritative
+      // and also feed the registry strip. Works with or without a company name.
+      const regQueries = regno ? [
+        { q: `"${regno}"`, country },
+        { q: `"${regno}" (company OR registration OR UEN OR incorporated)${countryClause}`, country }
+      ] : [];
+      const nameQueries = company ? [
         { q: cq1, country }, { q: cq2, country }, { q: cq3, country },
         { q: cq4, country }, { q: cq5, country: wantHost ? null : country },
         { q: cq6, country }, { q: cq7, country: wantHost ? null : country }
-      ]);
+      ] : [
+        // Reg-number-only search: simple trailing queries keep the DuckDuckGo
+        // fallback alive (it can't handle the boolean forms above)
+        { q: `${regno} company profile${countryClause}`, country },
+        { q: `${regno}${countryClause}`, country }
+      ];
+      const resultSets = await braveMulti([...regQueries, ...nameQueries]);
+      const regHits = resultSets.slice(0, regQueries.length).flat().map(r => ({ ...r, _qs: 4 }));
+      const nameSets = resultSets.slice(regQueries.length);
+      const [cr1, cr2, cr3, cr4, cr5, cr6, cr7] = company
+        ? nameSets
+        : [nameSets[0] || [], nameSets[1] || [], [], [], [], [], []];
 
       const companySlug  = company.toLowerCase().replace(/[^a-z0-9]/g, '');
       const companyWords = company.toLowerCase().split(/\s+/).filter(w => w.length > 2);
@@ -2231,6 +2250,7 @@ app.get('/api/search', async (req, res) => {
       const THIRD_PARTY = /(bestbuy|lowes|homedepot|walmart|amazon|ebay|target|costco|repair|review|complaint|glassdoor|indeed|trustpilot|yelp|justdial|yellowpages|mapquest|facebook|tiktok|pinterest|reddit|quora)/i;
 
       const all = [
+        ...regHits,
         ...cr1.map(r=>({...r,_qs:3})), ...cr2.map(r=>({...r,_qs:3})),
         ...cr3.map(r=>({...r,_qs:2})), ...cr4.map(r=>({...r,_qs:2})),
         ...cr5.map(r=>({...r,_qs:1})),
