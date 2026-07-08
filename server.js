@@ -3228,7 +3228,9 @@ const LB_PER_MT = 2204.62;
 let commodityCache = { time: 0, data: null };
 
 const LIVE_METALS = [
-  { key: 'copper', name: 'Copper', symbol: 'HG=F', unit: 'USD/lb', toMT: p => p * LB_PER_MT },
+  // Copper trades per-pound on the exchange (HG=F) but traders quote USD/MT —
+  // convert so the bar shows the ~$13,700/MT figure, not $6.21/lb.
+  { key: 'copper', name: 'Copper', symbol: 'HG=F', unit: 'USD/MT', displayMT: true, toMT: p => p * LB_PER_MT },
   { key: 'gold',   name: 'Gold',   symbol: 'GC=F', unit: 'USD/oz' },
   { key: 'silver', name: 'Silver', symbol: 'SI=F', unit: 'USD/oz' }
 ];
@@ -3239,12 +3241,15 @@ async function fetchLiveMetal(m) {
       { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10000) });
     const meta = (await r.json())?.chart?.result?.[0]?.meta;
     if (!meta || meta.regularMarketPrice == null) return null;
-    const price = meta.regularMarketPrice;
-    const prev = meta.chartPreviousClose ?? meta.previousClose ?? price;
-    const changePct = prev ? ((price - prev) / prev) * 100 : 0;
+    const rawPrice = meta.regularMarketPrice;
+    const prev = meta.chartPreviousClose ?? meta.previousClose ?? rawPrice;
+    const changePct = prev ? ((rawPrice - prev) / prev) * 100 : 0;
+    const pricePerMT = m.toMT ? Math.round(m.toMT(rawPrice)) : null;
+    // For metals traders quote per MT (copper), show the MT figure as the price.
+    const price = m.displayMT && pricePerMT != null ? pricePerMT : rawPrice;
     return {
       key: m.key, name: m.name, price, unit: m.unit,
-      pricePerMT: m.toMT ? Math.round(m.toMT(price)) : null,
+      pricePerMT,
       changePct: +changePct.toFixed(2), source: 'live', currency: meta.currency || 'USD'
     };
   } catch (_) { return null; }
