@@ -1835,17 +1835,33 @@ async function braveMulti(queries) {
       } else {
         console.warn('[braveMulti] Brave returned 0 results — falling back to DuckDuckGo');
       }
+      // Brave/Google both down — squeeze the most out of DuckDuckGo (our free
+      // engine). DDG chokes on boolean/site: operators, so simplify each query
+      // to plain keywords, then run several DISTINCT ones and dedup. This lifts
+      // "degraded mode" from ~2 queries' worth of results to the full breadth.
+      const simplify = (q) => q
+        .replace(/\bsite:[^\s)]+/gi, ' ')          // drop site: filters
+        .replace(/-\S+/g, ' ')                      // drop -exclusions
+        .replace(/\([^)]*\bOR\b[^)]*\)/gi, ' ')     // drop (A OR B) groups
+        .replace(/\bOR\b/gi, ' ')                   // drop stray OR
+        .replace(/"/g, ' ')                          // drop quotes
+        .replace(/\s+/g, ' ').trim();
+      const ddgSeen = new Set();
+      const ddgQueries = [];
+      for (const { q } of queries) {
+        const sq = simplify(q);
+        if (sq && !ddgSeen.has(sq.toLowerCase())) { ddgSeen.add(sq.toLowerCase()); ddgQueries.push(sq); }
+        if (ddgQueries.length >= 6) break;          // cap for speed (~1 req/sec each)
+      }
       const ddgResults = [];
-      // Use the simplest queries (last 2) for DDG — it doesn't handle complex boolean operators well
-      const ddgQueries = queries.slice(-2);
-      for (const { q } of ddgQueries) ddgResults.push(await searchDDG(q, 10));
-      // DDG often returns 0 for quoted multi-clause queries (e.g. `Brand "Country"`)
-      // even when the bare brand name alone works fine. If everything above came up
-      // empty, retry with quotes stripped from the simplest query as a last resort.
+      for (const q of ddgQueries) {
+        ddgResults.push(await searchDDG(q, 12));
+        await new Promise(r => setTimeout(r, 300)); // gentle pacing
+      }
+      // Last resort: bare simplest query if everything came up empty
       if (ddgResults.every(r => r.length === 0)) {
-        const bareQuery = queries[queries.length - 1].q.replace(/"/g, '');
-        const bareResults = await searchDDG(bareQuery, 10);
-        if (bareResults.length) ddgResults.push(bareResults);
+        const bare = simplify(queries[queries.length - 1].q);
+        if (bare) ddgResults.push(await searchDDG(bare, 12));
       }
       // Spread the DDG results across all query slots so dedup/scoring still works
       const merged = ddgResults.flat();
