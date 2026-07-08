@@ -9,6 +9,8 @@ const compression = require('compression');
 const path = require('path');
 const cheerio = require('cheerio');
 const session = require('express-session');
+const multer = require('multer');
+const mammoth = require('mammoth');
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const app = express();
@@ -3285,6 +3287,151 @@ app.post('/api/commodity-manual', (req, res) => {
   item.updatedAt = new Date().toISOString();
   writeJson(COMMODITY_MANUAL_FILE, list);
   res.json({ manual: list });
+});
+
+// ── Quote Comparison ───────────────────────────────────────────────────────────
+// Upload 2-6 supplier quotations (PDF / Word / image) for the same product.
+// Each file is read by Gemini (PDFs and images go in as native multimodal input;
+// Word docs are text-extracted with mammoth first), turning unstructured
+// quotes into comparable structured data, then a second AI pass recommends
+// which to go with — grounded on price, terms, AND trust/history where known.
+
+const quoteUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024, files: 6 }
+});
+
+// Cached FX rates (base USD) so quotes in different currencies compare fairly.
+// Free, no-key endpoint; refreshed once every 6 hours.
+let fxCache = { time: 0, rates: null };
+async function getFxRates() {
+  if (fxCache.rates && Date.now() - fxCache.time < 6 * 60 * 60 * 1000) return fxCache.rates;
+  try {
+    const r = await fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(8000) });
+    const j = await r.json();
+    if (j.rates) { fxCache = { time: Date.now(), rates: j.rates }; return j.rates; }
+  } catch (_) { /* fall through to stale/absent cache */ }
+  return fxCache.rates || null;
+}
+function toUSD(amount, currency, rates) {
+  if (amount == null || !currency) return null;
+  const cur = currency.toUpperCase();
+  if (cur === 'USD') return amount;
+  if (!rates || !rates[cur]) return null; // unknown currency code — leave unconverted
+  return +(amount / rates[cur]).toFixed(2);
+}
+
+// Extract raw text/inline-data payload for one uploaded file, ready for Gemini.
+async function fileToGeminiParts(file) {
+  const mime = file.mimetype || '';
+  if (mime === 'application/pdf' || mime.startsWith('image/')) {
+    return [{ inline_data: { mime_type: mime, data: file.buffer.toString('base64') } }];
+  }
+  if (mime.includes('wordprocessingml') || file.originalname.toLowerCase().endsWith('.docx')) {
+    const { value: text } = await mammoth.extractRawText({ buffer: file.buffer });
+    return [{ text: text.slice(0, 8000) }];
+  }
+  if (mime === 'text/plain' || file.originalname.toLowerCase().endsWith('.txt')) {
+    return [{ text: file.buffer.toString('utf8').slice(0, 8000) }];
+  }
+  // Old binary .doc — no reliable free text extractor; ask Gemini to try as a
+  // best-effort image-less fallback isn't possible, so flag it clearly instead
+  // of silently producing a wrong/empty result.
+  throw new Error('Unsupported file type for "' + file.originalname + '" — please use PDF, .docx, .txt, or an image (JPG/PNG) of the quote.');
+}
+
+async function extractQuoteFromFile(file, product) {
+  const parts = await fileToGeminiParts(file);
+  const prompt = `Extract the supplier quotation details from this document/image for the product: "${product || 'unspecified'}".
+
+Return ONLY valid JSON with these fields (use null for anything not stated — never guess or invent):
+{
+  "supplierName": "company name as it appears, or null",
+  "price": number or null,
+  "currency": "3-letter code (USD, EUR, CNY, SGD...) or null",
+  "unit": "e.g. per MT, per unit, per kg, or null",
+  "quantity": "quoted quantity/MOQ as written, or null",
+  "incoterm": "FOB / CIF / EXW / DAP / etc, or null",
+  "paymentTerms": "e.g. 30% deposit, LC at sight, or null",
+  "leadTime": "e.g. 2-3 weeks, or null",
+  "validUntil": "quote validity date if stated, or null",
+  "warranty": "warranty/certification terms if stated, or null",
+  "specs": "key product specifications mentioned, or null",
+  "notes": "anything else relevant in one short sentence, or null"
+}`;
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+    {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, ...parts] }],
+        generationConfig: { temperature: 0.1, maxOutputTokens: 1200, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } }
+      }),
+      signal: AbortSignal.timeout(60000)
+    }
+  );
+  const data = await res.json();
+  if (data.error) {
+    recordSvc('gemini', /quota|exceeded/i.test(data.error.message) ? 'quota' : 'error', data.error.message);
+    throw new Error(data.error.message);
+  }
+  recordSvc('gemini', 'ok');
+  const raw = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!raw) throw new Error('Gemini returned no extraction for "' + file.originalname + '"');
+  return JSON.parse(raw);
+}
+
+app.post('/api/quotes/compare', quoteUpload.array('files', 6), async (req, res) => {
+  const product = (req.body?.product || '').trim();
+  const files = req.files || [];
+  if (files.length < 2) return res.status(400).json({ error: 'Upload at least 2 quotations to compare.' });
+  if (!GEMINI_KEY) return res.status(503).json({ error: 'Quote comparison requires a Gemini API key' });
+
+  const rates = await getFxRates();
+  const quotes = [];
+  for (const file of files) {
+    try {
+      const extracted = await extractQuoteFromFile(file, product);
+      const priceUSD = toUSD(extracted.price, extracted.currency, rates);
+      // Company Brain: best-effort match on supplier name, so a known/trusted
+      // (or known-risky) supplier factors into the recommendation, not just price.
+      let known = null;
+      if (extracted.supplierName) {
+        const brain = loadJson(BRAIN_FILE, {});
+        const slug = extracted.supplierName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const hit = Object.values(brain).find(r => slug.includes((r.name || '').toLowerCase().replace(/[^a-z0-9]/g, '')) && r.name);
+        if (hit) known = { trustRating: hit.trustRating, trustScore: hit.trustScore, lastSeen: (hit.lastSeen || '').slice(0, 10) };
+      }
+      quotes.push({ fileName: file.originalname, ...extracted, priceUSD, known });
+    } catch (err) {
+      quotes.push({ fileName: file.originalname, error: String(err.message).slice(0, 200) });
+    }
+  }
+
+  const usable = quotes.filter(q => !q.error);
+  let recommendation = null;
+  if (usable.length >= 2) {
+    try {
+      const evidence = usable.map((q, i) => `[${i + 1}] ${q.supplierName || 'Unknown supplier'} (${q.fileName}): price=${q.price ?? '?'} ${q.currency ?? ''}${q.priceUSD ? ' (~$' + q.priceUSD + ' USD)' : ''}, unit=${q.unit ?? '?'}, qty=${q.quantity ?? '?'}, incoterm=${q.incoterm ?? '?'}, payment=${q.paymentTerms ?? '?'}, leadTime=${q.leadTime ?? '?'}, validUntil=${q.validUntil ?? '?'}, warranty=${q.warranty ?? '?'}, specs=${q.specs ?? '?'}${q.known ? ', KNOWN SUPPLIER trust=' + q.known.trustRating + ' ' + (q.known.trustScore ?? '') + ' lastDealt=' + q.known.lastSeen : ''}`).join('\n');
+      recommendation = await callAI(`You are a procurement advisor comparing ${usable.length} supplier quotations for: "${product || 'this product'}".
+
+QUOTES:
+${evidence}
+
+Rules:
+- Use ONLY the data given. Never invent prices, terms, or supplier facts.
+- Do not just pick the lowest price — weigh total landed cost (incoterm matters: a CIF quote already includes freight a FOB quote doesn't), payment risk, lead time, warranty/certification, and KNOWN SUPPLIER trust/history if present.
+- Flag any red flags: unrealistically low price, vague/missing terms, no validity date, unknown incoterm.
+- winner: the array index (1-based, matching the [n] above) of your recommended quote, or null if truly too close/insufficient data.
+
+Return ONLY valid JSON:
+{"winner": n or null, "reasoning": "2-4 sentences explaining the recommendation", "redFlags": ["..."], "priceRange": "e.g. $1,180-$1,340 per MT USD-equivalent"}`);
+    } catch (err) {
+      recommendation = { error: 'AI recommendation failed: ' + err.message };
+    }
+  }
+
+  res.json({ product, count: quotes.length, quotes, recommendation });
 });
 
 // ── Marketing Kit generator ───────────────────────────────────────────────────

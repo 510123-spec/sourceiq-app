@@ -170,6 +170,19 @@ const assertOkOrQuota = (res, shapeCheck) => {
     assertOkOrQuota(r, b => assert(typeof b.reply === 'string' && b.reply.length > 0, 'no reply'));
   });
 
+  await check('POST /api/quotes/compare', async () => {
+    const fd = new FormData();
+    fd.append('product', 'Copper Cathode Grade A');
+    fd.append('files', new Blob(['Supplier: Test Supplier A\nPrice: USD 9000 per MT\nIncoterm: FOB'], { type: 'text/plain' }), 'q1.txt');
+    fd.append('files', new Blob(['Supplier: Test Supplier B\nPrice: USD 9400 per MT\nIncoterm: CIF'], { type: 'text/plain' }), 'q2.txt');
+    const r = await fetch(BASE + '/api/quotes/compare', { method: 'POST', body: fd, signal: AbortSignal.timeout(90000) });
+    const body = await r.json().catch(() => null);
+    assertOkOrQuota({ status: r.status, body }, b => {
+      assert(Array.isArray(b.quotes) && b.quotes.length === 2, 'quotes array wrong length');
+      assert(b.quotes.every(q => q.supplierName || q.error), 'quote missing extraction and error');
+    });
+  });
+
   await check('POST /api/identify-image', async () => {
     // 1x1 red pixel PNG — enough to prove the endpoint parses and forwards the image
     const px = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';

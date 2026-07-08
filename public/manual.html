@@ -43,13 +43,14 @@
     <ol>
       <li><a href="#routine">The daily routine (start here)</a></li>
       <li><a href="#topbar">The top bar</a></li>
-      <li><a href="#modes">The 9 search tabs</a></li>
+      <li><a href="#modes">The 10 search tabs</a></li>
       <li><a href="#cards">Working with results</a></li>
       <li><a href="#shortlist">The Saved shortlist — your pipeline</a></li>
       <li><a href="#leads">The Lead Monitor</a></li>
       <li><a href="#copilot">The 🧠 Copilot</a></li>
       <li><a href="#prices">Live market prices</a></li>
       <li><a href="#marketing">Marketing tools</a></li>
+      <li><a href="#quotes">Comparing supplier quotations</a></li>
       <li><a href="#catalog">Your product catalog</a></li>
       <li><a href="#exports">Exports &amp; reports</a></li>
       <li><a href="#trouble">Troubleshooting</a></li>
@@ -80,7 +81,7 @@
   </table>
   <p>Below the top bar runs the <strong>live commodity price bar</strong> — see section 8.</p>
 
-  <h2 id="modes">3. The 9 search tabs</h2>
+  <h2 id="modes">3. The 10 search tabs</h2>
   <table>
     <tr><th>Tab</th><th>Use it to…</th><th>Example</th></tr>
     <tr><td><strong>Product</strong></td><td>Find suppliers/manufacturers of a product, optionally by country. Results are classified Manufacturer vs Distributor with a confidence %.</td><td>"copper cathode" + Chile</td></tr>
@@ -92,6 +93,7 @@
     <tr><td><strong>Prices</strong></td><td>Consumer price comparison for an exact model, by region. Table sorted cheapest-first, ⭐ Best Value marked, AI buying verdict on top, price-history links.</td><td>"MacBook Air M4 13"</td></tr>
     <tr><td><strong>Trade</strong></td><td>Import/export data by product or HS code. "✨ Find" suggests the HS code for you. Quick links into real customs databases (ImportYeti etc.).</td><td>HS 7403.11</td></tr>
     <tr><td><strong>Market</strong></td><td>Industry overview: AI market brief (size, growth, key players, trends) above the sources.</td><td>"copper" + Chile</td></tr>
+    <tr><td><strong>Quotes</strong></td><td>Upload 2–6 supplier quotations (PDF, Word, or photos) for the same product — AI reads each one, builds a side-by-side comparison, and recommends who to go with. See section 10.</td><td>3 copper cathode offers as PDF</td></tr>
   </table>
 
   <h2 id="cards">4. Working with results</h2>
@@ -153,7 +155,20 @@
   <h3>📣 Outreach Campaign (inside ⭐ Saved)</h3>
   <p>Pick up to 15 shortlisted companies and the product you're offering. The AI writes <em>one personalized email per company</em> (it uses their type, country, and your notes). Review each, open in your email app, or export the whole batch to Excel for mail-merge. <strong>You</strong> press send — the system never emails anyone by itself.</p>
 
-  <h2 id="catalog">10. Your product catalog</h2>
+  <h2 id="quotes">10. Comparing supplier quotations</h2>
+  <p>Open the <strong>Quotes</strong> tab when you've received offers from several suppliers for the same product and need to decide who to go with:</p>
+  <ol>
+    <li>Optionally type the product name (helps the AI read the files more accurately).</li>
+    <li>Upload <strong>2–6 quotations</strong> — PDF, Word (.docx), plain text, or a photo/scan (JPG, PNG) of each one. Mixed formats are fine.</li>
+    <li>Click <strong>Compare Quotations</strong>. The AI reads every file and extracts: supplier name, price, currency, unit, quantity/MOQ, Incoterm (FOB/CIF/etc.), payment terms, lead time, validity date, warranty/certifications, and specs.</li>
+    <li>Review the <strong>side-by-side table</strong> — the recommended quote is highlighted in green with a ⭐ badge.</li>
+    <li>Read the <strong>Recommendation</strong> panel: it doesn't just pick the lowest price — it weighs Incoterm (a CIF price already includes freight a FOB price doesn't), payment risk, lead time, and any 🧠 Known-supplier trust history. Red flags (vague terms, no validity date, unrealistic pricing) are called out separately.</li>
+    <li><strong>⭐ Save</strong> any supplier straight to your shortlist (their price and terms are added as notes automatically), or <strong>📄 Export</strong> the whole comparison to Word to justify the decision internally.</li>
+  </ol>
+  <div class="tip">💡 Prices in different currencies are automatically converted to USD for a fair comparison. Old binary <code>.doc</code> files aren't supported — re-save as .docx or PDF, or just photograph the quote instead.</div>
+  <div class="warn">⚠️ The AI only extracts what's actually written in each file — it never invents a price, term, or certification. Always verify the final terms directly with the supplier before placing an order.</div>
+
+  <h2 id="catalog">11. Your product catalog</h2>
   <p>A professional product page you can share with any customer:</p>
   <ol>
     <li>Click <strong>🗂 Catalog</strong> → add your products (name, description, specs, terms).</li>
@@ -162,7 +177,7 @@
   </ol>
   <div class="tip">💡 The Company Brain also works for you here: search results show a <strong>🧠 Known</strong> badge on any company the system has dealt with before — hover it to see your history with them. You can also ask the Copilot: <em>"Have we dealt with codelco.com before?"</em></div>
 
-  <h2 id="exports">11. Exports &amp; reports</h2>
+  <h2 id="exports">12. Exports &amp; reports</h2>
   <table>
     <tr><th>Export</th><th>Where</th><th>Contains</th></tr>
     <tr><td>📊 Excel (search)</td><td>Toolbar above results</td><td>All results incl. phone/email/WhatsApp/address columns</td></tr>
@@ -171,7 +186,7 @@
     <tr><td>📄 Word / ⬇ CSV / 📧 Email</td><td>Toolbar &amp; cards</td><td>Alternative formats for single cards or full result lists</td></tr>
   </table>
 
-  <h2 id="trouble">12. Troubleshooting</h2>
+  <h2 id="trouble">13. Troubleshooting</h2>
   <table>
     <tr><th>Problem</th><th>What to do</th></tr>
     <tr><td>Page looks old / a button is missing</td><td>Press <span class="key">Ctrl</span>+<span class="key">F5</span> (hard refresh).</td></tr>

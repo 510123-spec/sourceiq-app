@@ -52,6 +52,7 @@ function setMode(mode){
   document.getElementById('tradeSearchBox').style.display     = mode === 'trade'     ? 'flex' : 'none';
   document.getElementById('marketSearchBox').style.display    = mode === 'market'    ? 'flex' : 'none';
   document.getElementById('buyersSearchBox').style.display    = mode === 'buyers'    ? 'flex' : 'none';
+  document.getElementById('quotesSearchBox').style.display    = mode === 'quotes'    ? 'flex' : 'none';
   const hints = {
     product:   'Search by product, by country, or both — leave either field blank to broaden the search.',
     company:   'Search for a specific company by name to find its details directly.',
@@ -61,7 +62,8 @@ function setMode(mode){
     trade:     'Find importers, exporters, and trade data by product or HS code — with optional country and direction filters.',
     market:    'Explore market size, key players, trends, and industry outlook for any sector or region.',
     buyers:    'Find companies that BUY your product — importers, retailers, wholesalers, and procurement teams by country.',
-    price:     'Enter an exact product model to compare prices across trusted retailers in your region — lowest price, deals, and an AI buying verdict.'
+    price:     'Enter an exact product model to compare prices across trusted retailers in your region — lowest price, deals, and an AI buying verdict.',
+    quotes:    'Upload 2–6 supplier quotations (PDF, Word, or photos) for the same product — AI extracts price, terms, and specs, then recommends who to go with.'
   };
   document.getElementById('searchHint').textContent = hints[mode];
   if(mode !== 'image'){

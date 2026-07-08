@@ -158,6 +158,10 @@
       <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Market
     </button>
+    <button class="mode-tab" data-mode="quotes" onclick="setMode('quotes')" role="tab" aria-selected="false" aria-controls="quotesSearchBox">
+      <svg class="tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/><line x1="9" y1="11" x2="12" y2="11"/></svg>
+      Quotes
+    </button>
   </div>
 
   <div class="search-box" id="productSearchBox" role="tabpanel" aria-labelledby="tab-product">
@@ -958,6 +962,29 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
       Search Market
     </button>
+  </div>
+
+  <div class="search-box" id="quotesSearchBox" style="display:none; flex-direction:column; align-items:stretch; gap:12px;" role="tabpanel">
+    <div class="search-field" style="max-width:100%;">
+      <label for="quotesProduct">Product being quoted (optional, improves accuracy)</label>
+      <input id="quotesProduct" type="text" placeholder='e.g. "Copper cathode Grade A"' autocomplete="off" />
+    </div>
+    <div class="upload-zone quotes-upload-zone" id="quotesUploadZone"
+         onclick="document.getElementById('quotesFileInput').click()"
+         ondragover="event.preventDefault();this.classList.add('dragover')"
+         ondragleave="this.classList.remove('dragover')"
+         ondrop="handleQuotesDrop(event)">
+      <div class="uz-icon">📑</div>
+      <div class="uz-label">Click to upload or drag &amp; drop 2–6 quotations</div>
+      <div class="uz-hint">PDF, Word (.docx), or a photo/scan (JPG, PNG) of each quote</div>
+    </div>
+    <input type="file" id="quotesFileInput" accept=".pdf,.docx,.txt,image/*" multiple style="display:none" onchange="handleQuotesFiles(this.files)">
+    <div id="quotesFileList"></div>
+    <button id="quotesCompareBtn" onclick="runQuoteComparison()" disabled aria-label="Compare quotations">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:inline;vertical-align:-3px;margin-right:6px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Compare Quotations
+    </button>
+    <div id="quotesResultArea"></div>
   </div>
 
 </div>

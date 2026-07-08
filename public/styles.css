@@ -2447,13 +2447,16 @@ h1{ color:var(--biz-text) !important; }
 }
 #searchBtn, #companySearchBtn, #personSearchBtn, #buyersSearchBtn,
 #stockSearchBtn, #tradeSearchBtn, #marketSearchBtn, #priceSearchBtn,
+#quotesCompareBtn,
 .id-search-btn{
   background:var(--biz-blue) !important; border-radius:8px !important;
 }
 #searchBtn:hover, #companySearchBtn:hover, #personSearchBtn:hover, #buyersSearchBtn:hover,
-#stockSearchBtn:hover, #tradeSearchBtn:hover, #marketSearchBtn:hover, #priceSearchBtn:hover{
+#stockSearchBtn:hover, #tradeSearchBtn:hover, #marketSearchBtn:hover, #priceSearchBtn:hover,
+#quotesCompareBtn:hover{
   background:var(--biz-blue-dark) !important; box-shadow:0 2px 8px rgba(37,99,235,.3) !important;
 }
+#quotesCompareBtn:disabled{ background:#9ca3af !important; cursor:not-allowed; box-shadow:none !important; }
 .topbar-logo{ background:var(--biz-blue) !important; }
 #compareBar{ background:#1f2937 !important; }
 #compareBar button{ background:var(--biz-blue) !important; }
@@ -2666,3 +2669,40 @@ h1{ color:var(--biz-text) !important; }
   padding:3px;
 }
 .topbar-logo img{ display:block; }
+
+/* ============ Quote Comparison ============ */
+#quotesFileList{ display:flex; flex-wrap:wrap; gap:8px; }
+.quote-file-chip{
+  display:flex; align-items:center; gap:7px;
+  border:1px solid var(--biz-border); background:#fff; border-radius:9px;
+  padding:6px 10px; font-size:12.5px; color:#374151;
+}
+.qfc-icon{ font-size:15px; }
+.qfc-name{ max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.qfc-remove{ border:none; background:none; color:#9ca3af; cursor:pointer; font-size:12px; padding:0 2px; }
+.qfc-remove:hover{ color:#dc2626; }
+
+.qcmp-table-wrap{ overflow-x:auto; border:1px solid var(--biz-border); border-radius:12px; }
+.qcmp-table{ border-collapse:collapse; width:100%; font-size:12.5px; min-width:520px; }
+.qcmp-table th, .qcmp-table td{ border:1px solid var(--biz-border); padding:8px 12px; text-align:left; vertical-align:top; }
+.qcmp-table th{ background:#f9fafb; }
+.qcmp-field{ font-weight:700; color:#4b5563; white-space:nowrap; background:#f9fafb; }
+.qcmp-filename{ font-weight:700; color:#111827; font-size:12.5px; word-break:break-word; }
+.qcmp-file-error{ color:#b91c1c; font-size:11px; font-weight:500; margin-top:3px; }
+th.qcmp-winner, td.qcmp-winner{ background:#f0fdf4 !important; }
+.qcmp-winner-badge{ background:#10b981; color:#fff; border-radius:7px; padding:2px 8px; font-size:10.5px; font-weight:800; margin-bottom:4px; display:inline-block; }
+.qcmp-redflags{ margin-top:8px; font-size:12.5px; color:#b45309; display:flex; flex-direction:column; gap:3px; }
+
+/* Quote comparison action buttons live inside .search-box (quotesSearchBox),
+   which has a legacy ".search-box button" rule (purple gradient, higher
+   specificity than .saved-export-btn alone) — override it explicitly here. */
+#quotesResultArea .saved-export-btn{
+  background:#fff !important; color:var(--biz-blue) !important;
+  border:1px solid var(--biz-border) !important; box-shadow:none !important;
+  padding:8px 16px !important; font-family:inherit !important; font-weight:600 !important;
+  align-self:auto !important; letter-spacing:normal !important;
+}
+#quotesResultArea .saved-export-btn:hover{
+  background:#f3f6ff !important; transform:none !important; box-shadow:none !important;
+}
+#quotesResultArea .saved-export-btn::before{ display:none !important; }

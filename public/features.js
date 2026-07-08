@@ -1480,5 +1480,190 @@ async function annotateKnownCompanies(){
   }catch(e){}
 }
 
+// ═══════════════ Quote Comparison ═══════════════
+let quotesSelectedFiles = [];
+
+function handleQuotesDrop(e){
+  e.preventDefault();
+  document.getElementById('quotesUploadZone').classList.remove('dragover');
+  handleQuotesFiles(e.dataTransfer.files);
+}
+
+function handleQuotesFiles(fileList){
+  const incoming = [...fileList];
+  const allowedExt = /\.(pdf|docx|txt|jpe?g|png|webp)$/i;
+  for(const f of incoming){
+    if(quotesSelectedFiles.length >= 6) break;
+    if(!allowedExt.test(f.name) && !f.type.startsWith('image/')){
+      alert('Skipped "' + f.name + '" — please use PDF, .docx, .txt, or an image.');
+      continue;
+    }
+    quotesSelectedFiles.push(f);
+  }
+  renderQuotesFileList();
+}
+
+function removeQuoteFile(idx){
+  quotesSelectedFiles.splice(idx, 1);
+  renderQuotesFileList();
+}
+
+function renderQuotesFileList(){
+  const el = document.getElementById('quotesFileList');
+  const btn = document.getElementById('quotesCompareBtn');
+  if(!quotesSelectedFiles.length){
+    el.innerHTML = '';
+    btn.disabled = true;
+    return;
+  }
+  el.innerHTML = quotesSelectedFiles.map((f, i) => `
+    <div class="quote-file-chip">
+      <span class="qfc-icon">${/\.pdf$/i.test(f.name) ? '📄' : /\.docx?$/i.test(f.name) ? '📝' : /\.txt$/i.test(f.name) ? '📃' : '🖼️'}</span>
+      <span class="qfc-name">${escapeHtml(f.name)}</span>
+      <button class="qfc-remove" onclick="removeQuoteFile(${i})" title="Remove">✕</button>
+    </div>`).join('');
+  btn.disabled = quotesSelectedFiles.length < 2;
+  btn.title = quotesSelectedFiles.length < 2 ? 'Add at least 2 quotations to compare' : '';
+}
+
+async function runQuoteComparison(){
+  const btn = document.getElementById('quotesCompareBtn');
+  const result = document.getElementById('quotesResultArea');
+  if(quotesSelectedFiles.length < 2){ alert('Upload at least 2 quotations first.'); return; }
+
+  btn.disabled = true; const orig = btn.innerHTML; btn.textContent = '⏳ Reading quotations…';
+  result.innerHTML = '<p class="empty" style="padding:14px 0">Extracting details from ' + quotesSelectedFiles.length + ' file(s) — this can take up to a minute…</p>';
+
+  try{
+    const fd = new FormData();
+    fd.append('product', document.getElementById('quotesProduct').value.trim());
+    quotesSelectedFiles.forEach(f => fd.append('files', f));
+    const res = await fetch('/api/quotes/compare', { method: 'POST', body: fd });
+    const data = await res.json();
+    if(!res.ok || data.error){ result.innerHTML = `<p class="error">⚠️ ${escapeHtml(data.error || 'Comparison failed.')}</p>`; return; }
+    window._lastQuoteComparison = data;
+    renderQuoteComparison(data);
+  }catch(e){
+    result.innerHTML = `<p class="error">⚠️ ${escapeHtml(e.message)}</p>`;
+  }finally{
+    btn.disabled = quotesSelectedFiles.length < 2; btn.innerHTML = orig;
+  }
+}
+
+function renderQuoteComparison(data){
+  const result = document.getElementById('quotesResultArea');
+  const quotes = data.quotes || [];
+  const rec = data.recommendation;
+  const winnerIdx = rec && typeof rec.winner === 'number' ? rec.winner - 1 : -1;
+
+  const fields = [
+    ['Supplier', q => q.supplierName],
+    ['Price', q => q.price != null ? (q.price + ' ' + (q.currency || '')) : null],
+    ['≈ USD', q => q.priceUSD != null ? '$' + q.priceUSD.toLocaleString() : null],
+    ['Unit', q => q.unit],
+    ['Quantity / MOQ', q => q.quantity],
+    ['Incoterm', q => q.incoterm],
+    ['Payment Terms', q => q.paymentTerms],
+    ['Lead Time', q => q.leadTime],
+    ['Valid Until', q => q.validUntil],
+    ['Warranty / Certs', q => q.warranty],
+    ['Specs', q => q.specs],
+    ['Known Supplier?', q => q.known ? '🧠 ' + (q.known.trustRating || 'seen before') + (q.known.trustScore != null ? ' ' + q.known.trustScore + '/100' : '') : null]
+  ];
+
+  const head = quotes.map((q, i) => `
+    <th class="${i === winnerIdx ? 'qcmp-winner' : ''}">
+      ${i === winnerIdx ? '<div class="qcmp-winner-badge">⭐ Recommended</div>' : ''}
+      <div class="qcmp-filename">${escapeHtml(q.fileName)}</div>
+      ${q.error ? `<div class="qcmp-file-error">⚠️ ${escapeHtml(q.error)}</div>` : ''}
+    </th>`).join('');
+
+  const rows = fields.map(([label, fn]) => `
+    <tr>
+      <td class="qcmp-field">${label}</td>
+      ${quotes.map((q, i) => `<td class="${i === winnerIdx ? 'qcmp-winner' : ''}">${q.error ? '—' : escapeHtml(String(fn(q) ?? '—'))}</td>`).join('')}
+    </tr>`).join('');
+
+  const recHtml = rec ? (rec.error ? `<div class="error" style="margin-top:14px">⚠️ ${escapeHtml(rec.error)}</div>` : `
+    <div class="person-profile-panel" style="margin-top:16px">
+      <div class="profile-head">💡 <strong>Recommendation</strong>${winnerIdx >= 0 ? `<span class="profile-role">${escapeHtml(quotes[winnerIdx].supplierName || quotes[winnerIdx].fileName)}</span>` : ''}${rec.priceRange ? `<span class="reg-cell"><span class="reg-label">Range</span><strong>${escapeHtml(rec.priceRange)}</strong></span>` : ''}</div>
+      <p class="profile-summary">${escapeHtml(rec.reasoning || '')}</p>
+      ${(rec.redFlags && rec.redFlags.length) ? `<div class="qcmp-redflags">${rec.redFlags.map(f => `<div>🚩 ${escapeHtml(f)}</div>`).join('')}</div>` : ''}
+      <div class="profile-note">Based only on the extracted quote data above — always verify final terms directly with the supplier before ordering.</div>
+    </div>`) : '';
+
+  const saveButtons = quotes.map((q, i) => q.error || !q.supplierName ? '' :
+    `<button class="saved-export-btn" onclick="saveQuoteWinner(${i})">⭐ Save ${escapeHtml(q.supplierName)} to shortlist</button>`).join('');
+
+  result.innerHTML = `
+    <div class="qcmp-table-wrap">
+      <table class="qcmp-table"><thead><tr><th></th>${head}</tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    ${recHtml}
+    <div class="mk-actions" style="margin-top:12px">
+      ${saveButtons}
+      <button class="saved-export-btn" onclick="exportQuoteComparisonWord()">📄 Export comparison to Word</button>
+    </div>`;
+}
+
+async function saveQuoteWinner(idx){
+  const q = (window._lastQuoteComparison?.quotes || [])[idx];
+  if(!q || !q.supplierName) return;
+  const link = 'quote://' + encodeURIComponent(q.supplierName) + '/' + Date.now();
+  await fetch('/api/saved', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      link, title: q.supplierName,
+      snippet: 'From quotation comparison — ' + (q.price != null ? q.price + ' ' + (q.currency||'') : '')
+    })
+  });
+  // /api/saved only accepts notes via PATCH (POST always creates with empty notes) —
+  // follow up so the quote's price/terms context isn't lost from the shortlist.
+  const notes = [
+    q.price != null ? 'Quoted: ' + q.price + ' ' + (q.currency||'') + (q.unit ? ' ' + q.unit : '') : null,
+    q.incoterm, q.paymentTerms, q.leadTime
+  ].filter(Boolean).join(' · ');
+  if(notes){
+    await fetch('/api/saved', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ link, notes })
+    });
+  }
+  alert('Saved "' + q.supplierName + '" to your shortlist.');
+  loadSavedLinks();
+}
+
+function exportQuoteComparisonWord(){
+  const data = window._lastQuoteComparison;
+  if(!data) return;
+  const esc = escapeHtml;
+  const quotes = data.quotes || [];
+  const rec = data.recommendation;
+  const winnerIdx = rec && typeof rec.winner === 'number' ? rec.winner - 1 : -1;
+  const rowsHtml = quotes.map((q, i) => `
+    <tr${i===winnerIdx ? ' style="background:#eaf7ee"' : ''}>
+      <td>${esc(q.fileName)}${i===winnerIdx ? ' ⭐' : ''}</td>
+      <td>${esc(q.supplierName||'—')}</td>
+      <td>${q.price!=null ? esc(q.price+' '+(q.currency||'')) : '—'}</td>
+      <td>${q.priceUSD!=null ? '$'+q.priceUSD.toLocaleString() : '—'}</td>
+      <td>${esc(q.incoterm||'—')}</td>
+      <td>${esc(q.paymentTerms||'—')}</td>
+      <td>${esc(q.leadTime||'—')}</td>
+    </tr>`).join('');
+  const html = `<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8">
+<style>body{font-family:Calibri,Arial,sans-serif;font-size:11pt;color:#222;margin:40px}h1{font-size:18pt;color:#1a2040}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 9px;font-size:10pt}th{background:#f3f3f3}</style></head><body>
+<h1>Quotation Comparison — ${esc(data.product || 'Product')}</h1>
+<p style="color:#666;font-size:10pt">Generated by Erez Assistant on ${new Date().toLocaleDateString()}</p>
+<table><tr><th>File</th><th>Supplier</th><th>Price</th><th>≈ USD</th><th>Incoterm</th><th>Payment</th><th>Lead Time</th></tr>${rowsHtml}</table>
+${rec && !rec.error ? `<h2 style="font-size:13pt;margin-top:20px">Recommendation</h2><p>${esc(rec.reasoning||'')}</p>` : ''}
+</body></html>`;
+  const blob = new Blob(['﻿' + html], { type: 'application/msword' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (data.product || 'quote_comparison').replace(/[^a-z0-9]+/gi,'_').slice(0,40) + '.doc';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 // Load the shared shortlist state on startup
 loadSavedLinks();
