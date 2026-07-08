@@ -1038,8 +1038,9 @@ function toggleCopilot(){
       <button class="modal-close" onclick="document.getElementById('copilotBox').remove()">✕</button>
     </div>
     <div class="cp-msgs" id="cpMsgs">
-      <div class="cp-msg cp-bot">Ask me anything — I can search suppliers and buyers, check trust, read your shortlist and margins, review today's leads, and save or update companies for you.<br><br>
-      <em>Try: "Which of my deals are going stale?" or "Find aluminium scrap buyers in India and save the best two."</em></div>
+      <div class="cp-msg cp-bot">Ask me anything — I answer trade questions AND work inside the app for you.<br><br>
+      <strong>Trade knowledge:</strong> <em>"What's the HS code for copper wire scrap?" · "Explain FOB vs CIF" · "What documents do I need to export copper cathode to India?" · "How does a Letter of Credit protect me?"</em><br><br>
+      <strong>Do things:</strong> <em>"Which of my deals are going stale?" · "Find aluminium scrap buyers in India and save the best two."</em></div>
     </div>
     <div class="cp-input-row">
       <input id="cpInput" type="text" placeholder="Ask the Copilot…" onkeydown="if(event.key==='Enter')sendCopilot()">
